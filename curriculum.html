@@ -7,6 +7,164 @@
     <link rel="stylesheet" href="style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+        /* Schedule specific styles */
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            min-width: 700px;
+        }
+        .day-column {
+            background: var(--bg);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-soft);
+            overflow: hidden;
+            min-width: 80px;
+        }
+        .day-column.rest-day {
+            opacity: 0.4;
+            background: var(--panel-alt);
+        }
+        .day-header {
+            background: var(--panel-alt);
+            padding: 6px 4px;
+            text-align: center;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border-soft);
+            text-transform: uppercase;
+        }
+        .day-slots {
+            display: flex;
+            flex-direction: column;
+            min-height: 400px;
+            padding: 2px;
+        }
+        .time-slot {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 2px 4px;
+            border-bottom: 1px solid var(--border-soft);
+            cursor: pointer;
+            font-size: 0.6rem;
+            transition: background 0.15s;
+            position: relative;
+            gap: 4px;
+        }
+        .time-slot:hover {
+            background: var(--panel-alt);
+        }
+        .time-slot .slot-time {
+            font-size: 0.45rem;
+            color: var(--text-dim);
+            opacity: 0.6;
+            min-width: 30px;
+        }
+        .time-slot .slot-label {
+            font-size: 0.55rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            padding: 0 2px;
+        }
+        .time-slot.empty {
+            color: var(--text-dim);
+            opacity: 0.3;
+        }
+        .time-slot.empty .slot-label {
+            color: var(--text-dim);
+        }
+        .time-slot.occupied {
+            background: var(--accent-soft);
+            border-left: 3px solid var(--accent);
+            color: var(--text);
+            font-weight: 500;
+        }
+        .time-slot.occupied .slot-label {
+            color: var(--text);
+            font-weight: 500;
+        }
+        
+        .schedule-sidebar {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        @media (max-width: 768px) {
+            .schedule-sidebar {
+                grid-template-columns: 1fr;
+            }
+            .schedule-grid {
+                min-width: 500px;
+                padding: 4px;
+            }
+            .day-column {
+                min-width: 50px;
+            }
+            .day-slots {
+                min-height: 250px;
+            }
+            .time-slot {
+                min-height: 22px;
+                font-size: 0.5rem;
+            }
+            .time-slot .slot-time {
+                font-size: 0.4rem;
+                min-width: 20px;
+            }
+            .time-slot .slot-label {
+                font-size: 0.45rem;
+            }
+        }
+        .available-discipline {
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            background: var(--panel-alt);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            border-left: 2px solid var(--accent);
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .available-discipline .hours {
+            color: var(--text-dim);
+            font-size: 0.6rem;
+        }
+        .available-discipline.full {
+            opacity: 0.4;
+            border-left-color: var(--border);
+        }
+        .rest-day-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 4px 8px;
+        }
+        .rest-day-controls label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .rest-day-controls input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: auto;
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -28,7 +186,151 @@
         </div>
     </header>
 
-    <main id="app-container"></main>
+    <main id="app-container">
+        <div class="tab-container">
+            <div class="tab-nav">
+                <button class="tab-btn active" data-tab="disciplines">Disciplines</button>
+                <button class="tab-btn" data-tab="schedule">📅 Schedule</button>
+                <button class="tab-btn" data-tab="grades">Grades</button>
+                <button class="tab-btn" data-tab="ranking">Ranking</button>
+            </div>
+            <div class="tab-content">
+                <!-- TAB 1: Disciplines -->
+                <div id="tab-disciplines" class="tab-panel active">
+                    <div class="page-header">
+                        <h2>Disciplines</h2>
+                        <button id="add-discipline-btn" class="primary">+ Add Discipline</button>
+                    </div>
+                    <div id="discipline-list">
+                        <div class="list-header">
+                            <span>Discipline</span>
+                            <span>Instructor</span>
+                            <span>Weeks</span>
+                            <span>Hours/Week</span>
+                            <span>Students</span>
+                            <span>Actions</span>
+                        </div>
+                        <div id="disciplines-container"></div>
+                    </div>
+                    <!-- Discipline Form -->
+                    <div id="discipline-form" class="form-container hidden">
+                        <h3 id="discipline-form-title">Add Discipline</h3>
+                        <form id="discipline-form-inner">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Discipline Name *</label>
+                                    <input type="text" id="discipline-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Curriculum (free text)</label>
+                                    <input type="text" id="discipline-curriculum" placeholder="e.g., Mathematics, Physics...">
+                                </div>
+                                <div class="form-group">
+                                    <label>Start Week</label>
+                                    <input type="number" id="discipline-start-week" min="1" max="52">
+                                </div>
+                                <div class="form-group">
+                                    <label>End Week</label>
+                                    <input type="number" id="discipline-end-week" min="1" max="52">
+                                </div>
+                                <div class="form-group">
+                                    <label>Weekly Hours</label>
+                                    <input type="number" id="discipline-hours" min="1" max="40" step="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label>Instructor</label>
+                                    <select id="discipline-instructor">
+                                        <option value="">Select instructor...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Max Students per Class</label>
+                                    <input type="number" id="discipline-students" min="1" max="100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Weight (for grade calculation)</label>
+                                    <input type="number" id="discipline-weight" min="0.1" max="10" step="0.1" value="1">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Grading System</label>
+                                    <div id="grading-system-container">
+                                        <div class="grading-entry">
+                                            <input type="text" class="grading-letter" placeholder="Letter" style="width:80px;">
+                                            <input type="number" class="grading-min" placeholder="Min %" min="0" max="100" style="width:80px;">
+                                            <input type="number" class="grading-max" placeholder="Max %" min="0" max="100" style="width:80px;">
+                                            <button type="button" class="small danger remove-grading">✕</button>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="add-grading-btn" class="small" style="margin-top:8px;">+ Add Grade Level</button>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="cancel-discipline-btn" class="secondary">Cancel</button>
+                                <button type="submit" id="save-discipline-btn" class="primary">Save Discipline</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Schedule -->
+                <div id="tab-schedule" class="tab-panel">
+                    <div id="schedule-container"></div>
+                </div>
+
+                <!-- TAB 3: Grades -->
+                <div id="tab-grades" class="tab-panel">
+                    <div id="grades-view">
+                        <div class="page-header">
+                            <h2>Grades</h2>
+                        </div>
+                        <div class="grades-controls">
+                            <div class="student-selector">
+                                <label for="grades-student">Student:</label>
+                                <select id="grades-student">
+                                    <option value="">Select a student...</option>
+                                </select>
+                            </div>
+                            <div class="week-nav">
+                                <button id="prev-grade-week" class="small">← Prev</button>
+                                <span id="grade-week-display" style="font-weight:600;min-width:80px;text-align:center;">Week 1</span>
+                                <button id="next-grade-week" class="small">Next →</button>
+                            </div>
+                        </div>
+                        <div id="grades-container">
+                            <p class="empty-state">Select a student to view and manage grades</p>
+                        </div>
+                        <div class="grades-summary">
+                            <h3>Weekly Summary</h3>
+                            <div id="grades-summary-content">
+                                <p class="empty-state">No grades data available</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: Ranking -->
+                <div id="tab-ranking" class="tab-panel">
+                    <div id="ranking-view">
+                        <div class="page-header">
+                            <h2>Ranking</h2>
+                        </div>
+                        <div class="ranking-controls">
+                            <div class="week-nav">
+                                <button id="prev-rank-week" class="small">← Prev</button>
+                                <span id="rank-week-display" style="font-weight:600;min-width:80px;text-align:center;">Week 1</span>
+                                <button id="next-rank-week" class="small">Next →</button>
+                            </div>
+                            <button id="auto-rank-btn" class="small primary">Auto-Rank</button>
+                            <button id="save-rankings-btn" class="small primary">Save Rankings</button>
+                        </div>
+                        <div id="ranking-container">
+                            <p class="empty-state">No ranking data available for this week</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
 
     <div id="modal-container" class="modal hidden">
         <div class="modal-content">
@@ -44,6 +346,102 @@
     <script src="js/utils.js"></script>
     <script src="js/export.js"></script>
     <script src="js/curriculum.js"></script>
+    <script src="js/schedule.js"></script>
     <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait for data to load
+            var checkData = setInterval(function() {
+                if (typeof data !== 'undefined' && data) {
+                    clearInterval(checkData);
+                    initCurriculumPage();
+                }
+            }, 200);
+        });
+
+        function initCurriculumPage() {
+            // Initialize tabs
+            var tabs = document.querySelectorAll('.tab-btn');
+            var panels = {
+                disciplines: document.getElementById('tab-disciplines'),
+                schedule: document.getElementById('tab-schedule'),
+                grades: document.getElementById('tab-grades'),
+                ranking: document.getElementById('tab-ranking')
+            };
+
+            // Hide all panels
+            for (var key in panels) {
+                if (panels[key]) {
+                    panels[key].style.display = 'none';
+                    panels[key].classList.remove('active');
+                }
+            }
+
+            // Show active tab
+            var activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab) {
+                var tabName = activeTab.dataset.tab;
+                if (panels[tabName]) {
+                    panels[tabName].style.display = 'block';
+                    panels[tabName].classList.add('active');
+                }
+            }
+
+            // Tab click handlers
+            tabs.forEach(function(tab) {
+                tab.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    tabs.forEach(function(t) { t.classList.remove('active'); });
+                    this.classList.add('active');
+                    
+                    var tabName = this.dataset.tab;
+                    for (var key in panels) {
+                        if (panels[key]) {
+                            panels[key].style.display = 'none';
+                            panels[key].classList.remove('active');
+                        }
+                    }
+                    if (panels[tabName]) {
+                        panels[tabName].style.display = 'block';
+                        panels[tabName].classList.add('active');
+                    }
+                    
+                    // Refresh content
+                    if (tabName === 'disciplines' && typeof renderDisciplines === 'function') {
+                        renderDisciplines();
+                    } else if (tabName === 'schedule' && typeof renderScheduleView === 'function') {
+                        var container = document.getElementById('schedule-container');
+                        if (container) renderScheduleView(container);
+                    } else if (tabName === 'grades' && typeof renderGrades === 'function') {
+                        renderGrades();
+                    } else if (tabName === 'ranking' && typeof renderRanking === 'function') {
+                        renderRanking();
+                    }
+                });
+            });
+
+            // Render initial content
+            renderDisciplines();
+            
+            // Render schedule
+            var scheduleContainer = document.getElementById('schedule-container');
+            if (scheduleContainer && typeof renderScheduleView === 'function') {
+                renderScheduleView(scheduleContainer);
+            }
+            
+            // Render grades
+            if (typeof renderGrades === 'function') {
+                renderGrades();
+            }
+            
+            // Render ranking
+            if (typeof renderRanking === 'function') {
+                renderRanking();
+            }
+            
+            // Initialize events
+            initCurriculumEvents();
+        }
+    </script>
 </body>
 </html>
