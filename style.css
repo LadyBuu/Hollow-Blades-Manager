@@ -603,6 +603,30 @@ main {
     }
 }
 
+/* Instructor Entry */
+.instructor-entry {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.instructor-entry select {
+    flex: 1;
+    min-width: 120px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: Inter, sans-serif;
+}
+.instructor-entry .remove-instructor {
+    padding: 4px 8px;
+    font-size: 0.65rem;
+}
+
 /* Career Status */
 .career-status-entry,
 .name-history-entry {
@@ -685,6 +709,259 @@ main {
 .filter-section input:focus {
     outline: none;
     border-color: var(--accent);
+}
+
+/* ============================================================
+   SCHEDULE GRID - Mobile scroll support
+   ============================================================ */
+.schedule-grid-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    width: 100%;
+    position: relative;
+}
+
+.schedule-grid-wrapper::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+.schedule-grid-wrapper::-webkit-scrollbar-track {
+    background: var(--bg);
+    border-radius: 4px;
+}
+.schedule-grid-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+    border: 1px solid var(--bg);
+}
+.schedule-grid-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+}
+
+.schedule-grid-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--bg);
+}
+
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    min-width: 700px;
+    width: 100%;
+}
+
+.schedule-sidebar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.day-column {
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-soft);
+    overflow: hidden;
+    min-width: 80px;
+}
+.day-column.rest-day {
+    opacity: 0.4;
+    background: var(--panel-alt);
+}
+.day-header {
+    background: var(--panel-alt);
+    padding: 6px 4px;
+    text-align: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border-soft);
+    text-transform: uppercase;
+}
+.day-slots {
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+    padding: 2px;
+}
+.time-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 2px 4px;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    font-size: 0.6rem;
+    transition: background 0.15s;
+    position: relative;
+    gap: 4px;
+}
+.time-slot:hover {
+    background: var(--panel-alt);
+}
+.time-slot .slot-time {
+    font-size: 0.45rem;
+    color: var(--text-dim);
+    opacity: 0.6;
+    min-width: 30px;
+}
+.time-slot .slot-label {
+    font-size: 0.55rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    padding: 0 2px;
+}
+.time-slot.empty {
+    color: var(--text-dim);
+    opacity: 0.3;
+}
+.time-slot.empty .slot-label {
+    color: var(--text-dim);
+}
+.time-slot.occupied {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    color: var(--text);
+    font-weight: 500;
+}
+.time-slot.occupied .slot-label {
+    color: var(--text);
+    font-weight: 500;
+}
+
+/* Available disciplines */
+.available-discipline {
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    background: var(--panel-alt);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    border-left: 2px solid var(--accent);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.available-discipline .hours {
+    color: var(--text-dim);
+    font-size: 0.6rem;
+}
+.available-discipline.full {
+    opacity: 0.4;
+    border-left-color: var(--border);
+}
+
+/* Rest days */
+.rest-day-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px 8px;
+}
+.rest-day-controls label {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.rest-day-controls input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: auto;
+}
+
+/* Calendar controls */
+.calendar-controls {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.calendar-controls .student-selector,
+.calendar-controls .instructor-selector,
+.calendar-controls .week-nav {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.calendar-controls select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: 'Inter', sans-serif;
+    max-width: 200px;
+}
+.calendar-controls select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Instructor Calendar Grid */
+.instructor-calendar-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(7, 1fr);
+    gap: 2px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    overflow-x: auto;
+    min-width: 700px;
+}
+.instructor-calendar-grid .header-cell {
+    padding: 4px;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    text-align: center;
+    background: var(--panel-alt);
+    border-radius: 4px;
+}
+.instructor-calendar-grid .time-cell {
+    padding: 4px;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+.instructor-calendar-grid .class-cell {
+    background: var(--accent-soft);
+    border-radius: 4px;
+    padding: 4px;
+    font-size: 0.6rem;
+    border-left: 3px solid var(--accent);
+}
+.instructor-calendar-grid .class-cell .class-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+.instructor-calendar-grid .class-cell .student-name {
+    font-size: 0.5rem;
+    color: var(--text-dim);
+}
+.instructor-calendar-grid .empty-cell {
+    padding: 4px;
+    opacity: 0.2;
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    text-align: center;
 }
 
 /* ============================================================
@@ -809,27 +1086,27 @@ main {
 
 /* Discipline List */
 #discipline-list .list-header {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.7fr 1.2fr;
+    grid-template-columns: 1.2fr 0.8fr 1.2fr 0.8fr 0.8fr 0.7fr 1.2fr;
 }
 #discipline-list .list-item {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.7fr 1.2fr;
+    grid-template-columns: 1.2fr 0.8fr 1.2fr 0.8fr 0.8fr 0.7fr 1.2fr;
 }
 @media (max-width: 600px) {
     #discipline-list .list-header {
-        grid-template-columns: 1fr 0.6fr 0.7fr 0.6fr 0.5fr 1fr;
-        font-size: 0.6rem;
-        gap: 4px;
-        padding: 6px 8px;
+        grid-template-columns: 0.8fr 0.5fr 0.8fr 0.5fr 0.5fr 0.4fr 0.8fr;
+        font-size: 0.55rem;
+        gap: 3px;
+        padding: 4px 6px;
     }
     #discipline-list .list-item {
-        grid-template-columns: 1fr 0.6fr 0.7fr 0.6fr 0.5fr 1fr;
-        gap: 4px;
-        padding: 6px 8px;
-        font-size: 0.7rem;
+        grid-template-columns: 0.8fr 0.5fr 0.8fr 0.5fr 0.5fr 0.4fr 0.8fr;
+        gap: 3px;
+        padding: 4px 6px;
+        font-size: 0.65rem;
     }
     #discipline-list .list-item .actions button {
-        font-size: 0.6rem;
-        padding: 2px 6px;
+        font-size: 0.5rem;
+        padding: 1px 4px;
     }
 }
 
@@ -980,7 +1257,7 @@ main {
 }
 
 /* ============================================================
-   CALENDAR - Mobile optimized
+   CALENDAR
    ============================================================ */
 .calendar-controls {
     display: flex;
@@ -1193,44 +1470,6 @@ main {
 .sidebar-section .empty-state {
     padding: 10px;
     font-size: 0.75rem;
-}
-
-.rest-day-controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2px 8px;
-}
-.rest-day-controls label {
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.rest-day-controls input[type="checkbox"] {
-    width: auto;
-    accent-color: var(--accent);
-}
-
-.available-discipline {
-    padding: 3px 6px;
-    margin-bottom: 3px;
-    background: var(--panel-alt);
-    border-radius: 4px;
-    font-size: 0.7rem;
-    border-left: 2px solid var(--accent);
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-.available-discipline .hours {
-    color: var(--text-dim);
-    font-size: 0.6rem;
-}
-.available-discipline.full {
-    opacity: 0.4;
-    border-left-color: var(--border);
 }
 
 /* ============================================================
@@ -2017,33 +2256,137 @@ main {
 }
 
 /* ============================================================
+   CLASS VIEW
+   ============================================================ */
+.class-view-discipline {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+}
+.class-view-discipline .class-group {
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.class-view-discipline .class-group .student-tag {
+    background: var(--panel-alt);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    display: inline-block;
+    margin: 2px;
+}
+
+/* ============================================================
    RESPONSIVE FIXES
    ============================================================ */
-@media (max-width: 480px) {
-    .header-actions button.small {
+@media (max-width: 768px) {
+    .schedule-grid-wrapper {
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+    .schedule-grid {
+        min-width: 550px;
+        padding: 4px;
+        gap: 3px;
+    }
+    .day-column {
+        min-width: 60px;
+    }
+    .day-header {
         font-size: 0.55rem;
-        padding: 2px 6px;
-        min-width: 40px;
+        padding: 4px 2px;
     }
-    .page-header h2 {
-        font-size: 1.1rem;
+    .day-slots {
+        min-height: 250px;
     }
-    .stat-card .stat-number {
-        font-size: 1.4rem;
+    .time-slot {
+        min-height: 24px;
+        font-size: 0.5rem;
+        padding: 1px 2px;
     }
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
+    .time-slot .slot-time {
+        font-size: 0.4rem;
+        min-width: 20px;
     }
-    .stat-card {
+    .time-slot .slot-label {
+        font-size: 0.45rem;
+    }
+    .schedule-sidebar {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .schedule-sidebar .sidebar-section {
         padding: 10px;
     }
-    .stat-card h3 {
-        font-size: 0.65rem;
+    .calendar-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
     }
-    .tab-btn {
-        font-size: 0.65rem;
-        padding: 4px 8px;
+    .calendar-controls .student-selector,
+    .calendar-controls .instructor-selector,
+    .calendar-controls .week-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .calendar-controls select {
+        max-width: 100%;
+        width: 100%;
+    }
+    .instructor-calendar-grid {
+        min-width: 500px;
+    }
+    .rest-day-controls {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .schedule-grid {
+        min-width: 450px;
+        padding: 3px;
+        gap: 2px;
+    }
+    .day-column {
+        min-width: 45px;
+    }
+    .day-header {
+        font-size: 0.45rem;
+        padding: 3px 1px;
+    }
+    .day-slots {
+        min-height: 180px;
+    }
+    .time-slot {
+        min-height: 18px;
+        font-size: 0.4rem;
+        padding: 1px 1px;
+    }
+    .time-slot .slot-time {
+        font-size: 0.35rem;
+        min-width: 15px;
+    }
+    .time-slot .slot-label {
+        font-size: 0.4rem;
+    }
+    .time-slot.occupied {
+        border-left-width: 2px;
+    }
+    .instructor-calendar-grid {
+        min-width: 400px;
+        font-size: 0.5rem;
+    }
+    .instructor-calendar-grid .class-cell {
+        font-size: 0.45rem;
+        padding: 2px;
+    }
+    .instructor-calendar-grid .class-cell .student-name {
+        font-size: 0.4rem;
     }
     .modal-content {
         padding: 12px;
@@ -2057,131 +2400,5 @@ main {
     }
     .form-container {
         padding: 12px;
-    }
-    .calendar-grid {
-        min-width: 280px;
-    }
-    .day-column {
-        min-width: 30px;
-    }
-    .day-header {
-        font-size: 0.5rem;
-        padding: 2px 1px;
-    }
-    .time-slot {
-        min-height: 22px;
-        font-size: 0.5rem;
-    }
-    .time-slot .slot-label {
-        font-size: 0.45rem;
-    }
-    .time-slot .slot-time {
-        font-size: 0.4rem;
-    }
-    .day-slots {
-        min-height: 250px;
-    }
-    .calendar-sidebar {
-        min-width: 100%;
-    }
-    .grades-table {
-        font-size: 0.65rem;
-        min-width: 300px;
-    }
-    .grades-table th,
-    .grades-table td {
-        padding: 3px 4px;
-    }
-    .grades-table .grade-input {
-        width: 40px;
-        font-size: 0.65rem;
-    }
-    .ranking-table {
-        font-size: 0.65rem;
-        min-width: 280px;
-    }
-    .ranking-table th,
-    .ranking-table td {
-        padding: 3px 4px;
-    }
-    .weekly-table {
-        font-size: 0.6rem;
-        min-width: 450px;
-    }
-    .weekly-table th {
-        font-size: 0.5rem;
-        padding: 4px 2px;
-        min-width: 40px;
-    }
-    .weekly-table td {
-        padding: 2px 2px;
-    }
-    .week-cell {
-        min-width: 40px;
-        min-height: 20px;
-    }
-    .week-members .member-name {
-        font-size: 0.5rem;
-        max-width: 45px;
-        padding: 1px 2px;
-    }
-    .weekly-table .team-row td.team-name-cell {
-        min-width: 60px;
-        font-size: 0.6rem;
-        padding-left: 4px;
-    }
-    .weekly-legend {
-        gap: 6px;
-        padding: 6px 8px;
-    }
-    .legend-item {
-        font-size: 0.6rem;
-    }
-    .legend-color {
-        width: 10px;
-        height: 10px;
-    }
-    .list-header {
-        font-size: 0.55rem;
-        padding: 4px 6px;
-        gap: 4px;
-    }
-    .list-item {
-        font-size: 0.65rem;
-        padding: 4px 6px;
-        gap: 4px;
-    }
-    .list-item .actions button {
-        font-size: 0.55rem;
-        padding: 2px 5px;
-    }
-    #discipline-list .list-header,
-    #discipline-list .list-item {
-        grid-template-columns: 0.8fr 0.5fr 0.6fr 0.5fr 0.4fr 0.8fr;
-    }
-    .bracket-match .team {
-        font-size: 0.6rem;
-    }
-    .bracket-round {
-        min-width: 70px;
-        gap: 8px;
-    }
-    .bracket-match {
-        padding: 4px 6px;
-        min-height: 35px;
-    }
-    #bracket-container {
-        gap: 12px;
-        padding: 8px 0;
-    }
-    .team-entry {
-        font-size: 0.7rem;
-        padding: 4px 8px;
-    }
-    .participant-entry,
-    .match-entry,
-    .elimination-entry {
-        font-size: 0.7rem;
-        padding: 4px 8px;
     }
 }
