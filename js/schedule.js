@@ -2,6 +2,9 @@
  * schedule.js - Per-Student Schedule Calendar
  * Handles individual student schedules, week by week
  * Updated to support multiple instructors per discipline
+ * Added duplicate to specific week functionality
+ * Added "Add Classmate" button
+ * Rest days now remove classes from that day
  */
 
 // Schedule state
@@ -143,6 +146,14 @@ function getInstructorNames(discipline) {
 }
 
 /**
+ * Get all students except the current one
+ */
+function getOtherStudents(currentStudentId) {
+    var students = getStudents();
+    return students.filter(function(s) { return String(s.id) !== String(currentStudentId); });
+}
+
+/**
  * Render the schedule view
  */
 function renderScheduleView(container) {
@@ -152,7 +163,7 @@ function renderScheduleView(container) {
         <div class="page-header">
             <h2>Student Schedule</h2>
             <div class="header-actions">
-                <button id="duplicate-schedule-btn" class="primary small">📋 Duplicate to Next Week</button>
+                <button id="duplicate-schedule-btn" class="primary small">📋 Duplicate to Specific Week</button>
                 <button id="clear-schedule-btn" class="danger small">🗑️ Clear Week</button>
             </div>
         </div>
@@ -320,10 +331,10 @@ function initScheduleEvents() {
         });
     }
     
-    // Duplicate schedule - duplicates to week + 1
+    // Duplicate schedule - now opens a modal to select target week
     var duplicateBtn = document.getElementById('duplicate-schedule-btn');
     if (duplicateBtn) {
-        duplicateBtn.addEventListener('click', duplicateSchedule);
+        duplicateBtn.addEventListener('click', showDuplicateModal);
     }
     
     // Clear schedule
@@ -344,6 +355,150 @@ function initScheduleEvents() {
         scheduleState.selectedStudentId = studentSelect.value;
         renderSchedule();
     }
+}
+
+/**
+ * Show duplicate modal with target week selection
+ */
+function showDuplicateModal() {
+    if (!scheduleState.selectedStudentId) {
+        alert('Please select a student first.');
+        return;
+    }
+    
+    var currentWeek = scheduleState.currentWeek;
+    
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:400px;">
+            <div class="modal-header">
+                <h3>Duplicate Schedule</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:12px;">
+                    Copy schedule from <strong>Week ${currentWeek}</strong> to:
+                </p>
+                <div class="form-group">
+                    <label>Target Week:</label>
+                    <input type="number" id="duplicate-target-week" min="1" max="52" value="${currentWeek + 1}" style="width:100%;padding:8px;">
+                </div>
+                <div style="margin-top:8px;font-size:0.75rem;color:var(--text-dim);">
+                    <label><input type="checkbox" id="duplicate-overwrite" checked> Overwrite existing schedule</label>
+                </div>
+                <div class="form-actions" style="margin-top:16px;">
+                    <button type="button" id="cancel-duplicate" class="secondary">Cancel</button>
+                    <button type="button" id="confirm-duplicate" class="primary">Duplicate</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
+    modal.querySelector('#cancel-duplicate').onclick = function() { modal.remove(); };
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.remove();
+    });
+    
+    modal.querySelector('#confirm-duplicate').onclick = function() {
+        var targetWeek = parseInt(document.getElementById('duplicate-target-week').value);
+        var overwrite = document.getElementById('duplicate-overwrite').checked;
+        
+        if (isNaN(targetWeek) || targetWeek < 1 || targetWeek > 52) {
+            alert('Please enter a valid week (1-52).');
+            return;
+        }
+        
+        if (targetWeek === currentWeek) {
+            alert('Target week cannot be the same as the current week.');
+            return;
+        }
+        
+        duplicateScheduleToWeek(currentWeek, targetWeek, overwrite);
+        modal.remove();
+    };
+}
+
+/**
+ * Duplicate schedule from one week to another
+ */
+function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
+    if (!scheduleState.selectedStudentId) {
+        alert('Please select a student first.');
+        return;
+    }
+    
+    var studentId = scheduleState.selectedStudentId;
+    
+    // Check if target week already has data
+    var targetSchedule = getStudentSchedule(studentId, targetWeek);
+    var hasData = false;
+    for (var day in targetSchedule) {
+        for (var hour in targetSchedule[day]) {
+            if (targetSchedule[day][hour]) {
+                hasData = true;
+                break;
+            }
+        }
+        if (hasData) break;
+    }
+    
+    if (hasData && !overwrite) {
+        if (!confirm('Week ' + targetWeek + ' already has classes. Overwrite?')) {
+            return;
+        }
+    }
+    
+    var sourceSchedule = getStudentSchedule(studentId, sourceWeek);
+    var destSchedule = getStudentSchedule(studentId, targetWeek);
+    
+    // Clear destination if overwriting
+    if (overwrite) {
+        for (var day in destSchedule) {
+            delete destSchedule[day];
+        }
+    }
+    
+    // Copy all classes
+    var copiedCount = 0;
+    for (var day in sourceSchedule) {
+        if (!destSchedule[day]) destSchedule[day] = {};
+        for (var hour in sourceSchedule[day]) {
+            // Only copy if slot is empty or we're overwriting
+            if (!destSchedule[day][hour] || overwrite) {
+                destSchedule[day][hour] = sourceSchedule[day][hour];
+                // Also copy instructor assignments
+                var instructorId = getClassInstructor(studentId, sourceWeek, parseInt(day), parseInt(hour));
+                if (instructorId) {
+                    setClassInstructor(studentId, targetWeek, parseInt(day), parseInt(hour), instructorId);
+                }
+                copiedCount++;
+            }
+        }
+    }
+    
+    // Also copy rest days if they exist
+    if (data.curriculum.restDays[sourceWeek]) {
+        if (overwrite || !data.curriculum.restDays[targetWeek]) {
+            data.curriculum.restDays[targetWeek] = data.curriculum.restDays[sourceWeek].slice();
+        }
+    }
+    
+    saveData().then(function() {
+        if (typeof logActivity === 'function') {
+            logActivity('Duplicated schedule from week ' + sourceWeek + ' to ' + targetWeek + ' (' + copiedCount + ' classes)');
+        }
+        // Move to the duplicated week
+        scheduleState.currentWeek = targetWeek;
+        renderSchedule();
+        alert('Schedule duplicated from week ' + sourceWeek + ' to week ' + targetWeek + ' (' + copiedCount + ' classes copied)');
+    }).catch(function(err) {
+        console.error('Failed to save:', err);
+        alert('Failed to duplicate schedule.');
+    });
 }
 
 /**
@@ -403,6 +558,11 @@ function renderSchedule() {
             restMsg.style.textAlign = 'center';
             restMsg.textContent = '🛑 Rest Day';
             slots.appendChild(restMsg);
+            
+            // Remove any classes on this day from the schedule
+            if (schedule[day]) {
+                delete schedule[day];
+            }
             return;
         }
         
@@ -607,7 +767,7 @@ function updateScheduleSidebar() {
         }
     }
     
-    // Hours summary
+    // Hours summary - recalculate based on actual schedule (rest days already removed classes)
     var usedEl = document.getElementById('schedule-hours-used');
     var totalEl = document.getElementById('schedule-hours-total');
     if (usedEl && totalEl) {
@@ -818,7 +978,7 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
 }
 
 /**
- * Show class details with instructor info
+ * Show class details with instructor info and "Add Classmate" button
  */
 function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
     var discipline = getDiscipline(disciplineId);
@@ -842,6 +1002,9 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
     if (hour === 12) { ampm = 'PM'; }
     var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
+    // Get other students for the "Add Classmate" feature
+    var otherStudents = getOtherStudents(studentId);
+    
     var modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
@@ -857,6 +1020,7 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 <div class="detail-row"><span class="label">Curriculum:</span> <span>${discipline.curriculum || 'N/A'}</span></div>
                 <div class="detail-row"><span class="label">Day/Time:</span> <span>${dayNames[day]} at ${hourDisplay}:00 ${ampm}</span></div>
                 <div class="detail-row"><span class="label">Week:</span> <span>${week}</span></div>
+                
                 ${discipline.instructorIds && discipline.instructorIds.length > 1 ? `
                 <div style="margin-top:12px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
                     <label style="font-size:0.75rem;color:var(--text-dim);">Change Instructor:</label>
@@ -875,6 +1039,33 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                     <button id="change-instructor-btn" class="small primary" style="margin-top:4px;">Update Instructor</button>
                 </div>
                 ` : ''}
+                
+                <!-- Add Classmate Section -->
+                ${otherStudents.length > 0 ? `
+                <div style="margin-top:12px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
+                    <label style="font-size:0.75rem;color:var(--text-dim);">Add Classmate:</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+                        <select id="add-classmate-select" style="flex:1;min-width:120px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                            <option value="">Select a student...</option>
+                            ${otherStudents.map(function(s) {
+                                var name = [s.firstName, s.lastName].filter(function(n) { return n; }).join(' ');
+                                // Check if this student already has this class
+                                var schedule = getStudentSchedule(s.id, week);
+                                var hasClass = false;
+                                if (schedule[day] && schedule[day][hour] === disciplineId) {
+                                    hasClass = true;
+                                }
+                                return '<option value="' + s.id + '" ' + (hasClass ? 'disabled style="opacity:0.4;"' : '') + '>' + name + (hasClass ? ' (already has this class)' : '') + '</option>';
+                            }).join('')}
+                        </select>
+                        <button id="add-classmate-btn" class="primary small">Add Classmate</button>
+                    </div>
+                    <div style="font-size:0.6rem;color:var(--text-dim);margin-top:4px;">
+                        Copies this exact class to the selected student's schedule at the same day/time.
+                    </div>
+                </div>
+                ` : '<div style="margin-top:12px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);"><span style="color:var(--text-dim);font-size:0.75rem;">No other students available to add as classmates.</span></div>'}
+                
                 <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="button" id="remove-class-detail" class="danger small">Remove from Schedule</button>
                     <button type="button" id="close-detail" class="secondary small">Close</button>
@@ -920,6 +1111,48 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
             });
         });
     }
+    
+    // Add Classmate functionality
+    var addClassmateBtn = document.getElementById('add-classmate-btn');
+    if (addClassmateBtn) {
+        addClassmateBtn.addEventListener('click', function() {
+            var targetStudentId = document.getElementById('add-classmate-select').value;
+            if (!targetStudentId) {
+                alert('Please select a student to add as a classmate.');
+                return;
+            }
+            
+            // Check if the target student already has this class
+            var targetSchedule = getStudentSchedule(targetStudentId, week);
+            if (targetSchedule[day] && targetSchedule[day][hour]) {
+                alert('This student already has a class at this time.');
+                return;
+            }
+            
+            // Add the class to the target student
+            if (!targetSchedule[day]) targetSchedule[day] = {};
+            targetSchedule[day][hour] = disciplineId;
+            
+            // Copy the instructor if one is assigned
+            if (instructorId) {
+                setClassInstructor(targetStudentId, week, day, hour, instructorId);
+            }
+            
+            saveData().then(function() {
+                var targetStudent = data.characters.find(function(c) { return String(c.id) === String(targetStudentId); });
+                var targetName = targetStudent ? [targetStudent.firstName, targetStudent.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+                if (typeof logActivity === 'function') {
+                    logActivity('Added classmate ' + targetName + ' to ' + discipline.name + ' at ' + dayNames[day] + ' ' + hourDisplay + ':00 ' + ampm);
+                }
+                modal.remove();
+                renderSchedule();
+                alert('Class added to ' + targetName + '\'s schedule!');
+            }).catch(function(err) {
+                console.error('Failed to save:', err);
+                alert('Failed to add classmate.');
+            });
+        });
+    }
 }
 
 /**
@@ -937,58 +1170,6 @@ function removeScheduleClass(studentId, week, day, hour) {
             logActivity('Removed class from schedule');
         }
     }
-}
-
-/**
- * Duplicate schedule to next week
- */
-function duplicateSchedule() {
-    if (!scheduleState.selectedStudentId) {
-        alert('Please select a student first.');
-        return;
-    }
-    
-    var currentWeek = scheduleState.currentWeek;
-    var nextWeek = currentWeek + 1;
-    
-    if (nextWeek > 52) {
-        alert('Cannot duplicate beyond week 52.');
-        return;
-    }
-    
-    var currentSchedule = getStudentSchedule(scheduleState.selectedStudentId, currentWeek);
-    var nextSchedule = getStudentSchedule(scheduleState.selectedStudentId, nextWeek);
-    
-    // Deep copy the schedule
-    for (var day in currentSchedule) {
-        if (!nextSchedule[day]) nextSchedule[day] = {};
-        for (var hour in currentSchedule[day]) {
-            nextSchedule[day][hour] = currentSchedule[day][hour];
-            // Also copy instructor assignments
-            var instructorId = getClassInstructor(scheduleState.selectedStudentId, currentWeek, parseInt(day), parseInt(hour));
-            if (instructorId) {
-                setClassInstructor(scheduleState.selectedStudentId, nextWeek, parseInt(day), parseInt(hour), instructorId);
-            }
-        }
-    }
-    
-    // Also copy rest days if they exist
-    if (data.curriculum.restDays[currentWeek]) {
-        data.curriculum.restDays[nextWeek] = data.curriculum.restDays[currentWeek].slice();
-    }
-    
-    saveData().then(function() {
-        if (typeof logActivity === 'function') {
-            logActivity('Duplicated schedule from week ' + currentWeek + ' to ' + nextWeek);
-        }
-        // Move to the duplicated week
-        scheduleState.currentWeek = nextWeek;
-        renderSchedule();
-        alert('Schedule duplicated to week ' + nextWeek);
-    }).catch(function(err) {
-        console.error('Failed to save:', err);
-        alert('Failed to duplicate schedule.');
-    });
 }
 
 /**
@@ -1028,7 +1209,7 @@ function clearSchedule() {
 }
 
 /**
- * Save rest days
+ * Save rest days - NOW removes classes from rest days
  */
 function saveRestDays() {
     if (!scheduleState.selectedStudentId) {
@@ -1046,9 +1227,17 @@ function saveRestDays() {
     
     data.curriculum.restDays[scheduleState.currentWeek] = restDays;
     
+    // Remove any classes on rest days
+    var schedule = getStudentSchedule(scheduleState.selectedStudentId, scheduleState.currentWeek);
+    restDays.forEach(function(day) {
+        if (schedule[day]) {
+            delete schedule[day];
+        }
+    });
+    
     saveData().then(function() {
         if (typeof logActivity === 'function') {
-            logActivity('Saved rest days for week ' + scheduleState.currentWeek);
+            logActivity('Saved rest days for week ' + scheduleState.currentWeek + ' and removed classes on rest days');
         }
         renderSchedule();
     }).catch(function(err) {
@@ -1066,9 +1255,11 @@ window.getStudentDisciplineHours = getStudentDisciplineHours;
 window.getAvailableDisciplinesForStudent = getAvailableDisciplinesForStudent;
 window.getClassInstructor = getClassInstructor;
 window.setClassInstructor = setClassInstructor;
-window.duplicateSchedule = duplicateSchedule;
+window.duplicateScheduleToWeek = duplicateScheduleToWeek;
+window.showDuplicateModal = showDuplicateModal;
 window.clearSchedule = clearSchedule;
 window.saveRestDays = saveRestDays;
 window.showAddScheduleClassModal = showAddScheduleClassModal;
 window.showScheduleClassDetails = showScheduleClassDetails;
 window.removeScheduleClass = removeScheduleClass;
+window.getOtherStudents = getOtherStudents;
