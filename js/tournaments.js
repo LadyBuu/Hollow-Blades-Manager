@@ -800,7 +800,7 @@ function removeParticipant(tournId, index) {
 }
 
 /**
- * Populate participant select dropdowns
+ * Populate participant select dropdowns - FIXED to show team names
  */
 function populateParticipantSelects(tourn) {
     var select1 = document.getElementById('match-participant1');
@@ -814,6 +814,9 @@ function populateParticipantSelects(tourn) {
     if (tourn.mode === 'single') {
         var availableChars = data.characters.filter(function(char) {
             if (char.deceased) return false;
+            // Only show non-civilian characters
+            var status = getCurrentStatus(char).toLowerCase();
+            if (status === 'civilian' || status === '') return false;
             if (tourn.participants && tourn.participants.some(function(p) { 
                 return p.id === char.id && p.type === 'char'; 
             })) return false;
@@ -828,6 +831,7 @@ function populateParticipantSelects(tourn) {
     } else {
         var teamsInTournament = [];
         
+        // Get teams from tournament
         if (tourn.teams) {
             tourn.teams.forEach(function(teamEntry) {
                 var team = data.teams.find(function(t) { return t.id === teamEntry.teamId; });
@@ -841,6 +845,7 @@ function populateParticipantSelects(tourn) {
             });
         }
         
+        // Also check participants for teams
         if (tourn.participants) {
             tourn.participants.forEach(function(participant) {
                 if (participant.type === 'team') {
@@ -855,6 +860,25 @@ function populateParticipantSelects(tourn) {
                 }
             });
         }
+        
+        // Also get all academic teams that are active
+        var activeTeams = getActiveTeamsForWeek(1);
+        activeTeams.forEach(function(team) {
+            if (!teamsInTournament.some(function(t) { return t.id === team.id; })) {
+                // Only show teams that are not already in the tournament
+                var alreadyInTournament = tourn.teams && tourn.teams.some(function(t) { return t.teamId === team.id; });
+                if (!alreadyInTournament) {
+                    // Only show non-deleted, active academic teams
+                    if (team.status !== 'deleted' && team.type === 'academic') {
+                        teamsInTournament.push({
+                            id: team.id,
+                            name: team.name,
+                            rank: team.currentRank
+                        });
+                    }
+                }
+            }
+        });
         
         teamsInTournament.sort(function(a, b) {
             return a.name.localeCompare(b.name);
@@ -883,7 +907,13 @@ function populateEliminationSelect(tourn) {
                 var char = data.characters.find(function(c) { return c.id === participant.id; });
                 if (char) {
                     var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
-                    addOptionToSelect(elimSelect, 'char_' + char.id, name + (char.deceased ? ' Deceased' : ''));
+                    // Check if already eliminated - don't show eliminated characters
+                    var isEliminated = tourn.eliminations && tourn.eliminations.some(function(e) {
+                        return e.participantId === char.id && e.participantType === 'char';
+                    });
+                    if (!isEliminated) {
+                        addOptionToSelect(elimSelect, 'char_' + char.id, name);
+                    }
                 }
             }
         });
@@ -895,8 +925,14 @@ function populateEliminationSelect(tourn) {
                 team.members.forEach(function(member) {
                     var char = data.characters.find(function(c) { return c.id === member.characterId; });
                     if (char) {
-                        var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
-                        addOptionToSelect(elimSelect, 'char_' + char.id, team.name + ' - ' + name + (char.deceased ? ' Deceased' : ''));
+                        // Check if character is already eliminated
+                        var isEliminated = tourn.eliminations && tourn.eliminations.some(function(e) {
+                            return e.participantId === char.id && e.participantType === 'char';
+                        });
+                        if (!isEliminated) {
+                            var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
+                            addOptionToSelect(elimSelect, 'char_' + char.id, team.name + ' - ' + name);
+                        }
                     }
                 });
             }
@@ -927,7 +963,7 @@ function populateTeamSelector(tourn) {
     select.innerHTML = '<option value="">Select academic team...</option>';
     activeTeams.forEach(function(team) {
         var alreadyAdded = tourn.teams && tourn.teams.some(function(t) { return t.teamId === team.id; });
-        if (!alreadyAdded) {
+        if (!alreadyAdded && team.status !== 'deleted') {
             addOptionToSelect(select, team.id, team.name + (team.currentRank ? ' (#' + team.currentRank + ')' : ''));
         }
     });
@@ -950,29 +986,36 @@ function renderTournamentTeams(tourn) {
     var html = '';
     tourn.teams.forEach(function(entry) {
         var team = data.teams.find(function(t) { return t.id === entry.teamId; });
-        var isEliminated = tourn.eliminations && tourn.eliminations.some(function(e) {
-            return e.participantId === entry.teamId && e.participantType === 'team';
-        });
-        var elimClass = isEliminated ? ' eliminated' : '';
-        var elimMarker = isEliminated ? ' Eliminated' : '';
+        // Check if any characters in this team are eliminated (not the whole team)
+        var hasEliminatedMembers = false;
+        if (team && team.members) {
+            team.members.forEach(function(member) {
+                var isEliminated = tourn.eliminations && tourn.eliminations.some(function(e) {
+                    return e.participantId === member.characterId && e.participantType === 'char';
+                });
+                if (isEliminated) hasEliminatedMembers = true;
+            });
+        }
+        var elimClass = hasEliminatedMembers ? ' eliminated' : '';
+        var elimMarker = hasEliminatedMembers ? ' (has eliminated members)' : '';
         
         html += '<div class="team-entry' + elimClass + '">' +
             '<span>' + (team ? team.name : 'Unknown team') + elimMarker + '</span>' +
             '<span>' + (entry.seed || 'Unseeded') + '</span>' +
             '<span class="team-actions">' +
-                '<button class="small danger eliminate-team" data-tourn="' + tourn.id + '" data-team="' + entry.teamId + '">Eliminate</button>' +
-                '<button class="small restore-team" data-tourn="' + tourn.id + '" data-team="' + entry.teamId + '" style="display:' + (isEliminated ? 'inline-block' : 'none') + ';">Restore</button>' +
-                '<button class="small danger remove-team-from-tournament" data-tourn="' + tourn.id + '" data-team="' + entry.teamId + '">Remove</button>' +
+                '<button class="small danger eliminate-team-members" data-tourn="' + tourn.id + '" data-team="' + entry.teamId + '">Eliminate Members</button>' +
+                '<button class="small restore-team-members" data-tourn="' + tourn.id + '" data-team="' + entry.teamId + '" style="display:' + (hasEliminatedMembers ? 'inline-block' : 'none') + ';">Restore Members</button>' +
+                '<button class="small danger remove-team-from-tournament" data-tourn="' + tourn.id + '" data-team="' + entry.teamId + '">Remove Team</button>' +
             '</span>' +
         '</div>';
     });
     container.innerHTML = html;
 
-    container.querySelectorAll('.eliminate-team').forEach(function(btn) {
-        btn.addEventListener('click', function() { eliminateTeam(btn.dataset.tourn, btn.dataset.team); });
+    container.querySelectorAll('.eliminate-team-members').forEach(function(btn) {
+        btn.addEventListener('click', function() { eliminateTeamMembers(btn.dataset.tourn, btn.dataset.team); });
     });
-    container.querySelectorAll('.restore-team').forEach(function(btn) {
-        btn.addEventListener('click', function() { restoreTeam(btn.dataset.tourn, btn.dataset.team); });
+    container.querySelectorAll('.restore-team-members').forEach(function(btn) {
+        btn.addEventListener('click', function() { restoreTeamMembers(btn.dataset.tourn, btn.dataset.team); });
     });
     container.querySelectorAll('.remove-team-from-tournament').forEach(function(btn) {
         btn.addEventListener('click', function() { removeTeamFromTournament(btn.dataset.tourn, btn.dataset.team); });
@@ -1028,91 +1071,86 @@ function removeTeamFromTournament(tournId, teamId) {
 }
 
 /**
- * Eliminate team from tournament
+ * Eliminate team members (not the whole team, just the characters)
  */
-function eliminateTeam(tournId, teamId) {
-    if (!confirm('Eliminate this team from the tournament?')) return;
+function eliminateTeamMembers(tournId, teamId) {
+    if (!confirm('Eliminate all members of this team from the tournament?')) return;
     
     var tourn = data.tournaments.find(function(t) { return t.id === tournId; });
     if (!tourn) return;
     if (!tourn.eliminations) tourn.eliminations = [];
     
-    var block = getWeekBlock(data.currentWeek || 1);
-    var week = block.start;
+    var team = data.teams.find(function(t) { return t.id === teamId; });
+    if (!team || !team.members) return;
     
-    if (tourn.eliminations.some(function(e) { return e.participantId === teamId && e.participantType === 'team'; })) {
-        alert('Team already eliminated.');
+    var block = getWeekBlock(tourn.startWeek || 1);
+    var week = block.start;
+    var added = 0;
+    
+    team.members.forEach(function(member) {
+        var char = data.characters.find(function(c) { return c.id === member.characterId; });
+        if (!char) return;
+        
+        // Check if already eliminated
+        var existing = tourn.eliminations.some(function(e) {
+            return e.participantId === char.id && e.participantType === 'char';
+        });
+        if (!existing) {
+            tourn.eliminations.push({
+                participantId: char.id,
+                participantType: 'char',
+                week: week,
+                teamId: teamId
+            });
+            added++;
+        }
+    });
+    
+    if (added === 0) {
+        alert('All team members are already eliminated.');
         return;
     }
     
-    tourn.eliminations.push({
-        participantId: teamId,
-        participantType: 'team',
-        week: week
-    });
-    
-    var team = data.teams.find(function(t) { return t.id === teamId; });
-    if (team && team.members) {
-        team.members.forEach(function(member) {
-            var char = data.characters.find(function(c) { return c.id === member.characterId; });
-            if (char && !char.deceased) {
-                char.deceased = true;
-                char.deathYear = data.currentYear || new Date().getFullYear();
-                char.deathCause = 'Eliminated with team ' + team.name + ' in tournament: ' + tourn.name;
-                var birthYear = parseInt(char.birthYear);
-                if (!isNaN(birthYear)) char.deathAge = String(parseInt(char.deathYear) - birthYear);
-            }
-        });
-    }
-    
     if (typeof logActivity === 'function') {
-        logActivity('Eliminated team ' + (team ? team.name : '') + ' from tournament: ' + tourn.name);
+        logActivity('Eliminated ' + added + ' members of team ' + team.name + ' from tournament: ' + tourn.name);
     }
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
 }
 
 /**
- * Restore team in tournament
+ * Restore team members
  */
-function restoreTeam(tournId, teamId) {
+function restoreTeamMembers(tournId, teamId) {
+    if (!confirm('Restore all members of this team in the tournament?')) return;
+    
     var tourn = data.tournaments.find(function(t) { return t.id === tournId; });
     if (!tourn) return;
     
-    if (tourn.eliminations) {
-        tourn.eliminations = tourn.eliminations.filter(function(e) {
-            return !(e.participantId === teamId && e.participantType === 'team');
-        });
-    }
-    
     var team = data.teams.find(function(t) { return t.id === teamId; });
-    if (team && team.members) {
+    if (!team || !team.members) return;
+    
+    if (tourn.eliminations) {
+        var removed = 0;
         team.members.forEach(function(member) {
             var char = data.characters.find(function(c) { return c.id === member.characterId; });
-            if (char && char.deceased) {
-                var stillEliminated = false;
-                data.tournaments.forEach(function(t) {
-                    if (t.id === tournId) return;
-                    if (t.eliminations) {
-                        t.eliminations.forEach(function(e) {
-                            if (e.participantId === char.id && e.participantType === 'char') {
-                                stillEliminated = true;
-                            }
-                        });
-                    }
-                });
-                if (!stillEliminated) {
-                    char.deceased = false;
-                    char.deathYear = '';
-                    char.deathCause = '';
-                    char.deathAge = '';
-                }
-            }
+            if (!char) return;
+            
+            var before = tourn.eliminations.length;
+            tourn.eliminations = tourn.eliminations.filter(function(e) {
+                return !(e.participantId === char.id && e.participantType === 'char');
+            });
+            if (tourn.eliminations.length < before) removed++;
         });
+        
+        if (removed === 0) {
+            alert('No team members were eliminated.');
+            return;
+        }
     }
     
     if (typeof logActivity === 'function') {
-        logActivity('Restored team ' + (team ? team.name : '') + ' in tournament: ' + tourn.name);
+        logActivity('Restored ' + removed + ' members of team ' + team.name + ' in tournament: ' + tourn.name);
     }
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
@@ -1210,7 +1248,7 @@ function removeMatch(tournId, index) {
 }
 
 /**
- * Set match winner
+ * Set match winner - eliminates the loser (but does NOT mark as deceased)
  */
 function setMatchWinner(tournId, matchIndex, participantNum) {
     var tourn = data.tournaments.find(function(t) { return t.id === tournId; });
@@ -1220,39 +1258,30 @@ function setMatchWinner(tournId, matchIndex, participantNum) {
     var winner = participantNum === 1 ? match.participant1 : match.participant2;
     match.winner = winner;
     
-    if (tourn.mode === 'single') {
-        var loser = participantNum === 1 ? match.participant2 : match.participant1;
-        if (!tourn.eliminations) tourn.eliminations = [];
+    // Eliminate the loser (but NOT mark as deceased)
+    var loser = participantNum === 1 ? match.participant2 : match.participant1;
+    if (!tourn.eliminations) tourn.eliminations = [];
+    
+    var weekNum = parseInt(tourn.startWeek) || 1;
+    var blockStart = Math.floor((weekNum - 1) / 2) * 2 + 1;
+    
+    if (!tourn.eliminations.some(function(e) { 
+        return e.participantId === loser.id && e.participantType === loser.type; 
+    })) {
+        tourn.eliminations.push({
+            participantId: loser.id,
+            participantType: loser.type,
+            week: String(blockStart),
+            matchRound: match.round
+        });
         
-        var weekNum = parseInt(tourn.startWeek) || 1;
-        var blockStart = Math.floor((weekNum - 1) / 2) * 2 + 1;
-        
-        if (!tourn.eliminations.some(function(e) { 
-            return e.participantId === loser.id && e.participantType === loser.type; 
-        })) {
-            tourn.eliminations.push({
-                participantId: loser.id,
-                participantType: loser.type,
-                week: String(blockStart),
-                matchRound: match.round
-            });
-            
-            if (loser.type === 'char') {
-                var char = data.characters.find(function(c) { return c.id === loser.id; });
-                if (char && !char.deceased) {
-                    char.deceased = true;
-                    char.deathYear = data.currentYear || new Date().getFullYear();
-                    char.deathCause = 'Eliminated in tournament: ' + tourn.name + ' (Round ' + match.round + ')';
-                    var birthYear = parseInt(char.birthYear);
-                    if (!isNaN(birthYear)) char.deathAge = String(parseInt(char.deathYear) - birthYear);
-                }
-            }
+        // Log the elimination WITHOUT marking as deceased
+        var loserName = getParticipantName(loser, tourn);
+        if (typeof logActivity === 'function') {
+            logActivity('Eliminated ' + loserName + ' from tournament: ' + tourn.name + ' (Round ' + match.round + ')');
         }
     }
     
-    if (typeof logActivity === 'function') {
-        logActivity('Set winner for match in tournament: ' + tourn.name);
-    }
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
 }
@@ -1275,8 +1304,13 @@ function renderEliminations(tourn) {
         var name = getParticipantName({ type: entry.participantType, id: entry.participantId }, tourn);
         var block = getWeekBlock(entry.week);
         var weekDisplay = block ? block.label : entry.week;
+        var teamName = '';
+        if (entry.teamId) {
+            var team = data.teams.find(function(t) { return t.id === entry.teamId; });
+            if (team) teamName = ' (' + team.name + ')';
+        }
         html += '<div class="elimination-entry">' +
-            '<span><strong>Wk ' + weekDisplay + ':</strong> ' + name + (entry.matchRound ? ' (Round ' + entry.matchRound + ')' : '') + '</span>' +
+            '<span><strong>Wk ' + weekDisplay + ':</strong> ' + name + teamName + (entry.matchRound ? ' (Round ' + entry.matchRound + ')' : '') + '</span>' +
             '<button class="small danger remove-elimination" data-tourn="' + tourn.id + '" data-index="' + index + '">Remove</button>' +
         '</div>';
     });
@@ -1290,7 +1324,7 @@ function renderEliminations(tourn) {
 }
 
 /**
- * Add elimination
+ * Add elimination - DOES NOT mark as deceased
  */
 function addElimination() {
     var modal = document.getElementById('tournament-detail-modal');
@@ -1331,17 +1365,6 @@ function addElimination() {
                 participantType: type,
                 week: week
             });
-            
-            if (type === 'char') {
-                var char = data.characters.find(function(c) { return c.id === id; });
-                if (char && !char.deceased) {
-                    char.deceased = true;
-                    char.deathYear = data.currentYear || new Date().getFullYear();
-                    char.deathCause = 'Eliminated in tournament: ' + tourn.name + ' (Week ' + week + ')';
-                    var birthYear = parseInt(char.birthYear);
-                    if (!isNaN(birthYear)) char.deathAge = String(parseInt(char.deathYear) - birthYear);
-                }
-            }
             added++;
         }
     }
@@ -1359,30 +1382,14 @@ function addElimination() {
 }
 
 /**
- * Remove elimination
+ * Remove elimination - DOES NOT mark as deceased (never did)
  */
 function removeElimination(tournId, index) {
     if (!confirm('Remove this elimination?')) return;
     var tourn = data.tournaments.find(function(t) { return t.id === tournId; });
     if (!tourn || !tourn.eliminations || !tourn.eliminations[index]) return;
     
-    var removed = tourn.eliminations[index];
     tourn.eliminations.splice(index, 1);
-    
-    if (removed.participantType === 'char') {
-        var char = data.characters.find(function(c) { return c.id === removed.participantId; });
-        if (char) {
-            var stillEliminated = tourn.eliminations.some(function(e) { 
-                return e.participantId === removed.participantId && e.participantType === 'char'; 
-            });
-            if (!stillEliminated) {
-                char.deceased = false;
-                char.deathYear = '';
-                char.deathCause = '';
-                char.deathAge = '';
-            }
-        }
-    }
     
     if (typeof logActivity === 'function') {
         logActivity('Removed elimination from tournament: ' + tourn.name);
@@ -1576,18 +1583,6 @@ function initTournamentEvents() {
             });
             toRemove.sort(function(a, b) { return b - a; });
             toRemove.forEach(function(idx) {
-                var removed = tourn.eliminations[idx];
-                var char = data.characters.find(function(c) { return c.id === removed.participantId; });
-                if (char && char.eliminatedWeeks) {
-                    var weekIdx = char.eliminatedWeeks.indexOf(removed.week);
-                    if (weekIdx !== -1) char.eliminatedWeeks.splice(weekIdx, 1);
-                    if (char.eliminatedWeeks.length === 0 && char.deceased) {
-                        char.deceased = false;
-                        char.deathYear = '';
-                        char.deathCause = '';
-                        char.deathAge = '';
-                    }
-                }
                 tourn.eliminations.splice(idx, 1);
             });
             
@@ -1620,8 +1615,8 @@ window.populateTeamSelector = populateTeamSelector;
 window.renderTournamentTeams = renderTournamentTeams;
 window.addTeamToTournament = addTeamToTournament;
 window.removeTeamFromTournament = removeTeamFromTournament;
-window.eliminateTeam = eliminateTeam;
-window.restoreTeam = restoreTeam;
+window.eliminateTeamMembers = eliminateTeamMembers;
+window.restoreTeamMembers = restoreTeamMembers;
 window.renderMatches = renderMatches;
 window.addMatch = addMatch;
 window.removeMatch = removeMatch;
