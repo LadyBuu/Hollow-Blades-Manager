@@ -31,6 +31,7 @@ function renderCurriculumView(container) {
                     <div id="discipline-list">
                         <div class="list-header">
                             <span>Discipline</span>
+                            <span>Type</span>
                             <span>Instructor</span>
                             <span>Weeks</span>
                             <span>Hours/Week</span>
@@ -47,6 +48,14 @@ function renderCurriculumView(container) {
                                 <div class="form-group">
                                     <label>Discipline Name *</label>
                                     <input type="text" id="discipline-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Discipline Type *</label>
+                                    <select id="discipline-type" required>
+                                        <option value="">Select type...</option>
+                                        <option value="mandatory">Mandatory / Common</option>
+                                        <option value="optional">Optional / Choice</option>
+                                    </select>
                                 </div>
                                 <div class="form-group">
                                     <label>Curriculum (free text)</label>
@@ -118,6 +127,8 @@ function renderCurriculumView(container) {
                             <label for="class-discipline-filter" style="font-size:0.75rem;color:var(--text-dim);">Filter:</label>
                             <select id="class-discipline-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:0.75rem;">
                                 <option value="all">All Disciplines</option>
+                                <option value="mandatory">Mandatory Only</option>
+                                <option value="optional">Optional Only</option>
                             </select>
                         </div>
                     </div>
@@ -322,10 +333,10 @@ function renderClassView() {
     
     // Filter disciplines if needed
     var disciplines = allDisciplines;
-    if (classViewState.filterDiscipline !== 'all') {
-        disciplines = disciplines.filter(function(d) {
-            return String(d.id) === String(classViewState.filterDiscipline);
-        });
+    if (classViewState.filterDiscipline === 'mandatory') {
+        disciplines = disciplines.filter(function(d) { return d.type === 'mandatory'; });
+    } else if (classViewState.filterDiscipline === 'optional') {
+        disciplines = disciplines.filter(function(d) { return d.type === 'optional'; });
     }
     
     // Build class schedule for each discipline
@@ -370,8 +381,14 @@ function renderClassView() {
         }) : null;
         var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Not assigned';
         
+        var typeLabel = disc.type === 'mandatory' ? '📚 Mandatory' : '🎯 Optional';
+        var typeColor = disc.type === 'mandatory' ? 'var(--accent)' : 'var(--warning)';
+        
         html += '<div class="class-view-discipline" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:var(--shadow);">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
         html += '<h3 style="color:var(--accent);margin-bottom:4px;">' + disc.name + '</h3>';
+        html += '<span style="font-size:0.75rem;padding:2px 12px;border-radius:12px;background:' + typeColor + '33;color:' + typeColor + ';border:1px solid ' + typeColor + ';">' + typeLabel + '</span>';
+        html += '</div>';
         html += '<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:12px;">Instructor: ' + instructorName + ' | Week: ' + classViewState.currentWeek + ' | Max Students: ' + (disc.maxStudents || 'Unlimited') + '</p>';
         
         // Sort groups by day then hour
@@ -397,7 +414,7 @@ function renderClassView() {
             
             var isFull = disc.maxStudents && studentsList.length >= disc.maxStudents;
             
-            html += '<div class="class-group" style="background:var(--bg);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;border-left:3px solid ' + (isFull ? 'var(--danger)' : 'var(--accent)') + ';">';
+            html += '<div class="class-group" style="background:var(--bg);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;border-left:3px solid ' + (isFull ? 'var(--danger)' : typeColor) + ';">';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">';
             html += '<span style="font-weight:600;">' + dayNames[day] + ' at ' + hourDisplay + ':00 ' + ampm + '</span>';
             html += '<span style="font-size:0.75rem;color:var(--text-dim);">' + studentsList.length + ' student' + (studentsList.length > 1 ? 's' : '') + (isFull ? ' <span style="color:var(--danger);">(FULL)</span>' : '') + '</span>';
@@ -428,14 +445,12 @@ function populateDisciplineFilter() {
     var select = document.getElementById('class-discipline-filter');
     if (!select) return;
     
-    var disciplines = getAvailableDisciplines(classViewState.currentWeek);
-    select.innerHTML = '<option value="all">All Disciplines</option>';
-    disciplines.forEach(function(d) {
-        var option = document.createElement('option');
-        option.value = d.id;
-        option.textContent = d.name;
-        select.appendChild(option);
-    });
+    // Keep the existing options and add discipline-specific ones
+    select.innerHTML = `
+        <option value="all">All Disciplines</option>
+        <option value="mandatory">📚 Mandatory Only</option>
+        <option value="optional">🎯 Optional Only</option>
+    `;
     
     // Set selected value
     if (classViewState.filterDiscipline !== 'all') {
@@ -516,6 +531,8 @@ function exportClassView() {
     win.document.write('h3{color:#2E7D32;}');
     win.document.write('.meta{color:#666;font-size:13px;}');
     win.document.write('.full{color:#d32f2f;}');
+    win.document.write('.mandatory-badge{color:#2E7D32;font-weight:bold;}');
+    win.document.write('.optional-badge{color:#ED6C02;font-weight:bold;}');
     win.document.write('</style></head><body>');
     win.document.write('<h1>Class View - Week ' + week + '</h1>');
     win.document.write('<p>Generated: ' + new Date().toLocaleString() + '</p>');
@@ -564,8 +581,12 @@ function renderDisciplines() {
         var weekDisplay = d.startWeek ? 'Wk ' + d.startWeek : '?';
         if (d.endWeek) weekDisplay += ' - Wk ' + d.endWeek;
         
+        var typeLabel = d.type === 'mandatory' ? '📚 Mandatory' : (d.type === 'optional' ? '🎯 Optional' : '—');
+        var typeColor = d.type === 'mandatory' ? 'var(--accent)' : (d.type === 'optional' ? 'var(--warning)' : 'var(--text-dim)');
+        
         html += '<div class="list-item" data-id="' + d.id + '">' +
             '<span><strong>' + d.name + '</strong></span>' +
+            '<span style="color:' + typeColor + ';font-size:0.75rem;">' + typeLabel + '</span>' +
             '<span>' + instructorName + '</span>' +
             '<span>' + weekDisplay + '</span>' +
             '<span>' + (d.weeklyHours || '-') + 'h</span>' +
@@ -616,6 +637,7 @@ function showDisciplineForm(editId) {
         var discipline = data.curriculum.disciplines.find(function(d) { return String(d.id) === String(editId); });
         if (discipline) {
             document.getElementById('discipline-name').value = discipline.name || '';
+            document.getElementById('discipline-type').value = discipline.type || '';
             document.getElementById('discipline-curriculum').value = discipline.curriculum || '';
             document.getElementById('discipline-start-week').value = discipline.startWeek || '';
             document.getElementById('discipline-end-week').value = discipline.endWeek || '';
@@ -693,6 +715,7 @@ function saveDiscipline(e) {
     
     var disciplineData = {
         name: document.getElementById('discipline-name').value.trim(),
+        type: document.getElementById('discipline-type').value,
         curriculum: document.getElementById('discipline-curriculum').value.trim(),
         startWeek: document.getElementById('discipline-start-week').value || '',
         endWeek: document.getElementById('discipline-end-week').value || '',
@@ -704,6 +727,7 @@ function saveDiscipline(e) {
     };
     
     if (!disciplineData.name) { alert('Discipline name is required.'); return; }
+    if (!disciplineData.type) { alert('Please select a discipline type.'); return; }
     
     if (!data.curriculum) {
         data.curriculum = { disciplines: [], schedules: {}, restDays: {}, examDays: {}, grades: {}, rankings: {}, currentWeek: 1 };
@@ -721,6 +745,7 @@ function saveDiscipline(e) {
         var newDiscipline = {
             id: generateId('disc'),
             name: disciplineData.name,
+            type: disciplineData.type,
             curriculum: disciplineData.curriculum,
             startWeek: disciplineData.startWeek,
             endWeek: disciplineData.endWeek,
@@ -733,7 +758,7 @@ function saveDiscipline(e) {
         };
         data.curriculum.disciplines.push(newDiscipline);
         if (typeof logActivity === 'function') {
-            logActivity('Added discipline: ' + disciplineData.name);
+            logActivity('Added discipline: ' + disciplineData.name + ' (' + disciplineData.type + ')');
         }
     }
     
@@ -832,6 +857,7 @@ function renderGrades() {
     var html = '<table class="grades-table">';
     html += '<thead><tr>';
     html += '<th>Discipline</th>';
+    html += '<th>Type</th>';
     html += '<th>Weight</th>';
     html += '<th>Score</th>';
     html += '<th>Grade</th>';
@@ -854,8 +880,12 @@ function renderGrades() {
             totalWeight += d.weight;
         }
         
+        var typeLabel = d.type === 'mandatory' ? '📚' : (d.type === 'optional' ? '🎯' : '—');
+        var typeColor = d.type === 'mandatory' ? 'var(--accent)' : (d.type === 'optional' ? 'var(--warning)' : 'var(--text-dim)');
+        
         html += '<tr' + (isInSchedule ? '' : ' style="opacity:0.4;"') + '>';
         html += '<td>' + d.name + (isInSchedule ? '' : ' (not scheduled)') + '</td>';
+        html += '<td style="color:' + typeColor + ';font-size:0.7rem;">' + typeLabel + '</td>';
         html += '<td class="weight">' + d.weight + '</td>';
         html += '<td><input type="number" class="grade-input" data-discipline="' + d.id + '" value="' + score + '" min="0" max="100" step="0.1"></td>';
         html += '<td class="grade-letter">' + (letter || '—') + '</td>';
@@ -959,6 +989,8 @@ function updateGradeSummary() {
     var totalWeighted = 0;
     var totalWeight = 0;
     var count = 0;
+    var mandatoryCount = 0;
+    var optionalCount = 0;
     
     disciplines.forEach(function(d) {
         var score = grades[d.id];
@@ -966,15 +998,22 @@ function updateGradeSummary() {
             totalWeighted += parseFloat(score) * d.weight;
             totalWeight += d.weight;
             count++;
+            if (d.type === 'mandatory') mandatoryCount++;
+            else if (d.type === 'optional') optionalCount++;
         }
     });
     
     var average = totalWeight > 0 ? totalWeighted / totalWeight : 0;
     
-    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">' +
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;">' +
         '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Average</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--accent);">' + average.toFixed(1) + '</span></div>' +
         '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Disciplines</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--text);">' + count + '/' + disciplines.length + '</span></div>' +
-        '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Status</span><br><span style="font-size:1.8rem;font-weight:700;' + (average >= 70 ? 'color:var(--accent);' : 'color:var(--danger);') + '">' + (average >= 70 ? 'Passing' : 'Needs Work') + '</span></div>' +
+        '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">📚 Mandatory</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--accent);">' + mandatoryCount + '</span></div>' +
+        '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">🎯 Optional</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--warning);">' + optionalCount + '</span></div>' +
+    '</div>';
+    html += '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;">' +
+        '<span style="color:var(--text-dim);">Status: </span>' +
+        '<span style="font-weight:700;' + (average >= 70 ? 'color:var(--accent);' : 'color:var(--danger);') + '">' + (average >= 70 ? '✅ Passing' : '⚠️ Needs Work') + '</span>' +
     '</div>';
     summary.innerHTML = html;
 }
@@ -1009,6 +1048,8 @@ function renderRanking() {
         var totalWeighted = 0;
         var totalWeight = 0;
         var count = 0;
+        var mandatoryCount = 0;
+        var optionalCount = 0;
         
         disciplines.forEach(function(d) {
             var score = grades[d.id];
@@ -1016,6 +1057,8 @@ function renderRanking() {
                 totalWeighted += parseFloat(score) * d.weight;
                 totalWeight += d.weight;
                 count++;
+                if (d.type === 'mandatory') mandatoryCount++;
+                else if (d.type === 'optional') optionalCount++;
             }
         });
         
@@ -1026,7 +1069,9 @@ function renderRanking() {
             lastName: student.lastName || '',
             average: average,
             count: count,
-            total: disciplines.length
+            total: disciplines.length,
+            mandatoryCount: mandatoryCount,
+            optionalCount: optionalCount
         });
     });
     
@@ -1065,7 +1110,8 @@ function renderRanking() {
     html += '<th>Rank</th>';
     html += '<th>Student</th>';
     html += '<th>Average</th>';
-    html += '<th>Disciplines</th>';
+    html += '<th>📚 Mandatory</th>';
+    html += '<th>🎯 Optional</th>';
     html += '<th>Change</th>';
     html += '</tr></thead><tbody>';
     
@@ -1095,7 +1141,8 @@ function renderRanking() {
         html += '<td class="rank-number"><input type="number" class="rank-input" data-student="' + r.studentId + '" value="' + rank + '" min="1" max="' + rankings.length + '"></td>';
         html += '<td>' + r.firstName + (r.lastName ? ' ' + r.lastName : '') + '</td>';
         html += '<td style="font-weight:700;color:var(--accent);">' + (r.average > 0 ? r.average.toFixed(1) : '—') + '</td>';
-        html += '<td>' + r.count + '/' + r.total + '</td>';
+        html += '<td>' + r.mandatoryCount + '</td>';
+        html += '<td>' + r.optionalCount + '</td>';
         html += '<td><span class="rank-change ' + changeClass + '">' + change + '</span></td>';
         html += '</tr>';
     });
