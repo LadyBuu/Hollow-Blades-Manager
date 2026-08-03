@@ -361,7 +361,7 @@ function addCareerStatusEntry(container, status, startYear, endYear) {
 }
 
 /**
- * Save character from form
+ * Save character from form - FIXED to properly save career status
  */
 function saveCharacter(e) {
     e.preventDefault();
@@ -372,16 +372,17 @@ function saveCharacter(e) {
     var deathCause = document.getElementById('char-death-cause').value.trim();
     var deathAge = document.getElementById('char-death-age').value.trim();
     
+    // Collect career status - FIXED to get all entries
     var careerStatus = [];
     document.querySelectorAll('.career-status-entry').forEach(function(entry) {
         var select = entry.querySelector('.career-status-select');
         var startInput = entry.querySelector('.career-start-year');
         var endInput = entry.querySelector('.career-end-year');
-        if (select.value) {
+        if (select && select.value) {
             careerStatus.push({
                 status: select.value,
-                startYear: startInput.value || '',
-                endYear: endInput.value || ''
+                startYear: startInput ? startInput.value || '' : '',
+                endYear: endInput ? endInput.value || '' : ''
             });
         }
     });
