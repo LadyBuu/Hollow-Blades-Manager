@@ -127,7 +127,7 @@ button.small {
 }
 
 /* ============================================================
-   HEADER - Fixed horizontal nav on desktop
+   HEADER
    ============================================================ */
 header {
     display: flex;
@@ -186,7 +186,6 @@ header nav a.active {
     padding: 3px 8px;
 }
 
-/* Mobile header - stack vertically */
 @media (max-width: 768px) {
     header {
         flex-direction: column;
@@ -430,7 +429,7 @@ main {
 }
 
 /* ============================================================
-   MODAL - No blur, no overlay effects
+   MODAL
    ============================================================ */
 .modal {
     position: fixed;
@@ -712,6 +711,98 @@ main {
 }
 
 /* ============================================================
+   DISCIPLINE LIST - FIXED OVERLAPPING TEXT
+   ============================================================ */
+#discipline-list {
+    overflow-x: auto;
+}
+#discipline-list .list-header {
+    display: grid;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--panel-alt);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    min-width: 700px;
+    grid-template-columns: 1.5fr 0.9fr 1.2fr 0.8fr 0.8fr 0.7fr 1fr;
+}
+#discipline-list .list-item {
+    display: grid;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: none;
+    align-items: center;
+    min-width: 700px;
+    grid-template-columns: 1.5fr 0.9fr 1.2fr 0.8fr 0.8fr 0.7fr 1fr;
+    font-size: 0.78rem;
+    word-break: break-word;
+}
+#discipline-list .list-item:last-child {
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+#discipline-list .list-item .actions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+#discipline-list .list-item .actions button {
+    font-size: 0.6rem;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+#discipline-list .list-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+    #discipline-list .list-header {
+        min-width: 600px;
+        font-size: 0.55rem;
+        padding: 6px 8px;
+        gap: 4px;
+        grid-template-columns: 1.2fr 0.7fr 0.8fr 0.6fr 0.6fr 0.5fr 0.8fr;
+    }
+    #discipline-list .list-item {
+        min-width: 600px;
+        font-size: 0.65rem;
+        padding: 6px 8px;
+        gap: 4px;
+        grid-template-columns: 1.2fr 0.7fr 0.8fr 0.6fr 0.6fr 0.5fr 0.8fr;
+    }
+    #discipline-list .list-item .actions button {
+        font-size: 0.5rem;
+        padding: 1px 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    #discipline-list .list-header {
+        min-width: 500px;
+        font-size: 0.5rem;
+        padding: 4px 6px;
+        gap: 3px;
+        grid-template-columns: 1fr 0.6fr 0.6fr 0.5fr 0.5fr 0.4fr 0.6fr;
+    }
+    #discipline-list .list-item {
+        min-width: 500px;
+        font-size: 0.55rem;
+        padding: 4px 6px;
+        gap: 3px;
+        grid-template-columns: 1fr 0.6fr 0.6fr 0.5fr 0.5fr 0.4fr 0.6fr;
+    }
+}
+
+/* ============================================================
    SCHEDULE GRID - Mobile scroll support
    ============================================================ */
 .schedule-grid-wrapper {
@@ -912,7 +1003,42 @@ main {
     border-color: var(--accent);
 }
 
-/* Instructor Calendar Grid */
+/* ============================================================
+   INSTRUCTOR CALENDAR - With scroll support
+   ============================================================ */
+.instructor-calendar-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    width: 100%;
+    position: relative;
+}
+
+.instructor-calendar-wrapper::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+.instructor-calendar-wrapper::-webkit-scrollbar-track {
+    background: var(--bg);
+    border-radius: 4px;
+}
+.instructor-calendar-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+    border: 1px solid var(--bg);
+}
+.instructor-calendar-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+}
+
+.instructor-calendar-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) var(--bg);
+}
+
 .instructor-calendar-grid {
     display: grid;
     grid-template-columns: 60px repeat(7, 1fr);
@@ -921,9 +1047,10 @@ main {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 8px;
-    overflow-x: auto;
     min-width: 700px;
+    width: 100%;
 }
+
 .instructor-calendar-grid .header-cell {
     padding: 4px;
     font-weight: 600;
@@ -945,6 +1072,12 @@ main {
     padding: 4px;
     font-size: 0.6rem;
     border-left: 3px solid var(--accent);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.instructor-calendar-grid .class-cell:hover {
+    background: var(--accent-soft);
+    opacity: 0.8;
 }
 .instructor-calendar-grid .class-cell .class-name {
     white-space: nowrap;
@@ -955,6 +1088,9 @@ main {
 .instructor-calendar-grid .class-cell .student-name {
     font-size: 0.5rem;
     color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .instructor-calendar-grid .empty-cell {
     padding: 4px;
@@ -962,6 +1098,109 @@ main {
     font-size: 0.5rem;
     color: var(--text-dim);
     text-align: center;
+}
+
+/* Instructor calendar responsive */
+@media (max-width: 768px) {
+    .instructor-calendar-grid {
+        min-width: 550px;
+        padding: 4px;
+        gap: 2px;
+    }
+    .instructor-calendar-grid .header-cell {
+        font-size: 0.5rem;
+        padding: 3px 2px;
+    }
+    .instructor-calendar-grid .time-cell {
+        font-size: 0.5rem;
+        padding: 3px 2px;
+    }
+    .instructor-calendar-grid .class-cell {
+        font-size: 0.5rem;
+        padding: 3px 2px;
+    }
+    .instructor-calendar-grid .class-cell .student-name {
+        font-size: 0.4rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .instructor-calendar-grid {
+        min-width: 450px;
+        padding: 3px;
+        gap: 1px;
+    }
+    .instructor-calendar-grid .header-cell {
+        font-size: 0.4rem;
+        padding: 2px 1px;
+    }
+    .instructor-calendar-grid .time-cell {
+        font-size: 0.4rem;
+        padding: 2px 1px;
+    }
+    .instructor-calendar-grid .class-cell {
+        font-size: 0.4rem;
+        padding: 2px 1px;
+        border-left-width: 2px;
+    }
+    .instructor-calendar-grid .class-cell .student-name {
+        font-size: 0.35rem;
+    }
+}
+
+/* ============================================================
+   CLASS VIEW - Grouped by instructor
+   ============================================================ */
+.class-view-discipline {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+}
+.class-view-discipline .discipline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.class-view-discipline .instructor-group {
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--accent);
+}
+.class-view-discipline .instructor-group .instructor-name {
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+.class-view-discipline .instructor-group .class-group {
+    background: var(--panel-alt);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+.class-view-discipline .instructor-group .class-group:last-child {
+    margin-bottom: 0;
+}
+.class-view-discipline .instructor-group .class-group .class-time {
+    font-weight: 500;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+}
+.class-view-discipline .instructor-group .class-group .student-tag {
+    background: var(--panel);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    display: inline-block;
+    margin: 2px;
 }
 
 /* ============================================================
@@ -1081,32 +1320,6 @@ main {
     .list-item.tourn-item .actions button {
         font-size: 0.6rem;
         padding: 2px 6px;
-    }
-}
-
-/* Discipline List */
-#discipline-list .list-header {
-    grid-template-columns: 1.2fr 0.8fr 1.2fr 0.8fr 0.8fr 0.7fr 1.2fr;
-}
-#discipline-list .list-item {
-    grid-template-columns: 1.2fr 0.8fr 1.2fr 0.8fr 0.8fr 0.7fr 1.2fr;
-}
-@media (max-width: 600px) {
-    #discipline-list .list-header {
-        grid-template-columns: 0.8fr 0.5fr 0.8fr 0.5fr 0.5fr 0.4fr 0.8fr;
-        font-size: 0.55rem;
-        gap: 3px;
-        padding: 4px 6px;
-    }
-    #discipline-list .list-item {
-        grid-template-columns: 0.8fr 0.5fr 0.8fr 0.5fr 0.5fr 0.4fr 0.8fr;
-        gap: 3px;
-        padding: 4px 6px;
-        font-size: 0.65rem;
-    }
-    #discipline-list .list-item .actions button {
-        font-size: 0.5rem;
-        padding: 1px 4px;
     }
 }
 
@@ -1330,108 +1543,6 @@ main {
     .calendar-grid {
         min-width: 350px;
         gap: 3px;
-    }
-}
-.day-column {
-    background: var(--bg);
-    border-radius: var(--radius);
-    border: 1px solid var(--border-soft);
-    overflow: hidden;
-    min-width: 40px;
-}
-.day-column.rest-day {
-    opacity: 0.4;
-}
-.day-column.exam-day {
-    border-color: var(--danger);
-}
-.day-header {
-    background: var(--panel-alt);
-    padding: 4px 2px;
-    text-align: center;
-    font-size: 0.6rem;
-    font-weight: 600;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border-soft);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-@media (min-width: 768px) {
-    .day-header {
-        padding: 6px 4px;
-        font-size: 0.7rem;
-    }
-}
-.day-slots {
-    display: flex;
-    flex-direction: column;
-    min-height: 400px;
-    padding: 2px;
-}
-@media (min-width: 768px) {
-    .day-slots {
-        min-height: 600px;
-    }
-}
-.time-slot {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 30px;
-    padding: 2px 0;
-    border-bottom: 1px solid var(--border-soft);
-    cursor: pointer;
-    font-size: 0.6rem;
-    transition: background 0.15s;
-    position: relative;
-    flex-wrap: wrap;
-}
-@media (min-width: 768px) {
-    .time-slot {
-        min-height: 40px;
-        font-size: 0.7rem;
-    }
-}
-.time-slot:hover {
-    background: var(--panel-alt);
-}
-.time-slot.empty {
-    color: var(--text-dim);
-    opacity: 0.3;
-}
-.time-slot.occupied {
-    background: var(--accent-soft);
-    border-left: 3px solid var(--accent);
-    color: var(--text);
-    font-weight: 500;
-    cursor: pointer;
-}
-.time-slot.occupied:hover {
-    background: var(--accent-soft);
-    opacity: 0.8;
-}
-.time-slot .slot-label {
-    font-size: 0.55rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-    padding: 0 2px;
-}
-@media (min-width: 768px) {
-    .time-slot .slot-label {
-        font-size: 0.6rem;
-    }
-}
-.time-slot .slot-time {
-    font-size: 0.45rem;
-    color: var(--text-dim);
-    opacity: 0.5;
-    margin-right: 2px;
-}
-@media (min-width: 768px) {
-    .time-slot .slot-time {
-        font-size: 0.5rem;
     }
 }
 
@@ -2256,32 +2367,6 @@ main {
 }
 
 /* ============================================================
-   CLASS VIEW
-   ============================================================ */
-.class-view-discipline {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: var(--shadow);
-}
-.class-view-discipline .class-group {
-    background: var(--bg);
-    border-radius: var(--radius);
-    padding: 10px 12px;
-    margin-bottom: 8px;
-}
-.class-view-discipline .class-group .student-tag {
-    background: var(--panel-alt);
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    display: inline-block;
-    margin: 2px;
-}
-
-/* ============================================================
    RESPONSIVE FIXES
    ============================================================ */
 @media (max-width: 768px) {
@@ -2339,7 +2424,7 @@ main {
         width: 100%;
     }
     .instructor-calendar-grid {
-        min-width: 500px;
+        min-width: 550px;
     }
     .rest-day-controls {
         grid-template-columns: 1fr 1fr;
@@ -2378,15 +2463,26 @@ main {
         border-left-width: 2px;
     }
     .instructor-calendar-grid {
-        min-width: 400px;
+        min-width: 450px;
         font-size: 0.5rem;
+        padding: 3px;
+        gap: 1px;
+    }
+    .instructor-calendar-grid .header-cell {
+        font-size: 0.4rem;
+        padding: 2px 1px;
+    }
+    .instructor-calendar-grid .time-cell {
+        font-size: 0.4rem;
+        padding: 2px 1px;
     }
     .instructor-calendar-grid .class-cell {
-        font-size: 0.45rem;
-        padding: 2px;
+        font-size: 0.4rem;
+        padding: 2px 1px;
+        border-left-width: 2px;
     }
     .instructor-calendar-grid .class-cell .student-name {
-        font-size: 0.4rem;
+        font-size: 0.35rem;
     }
     .modal-content {
         padding: 12px;
@@ -2400,5 +2496,23 @@ main {
     }
     .form-container {
         padding: 12px;
+    }
+    #discipline-list .list-header {
+        min-width: 450px;
+        font-size: 0.45rem;
+        padding: 3px 4px;
+        gap: 2px;
+        grid-template-columns: 0.9fr 0.5fr 0.5fr 0.4fr 0.4fr 0.3fr 0.5fr;
+    }
+    #discipline-list .list-item {
+        min-width: 450px;
+        font-size: 0.5rem;
+        padding: 3px 4px;
+        gap: 2px;
+        grid-template-columns: 0.9fr 0.5fr 0.5fr 0.4fr 0.4fr 0.3fr 0.5fr;
+    }
+    #discipline-list .list-item .actions button {
+        font-size: 0.45rem;
+        padding: 1px 3px;
     }
 }
