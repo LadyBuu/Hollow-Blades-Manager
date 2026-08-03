@@ -9,6 +9,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
         /* Schedule specific styles */
+        .schedule-grid-wrapper {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            width: 100%;
+            position: relative;
+        }
+        .schedule-grid-wrapper::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .schedule-grid-wrapper::-webkit-scrollbar-track {
+            background: var(--bg);
+            border-radius: 4px;
+        }
+        .schedule-grid-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+            border: 1px solid var(--bg);
+        }
+        .schedule-grid-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+        .schedule-grid-wrapper {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) var(--bg);
+        }
         .schedule-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -17,85 +47,9 @@
             border: 1px solid var(--border);
             border-radius: var(--radius);
             padding: 8px;
-            margin-bottom: 16px;
-            overflow-x: auto;
             min-width: 700px;
+            width: 100%;
         }
-        .day-column {
-            background: var(--bg);
-            border-radius: var(--radius);
-            border: 1px solid var(--border-soft);
-            overflow: hidden;
-            min-width: 80px;
-        }
-        .day-column.rest-day {
-            opacity: 0.4;
-            background: var(--panel-alt);
-        }
-        .day-header {
-            background: var(--panel-alt);
-            padding: 6px 4px;
-            text-align: center;
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: var(--text-dim);
-            border-bottom: 1px solid var(--border-soft);
-            text-transform: uppercase;
-        }
-        .day-slots {
-            display: flex;
-            flex-direction: column;
-            min-height: 400px;
-            padding: 2px;
-        }
-        .time-slot {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 30px;
-            padding: 2px 4px;
-            border-bottom: 1px solid var(--border-soft);
-            cursor: pointer;
-            font-size: 0.6rem;
-            transition: background 0.15s;
-            position: relative;
-            gap: 4px;
-        }
-        .time-slot:hover {
-            background: var(--panel-alt);
-        }
-        .time-slot .slot-time {
-            font-size: 0.45rem;
-            color: var(--text-dim);
-            opacity: 0.6;
-            min-width: 30px;
-        }
-        .time-slot .slot-label {
-            font-size: 0.55rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-            padding: 0 2px;
-        }
-        .time-slot.empty {
-            color: var(--text-dim);
-            opacity: 0.3;
-        }
-        .time-slot.empty .slot-label {
-            color: var(--text-dim);
-        }
-        .time-slot.occupied {
-            background: var(--accent-soft);
-            border-left: 3px solid var(--accent);
-            color: var(--text);
-            font-weight: 500;
-        }
-        .time-slot.occupied .slot-label {
-            color: var(--text);
-            font-weight: 500;
-        }
-        
         .schedule-sidebar {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -103,51 +57,251 @@
             margin-top: 16px;
         }
         @media (max-width: 768px) {
+            .schedule-grid {
+                min-width: 550px;
+                padding: 4px;
+                gap: 3px;
+            }
             .schedule-sidebar {
                 grid-template-columns: 1fr;
-            }
-            .schedule-grid {
-                min-width: 500px;
-                padding: 4px;
-            }
-            .day-column {
-                min-width: 50px;
-            }
-            .day-slots {
-                min-height: 250px;
-            }
-            .time-slot {
-                min-height: 22px;
-                font-size: 0.5rem;
-            }
-            .time-slot .slot-time {
-                font-size: 0.4rem;
-                min-width: 20px;
-            }
-            .time-slot .slot-label {
-                font-size: 0.45rem;
+                gap: 12px;
             }
         }
-        .available-discipline {
-            padding: 4px 8px;
-            margin-bottom: 4px;
+        @media (max-width: 480px) {
+            .schedule-grid {
+                min-width: 450px;
+                padding: 3px;
+                gap: 2px;
+            }
+        }
+        /* Instructor calendar scroll */
+        .instructor-calendar-wrapper {
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            width: 100%;
+            position: relative;
+        }
+        .instructor-calendar-wrapper::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .instructor-calendar-wrapper::-webkit-scrollbar-track {
+            background: var(--bg);
+            border-radius: 4px;
+        }
+        .instructor-calendar-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+            border: 1px solid var(--bg);
+        }
+        .instructor-calendar-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+        .instructor-calendar-wrapper {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) var(--bg);
+        }
+        .instructor-calendar-grid {
+            display: grid;
+            grid-template-columns: 60px repeat(7, 1fr);
+            gap: 2px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px;
+            min-width: 700px;
+            width: 100%;
+        }
+        @media (max-width: 768px) {
+            .instructor-calendar-grid {
+                min-width: 550px;
+                padding: 4px;
+                gap: 2px;
+            }
+        }
+        @media (max-width: 480px) {
+            .instructor-calendar-grid {
+                min-width: 450px;
+                padding: 3px;
+                gap: 1px;
+            }
+        }
+        .instructor-calendar-grid .header-cell {
+            padding: 4px;
+            font-weight: 600;
+            color: var(--text-dim);
+            font-size: 0.65rem;
+            text-align: center;
             background: var(--panel-alt);
             border-radius: 4px;
-            font-size: 0.7rem;
-            border-left: 2px solid var(--accent);
+        }
+        .instructor-calendar-grid .time-cell {
+            padding: 4px;
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            text-align: right;
+        }
+        .instructor-calendar-grid .class-cell {
+            background: var(--accent-soft);
+            border-radius: 4px;
+            padding: 4px;
+            font-size: 0.6rem;
+            border-left: 3px solid var(--accent);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .instructor-calendar-grid .class-cell:hover {
+            background: var(--accent-soft);
+            opacity: 0.8;
+        }
+        .instructor-calendar-grid .class-cell .class-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 500;
+        }
+        .instructor-calendar-grid .class-cell .student-name {
+            font-size: 0.5rem;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .instructor-calendar-grid .empty-cell {
+            padding: 4px;
+            opacity: 0.2;
+            font-size: 0.5rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
+        /* Class view */
+        .class-view-discipline {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        .class-view-discipline .discipline-header {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 8px;
+            margin-bottom: 8px;
         }
-        .available-discipline .hours {
+        .class-view-discipline .instructor-group {
+            background: var(--bg);
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-left: 3px solid var(--accent);
+        }
+        .class-view-discipline .instructor-group .instructor-name {
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+        .class-view-discipline .instructor-group .class-group {
+            background: var(--panel-alt);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+        }
+        .class-view-discipline .instructor-group .class-group:last-child {
+            margin-bottom: 0;
+        }
+        .class-view-discipline .instructor-group .class-group .class-time {
+            font-weight: 500;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+        .class-view-discipline .instructor-group .class-group .student-tag {
+            background: var(--panel);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            display: inline-block;
+            margin: 2px;
+        }
+        /* Discipline list */
+        #discipline-list .list-header {
+            display: grid;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--panel-alt);
+            border-radius: var(--radius) var(--radius) 0 0;
+            border: 1px solid var(--border);
+            border-bottom: none;
+            font-weight: 600;
+            font-size: 0.65rem;
             color: var(--text-dim);
-            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            min-width: 700px;
+            grid-template-columns: 1.5fr 0.9fr 1.2fr 0.8fr 0.8fr 0.7fr 1fr;
         }
-        .available-discipline.full {
-            opacity: 0.4;
-            border-left-color: var(--border);
+        #discipline-list .list-item {
+            display: grid;
+            gap: 6px;
+            padding: 8px 12px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-top: none;
+            align-items: center;
+            min-width: 700px;
+            grid-template-columns: 1.5fr 0.9fr 1.2fr 0.8fr 0.8fr 0.7fr 1fr;
+            font-size: 0.78rem;
+            word-break: break-word;
         }
+        #discipline-list .list-item:last-child {
+            border-radius: 0 0 var(--radius) var(--radius);
+        }
+        #discipline-list .list-item .actions {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        @media (max-width: 768px) {
+            #discipline-list .list-header {
+                min-width: 600px;
+                font-size: 0.55rem;
+                padding: 6px 8px;
+                gap: 4px;
+                grid-template-columns: 1.2fr 0.7fr 0.8fr 0.6fr 0.6fr 0.5fr 0.8fr;
+            }
+            #discipline-list .list-item {
+                min-width: 600px;
+                font-size: 0.65rem;
+                padding: 6px 8px;
+                gap: 4px;
+                grid-template-columns: 1.2fr 0.7fr 0.8fr 0.6fr 0.6fr 0.5fr 0.8fr;
+            }
+        }
+        @media (max-width: 480px) {
+            #discipline-list .list-header {
+                min-width: 500px;
+                font-size: 0.5rem;
+                padding: 4px 6px;
+                gap: 3px;
+                grid-template-columns: 1fr 0.6fr 0.6fr 0.5fr 0.5fr 0.4fr 0.6fr;
+            }
+            #discipline-list .list-item {
+                min-width: 500px;
+                font-size: 0.55rem;
+                padding: 4px 6px;
+                gap: 3px;
+                grid-template-columns: 1fr 0.6fr 0.6fr 0.5fr 0.5fr 0.4fr 0.6fr;
+            }
+        }
+        /* Rest days */
         .rest-day-controls {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -163,6 +317,87 @@
         .rest-day-controls input[type="checkbox"] {
             accent-color: var(--accent);
             width: auto;
+        }
+        /* Instructor entry */
+        .instructor-entry {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .instructor-entry select {
+            flex: 1;
+            min-width: 120px;
+            background: var(--panel-alt);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 5px 8px;
+            font-size: 0.78rem;
+            font-family: Inter, sans-serif;
+        }
+        .instructor-entry .remove-instructor {
+            padding: 4px 8px;
+            font-size: 0.65rem;
+        }
+        /* Grading entry */
+        .grading-entry {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .grading-entry input {
+            background: var(--panel-alt);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 5px 8px;
+            font-size: 0.78rem;
+            font-family: 'Inter', sans-serif;
+            flex: 1;
+            min-width: 60px;
+        }
+        /* Calendar controls */
+        .calendar-controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .calendar-controls .student-selector,
+        .calendar-controls .instructor-selector,
+        .calendar-controls .week-nav {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .calendar-controls select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 5px 8px;
+            font-size: 0.78rem;
+            font-family: 'Inter', sans-serif;
+            max-width: 200px;
+        }
+        .calendar-controls select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        @media (max-width: 600px) {
+            .calendar-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .calendar-controls select {
+                max-width: 100%;
+            }
         }
     </style>
 </head>
@@ -187,149 +422,7 @@
     </header>
 
     <main id="app-container">
-        <div class="tab-container">
-            <div class="tab-nav">
-                <button class="tab-btn active" data-tab="disciplines">Disciplines</button>
-                <button class="tab-btn" data-tab="schedule">📅 Schedule</button>
-                <button class="tab-btn" data-tab="grades">Grades</button>
-                <button class="tab-btn" data-tab="ranking">Ranking</button>
-            </div>
-            <div class="tab-content">
-                <!-- TAB 1: Disciplines -->
-                <div id="tab-disciplines" class="tab-panel active">
-                    <div class="page-header">
-                        <h2>Disciplines</h2>
-                        <button id="add-discipline-btn" class="primary">+ Add Discipline</button>
-                    </div>
-                    <div id="discipline-list">
-                        <div class="list-header">
-                            <span>Discipline</span>
-                            <span>Instructor</span>
-                            <span>Weeks</span>
-                            <span>Hours/Week</span>
-                            <span>Students</span>
-                            <span>Actions</span>
-                        </div>
-                        <div id="disciplines-container"></div>
-                    </div>
-                    <!-- Discipline Form -->
-                    <div id="discipline-form" class="form-container hidden">
-                        <h3 id="discipline-form-title">Add Discipline</h3>
-                        <form id="discipline-form-inner">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label>Discipline Name *</label>
-                                    <input type="text" id="discipline-name" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Curriculum (free text)</label>
-                                    <input type="text" id="discipline-curriculum" placeholder="e.g., Mathematics, Physics...">
-                                </div>
-                                <div class="form-group">
-                                    <label>Start Week</label>
-                                    <input type="number" id="discipline-start-week" min="1" max="52">
-                                </div>
-                                <div class="form-group">
-                                    <label>End Week</label>
-                                    <input type="number" id="discipline-end-week" min="1" max="52">
-                                </div>
-                                <div class="form-group">
-                                    <label>Weekly Hours</label>
-                                    <input type="number" id="discipline-hours" min="1" max="40" step="0.5">
-                                </div>
-                                <div class="form-group">
-                                    <label>Instructor</label>
-                                    <select id="discipline-instructor">
-                                        <option value="">Select instructor...</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>Max Students per Class</label>
-                                    <input type="number" id="discipline-students" min="1" max="100">
-                                </div>
-                                <div class="form-group">
-                                    <label>Weight (for grade calculation)</label>
-                                    <input type="number" id="discipline-weight" min="0.1" max="10" step="0.1" value="1">
-                                </div>
-                                <div class="form-group full-width">
-                                    <label>Grading System</label>
-                                    <div id="grading-system-container">
-                                        <div class="grading-entry">
-                                            <input type="text" class="grading-letter" placeholder="Letter" style="width:80px;">
-                                            <input type="number" class="grading-min" placeholder="Min %" min="0" max="100" style="width:80px;">
-                                            <input type="number" class="grading-max" placeholder="Max %" min="0" max="100" style="width:80px;">
-                                            <button type="button" class="small danger remove-grading">✕</button>
-                                        </div>
-                                    </div>
-                                    <button type="button" id="add-grading-btn" class="small" style="margin-top:8px;">+ Add Grade Level</button>
-                                </div>
-                            </div>
-                            <div class="form-actions">
-                                <button type="button" id="cancel-discipline-btn" class="secondary">Cancel</button>
-                                <button type="submit" id="save-discipline-btn" class="primary">Save Discipline</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- TAB 2: Schedule -->
-                <div id="tab-schedule" class="tab-panel">
-                    <div id="schedule-container"></div>
-                </div>
-
-                <!-- TAB 3: Grades -->
-                <div id="tab-grades" class="tab-panel">
-                    <div id="grades-view">
-                        <div class="page-header">
-                            <h2>Grades</h2>
-                        </div>
-                        <div class="grades-controls">
-                            <div class="student-selector">
-                                <label for="grades-student">Student:</label>
-                                <select id="grades-student">
-                                    <option value="">Select a student...</option>
-                                </select>
-                            </div>
-                            <div class="week-nav">
-                                <button id="prev-grade-week" class="small">← Prev</button>
-                                <span id="grade-week-display" style="font-weight:600;min-width:80px;text-align:center;">Week 1</span>
-                                <button id="next-grade-week" class="small">Next →</button>
-                            </div>
-                        </div>
-                        <div id="grades-container">
-                            <p class="empty-state">Select a student to view and manage grades</p>
-                        </div>
-                        <div class="grades-summary">
-                            <h3>Weekly Summary</h3>
-                            <div id="grades-summary-content">
-                                <p class="empty-state">No grades data available</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 4: Ranking -->
-                <div id="tab-ranking" class="tab-panel">
-                    <div id="ranking-view">
-                        <div class="page-header">
-                            <h2>Ranking</h2>
-                        </div>
-                        <div class="ranking-controls">
-                            <div class="week-nav">
-                                <button id="prev-rank-week" class="small">← Prev</button>
-                                <span id="rank-week-display" style="font-weight:600;min-width:80px;text-align:center;">Week 1</span>
-                                <button id="next-rank-week" class="small">Next →</button>
-                            </div>
-                            <button id="auto-rank-btn" class="small primary">Auto-Rank</button>
-                            <button id="save-rankings-btn" class="small primary">Save Rankings</button>
-                        </div>
-                        <div id="ranking-container">
-                            <p class="empty-state">No ranking data available for this week</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- Content rendered by curriculum-main.js -->
     </main>
 
     <div id="modal-container" class="modal hidden">
@@ -345,103 +438,26 @@
     <script src="js/database.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/export.js"></script>
-    <script src="js/curriculum.js"></script>
     <script src="js/schedule.js"></script>
+    <script src="js/curriculum/curriculum-main.js"></script>
+    <script src="js/curriculum/disciplines.js"></script>
+    <script src="js/curriculum/class-view.js"></script>
+    <script src="js/curriculum/instructor-calendar.js"></script>
+    <script src="js/curriculum/grades.js"></script>
+    <script src="js/curriculum/ranking.js"></script>
     <script src="js/app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Wait for data to load
             var checkData = setInterval(function() {
                 if (typeof data !== 'undefined' && data) {
                     clearInterval(checkData);
-                    initCurriculumPage();
+                    var container = document.getElementById('app-container');
+                    if (container && typeof renderCurriculumView === 'function') {
+                        renderCurriculumView(container);
+                    }
                 }
             }, 200);
         });
-
-        function initCurriculumPage() {
-            // Initialize tabs
-            var tabs = document.querySelectorAll('.tab-btn');
-            var panels = {
-                disciplines: document.getElementById('tab-disciplines'),
-                schedule: document.getElementById('tab-schedule'),
-                grades: document.getElementById('tab-grades'),
-                ranking: document.getElementById('tab-ranking')
-            };
-
-            // Hide all panels
-            for (var key in panels) {
-                if (panels[key]) {
-                    panels[key].style.display = 'none';
-                    panels[key].classList.remove('active');
-                }
-            }
-
-            // Show active tab
-            var activeTab = document.querySelector('.tab-btn.active');
-            if (activeTab) {
-                var tabName = activeTab.dataset.tab;
-                if (panels[tabName]) {
-                    panels[tabName].style.display = 'block';
-                    panels[tabName].classList.add('active');
-                }
-            }
-
-            // Tab click handlers
-            tabs.forEach(function(tab) {
-                tab.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    tabs.forEach(function(t) { t.classList.remove('active'); });
-                    this.classList.add('active');
-                    
-                    var tabName = this.dataset.tab;
-                    for (var key in panels) {
-                        if (panels[key]) {
-                            panels[key].style.display = 'none';
-                            panels[key].classList.remove('active');
-                        }
-                    }
-                    if (panels[tabName]) {
-                        panels[tabName].style.display = 'block';
-                        panels[tabName].classList.add('active');
-                    }
-                    
-                    // Refresh content
-                    if (tabName === 'disciplines' && typeof renderDisciplines === 'function') {
-                        renderDisciplines();
-                    } else if (tabName === 'schedule' && typeof renderScheduleView === 'function') {
-                        var container = document.getElementById('schedule-container');
-                        if (container) renderScheduleView(container);
-                    } else if (tabName === 'grades' && typeof renderGrades === 'function') {
-                        renderGrades();
-                    } else if (tabName === 'ranking' && typeof renderRanking === 'function') {
-                        renderRanking();
-                    }
-                });
-            });
-
-            // Render initial content
-            renderDisciplines();
-            
-            // Render schedule
-            var scheduleContainer = document.getElementById('schedule-container');
-            if (scheduleContainer && typeof renderScheduleView === 'function') {
-                renderScheduleView(scheduleContainer);
-            }
-            
-            // Render grades
-            if (typeof renderGrades === 'function') {
-                renderGrades();
-            }
-            
-            // Render ranking
-            if (typeof renderRanking === 'function') {
-                renderRanking();
-            }
-            
-            // Initialize events
-            initCurriculumEvents();
-        }
     </script>
 </body>
 </html>
