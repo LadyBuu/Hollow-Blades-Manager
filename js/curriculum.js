@@ -1,13 +1,11 @@
 /**
  * curriculum.js - Curriculum Management
- * Handles disciplines, calendar, grades, and ranking tabs
+ * Handles disciplines, grades, and ranking tabs (schedule is now in schedule.js)
  */
 
 // Curriculum state
-var currentCalendarWeek = 1;
 var currentGradeWeek = 1;
 var currentRankWeek = 1;
-var selectedStudentId = null;
 var selectedGradeStudentId = null;
 
 /**
@@ -15,21 +13,20 @@ var selectedGradeStudentId = null;
  */
 function renderCurriculumView(container) {
     container.innerHTML = `
-        <div class="page-header">
-            <h2>Curriculum Manager</h2>
-            <button id="add-discipline-btn" class="primary">+ Add Discipline</button>
-        </div>
-
         <div class="tab-container">
             <div class="tab-nav">
                 <button class="tab-btn active" data-tab="disciplines">Disciplines</button>
-                <button class="tab-btn" data-tab="calendar">Weekly Calendar</button>
+                <button class="tab-btn" data-tab="schedule">📅 Schedule</button>
                 <button class="tab-btn" data-tab="grades">Grades</button>
                 <button class="tab-btn" data-tab="ranking">Ranking</button>
             </div>
             <div class="tab-content">
                 <!-- TAB 1: Disciplines -->
                 <div id="tab-disciplines" class="tab-panel active">
+                    <div class="page-header">
+                        <h2>Disciplines</h2>
+                        <button id="add-discipline-btn" class="primary">+ Add Discipline</button>
+                    </div>
                     <div id="discipline-list">
                         <div class="list-header">
                             <span>Discipline</span>
@@ -41,97 +38,77 @@ function renderCurriculumView(container) {
                         </div>
                         <div id="disciplines-container"></div>
                     </div>
+                    <!-- Discipline Form -->
+                    <div id="discipline-form" class="form-container hidden">
+                        <h3 id="discipline-form-title">Add Discipline</h3>
+                        <form id="discipline-form-inner">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Discipline Name *</label>
+                                    <input type="text" id="discipline-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Curriculum (free text)</label>
+                                    <input type="text" id="discipline-curriculum" placeholder="e.g., Mathematics, Physics...">
+                                </div>
+                                <div class="form-group">
+                                    <label>Start Week</label>
+                                    <input type="number" id="discipline-start-week" min="1" max="52">
+                                </div>
+                                <div class="form-group">
+                                    <label>End Week</label>
+                                    <input type="number" id="discipline-end-week" min="1" max="52">
+                                </div>
+                                <div class="form-group">
+                                    <label>Weekly Hours</label>
+                                    <input type="number" id="discipline-hours" min="1" max="40" step="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label>Instructor</label>
+                                    <select id="discipline-instructor">
+                                        <option value="">Select instructor...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Max Students per Class</label>
+                                    <input type="number" id="discipline-students" min="1" max="100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Weight (for grade calculation)</label>
+                                    <input type="number" id="discipline-weight" min="0.1" max="10" step="0.1" value="1">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Grading System</label>
+                                    <div id="grading-system-container">
+                                        <div class="grading-entry">
+                                            <input type="text" class="grading-letter" placeholder="Letter" style="width:80px;">
+                                            <input type="number" class="grading-min" placeholder="Min %" min="0" max="100" style="width:80px;">
+                                            <input type="number" class="grading-max" placeholder="Max %" min="0" max="100" style="width:80px;">
+                                            <button type="button" class="small danger remove-grading">✕</button>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="add-grading-btn" class="small" style="margin-top:8px;">+ Add Grade Level</button>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="cancel-discipline-btn" class="secondary">Cancel</button>
+                                <button type="submit" id="save-discipline-btn" class="primary">Save Discipline</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
 
-                <!-- TAB 2: Calendar -->
-                <div id="tab-calendar" class="tab-panel">
-                    <div id="calendar-view">
-                        <div class="calendar-controls">
-                            <div class="student-selector">
-                                <label for="calendar-student">Student:</label>
-                                <select id="calendar-student">
-                                    <option value="">Select a student...</option>
-                                </select>
-                            </div>
-                            <div class="week-nav">
-                                <button id="prev-cal-week" class="small">← Prev</button>
-                                <span id="cal-week-display" style="font-weight:600;min-width:80px;text-align:center;">Week 1</span>
-                                <button id="next-cal-week" class="small">Next →</button>
-                            </div>
-                            <button id="set-cal-week" class="small primary">Jump to Week</button>
-                            <button id="export-schedule-btn" class="small primary">Export Schedule</button>
-                        </div>
-                        <div class="calendar-container">
-                            <div class="calendar-grid">
-                                <div class="day-column" data-day="1">
-                                    <div class="day-header">Mon</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                                <div class="day-column" data-day="2">
-                                    <div class="day-header">Tue</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                                <div class="day-column" data-day="3">
-                                    <div class="day-header">Wed</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                                <div class="day-column" data-day="4">
-                                    <div class="day-header">Thu</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                                <div class="day-column" data-day="5">
-                                    <div class="day-header">Fri</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                                <div class="day-column" data-day="6">
-                                    <div class="day-header">Sat</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                                <div class="day-column" data-day="7">
-                                    <div class="day-header">Sun</div>
-                                    <div class="day-slots"></div>
-                                </div>
-                            </div>
-                            <div class="calendar-sidebar">
-                                <div class="sidebar-section">
-                                    <h4>Week Overview</h4>
-                                    <div id="week-overview">
-                                        <p class="empty-state">No classes scheduled</p>
-                                    </div>
-                                </div>
-                                <div class="sidebar-section">
-                                    <h4>Available Disciplines</h4>
-                                    <div id="available-disciplines">
-                                        <p class="empty-state">No disciplines available this week</p>
-                                    </div>
-                                </div>
-                                <div class="sidebar-section">
-                                    <h4>Rest Days</h4>
-                                    <div class="rest-day-controls">
-                                        <label><input type="checkbox" class="rest-day" data-day="1"> Mon</label>
-                                        <label><input type="checkbox" class="rest-day" data-day="2"> Tue</label>
-                                        <label><input type="checkbox" class="rest-day" data-day="3"> Wed</label>
-                                        <label><input type="checkbox" class="rest-day" data-day="4"> Thu</label>
-                                        <label><input type="checkbox" class="rest-day" data-day="5"> Fri</label>
-                                        <label><input type="checkbox" class="rest-day" data-day="6"> Sat</label>
-                                        <label><input type="checkbox" class="rest-day" data-day="7"> Sun</label>
-                                    </div>
-                                    <button id="save-rest-days" class="small primary">Save Rest Days</button>
-                                </div>
-                                <div class="sidebar-section">
-                                    <h4>Hours Used</h4>
-                                    <div id="hours-used">
-                                        <span>Used: <strong id="used-hours">0</strong> / <span id="total-hours">0</span></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <!-- TAB 2: Schedule -->
+                <div id="tab-schedule" class="tab-panel">
+                    <div id="schedule-container"></div>
                 </div>
 
                 <!-- TAB 3: Grades -->
                 <div id="tab-grades" class="tab-panel">
                     <div id="grades-view">
+                        <div class="page-header">
+                            <h2>Grades</h2>
+                        </div>
                         <div class="grades-controls">
                             <div class="student-selector">
                                 <label for="grades-student">Student:</label>
@@ -160,6 +137,9 @@ function renderCurriculumView(container) {
                 <!-- TAB 4: Ranking -->
                 <div id="tab-ranking" class="tab-panel">
                     <div id="ranking-view">
+                        <div class="page-header">
+                            <h2>Ranking</h2>
+                        </div>
                         <div class="ranking-controls">
                             <div class="week-nav">
                                 <button id="prev-rank-week" class="small">← Prev</button>
@@ -176,65 +156,6 @@ function renderCurriculumView(container) {
                 </div>
             </div>
         </div>
-
-        <!-- Discipline Form (outside tabs, shown/hidden separately) -->
-        <div id="discipline-form" class="form-container hidden">
-            <h3 id="discipline-form-title">Add Discipline</h3>
-            <form id="discipline-form-inner">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Discipline Name *</label>
-                        <input type="text" id="discipline-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Curriculum (free text)</label>
-                        <input type="text" id="discipline-curriculum" placeholder="e.g., Mathematics, Physics...">
-                    </div>
-                    <div class="form-group">
-                        <label>Start Week</label>
-                        <input type="number" id="discipline-start-week" min="1" max="52">
-                    </div>
-                    <div class="form-group">
-                        <label>End Week</label>
-                        <input type="number" id="discipline-end-week" min="1" max="52">
-                    </div>
-                    <div class="form-group">
-                        <label>Weekly Hours</label>
-                        <input type="number" id="discipline-hours" min="1" max="40" step="0.5">
-                    </div>
-                    <div class="form-group">
-                        <label>Instructor</label>
-                        <select id="discipline-instructor">
-                            <option value="">Select instructor...</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Max Students per Class</label>
-                        <input type="number" id="discipline-students" min="1" max="100">
-                    </div>
-                    <div class="form-group">
-                        <label>Weight (for grade calculation)</label>
-                        <input type="number" id="discipline-weight" min="0.1" max="10" step="0.1" value="1">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Grading System</label>
-                        <div id="grading-system-container">
-                            <div class="grading-entry">
-                                <input type="text" class="grading-letter" placeholder="Letter" style="width:80px;">
-                                <input type="number" class="grading-min" placeholder="Min %" min="0" max="100" style="width:80px;">
-                                <input type="number" class="grading-max" placeholder="Max %" min="0" max="100" style="width:80px;">
-                                <button type="button" class="small danger remove-grading">✕</button>
-                            </div>
-                        </div>
-                        <button type="button" id="add-grading-btn" class="small" style="margin-top:8px;">+ Add Grade Level</button>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" id="cancel-discipline-btn" class="secondary">Cancel</button>
-                    <button type="submit" id="save-discipline-btn" class="primary">Save Discipline</button>
-                </div>
-            </form>
-        </div>
     `;
 
     // Initialize tabs
@@ -242,7 +163,13 @@ function renderCurriculumView(container) {
     
     // Render content
     renderDisciplines();
-    renderCalendar();
+    
+    // Render schedule (if schedule.js is loaded)
+    var scheduleContainer = document.getElementById('schedule-container');
+    if (scheduleContainer && typeof renderScheduleView === 'function') {
+        renderScheduleView(scheduleContainer);
+    }
+    
     renderGrades();
     renderRanking();
     initCurriculumEvents();
@@ -255,7 +182,7 @@ function initCurriculumTabs() {
     var tabs = document.querySelectorAll('.tab-btn');
     var panels = {
         disciplines: document.getElementById('tab-disciplines'),
-        calendar: document.getElementById('tab-calendar'),
+        schedule: document.getElementById('tab-schedule'),
         grades: document.getElementById('tab-grades'),
         ranking: document.getElementById('tab-ranking')
     };
@@ -310,10 +237,18 @@ function initCurriculumTabs() {
             }
             
             // Refresh content when switching tabs
-            if (tabName === 'disciplines') renderDisciplines();
-            else if (tabName === 'calendar') renderCalendar();
-            else if (tabName === 'grades') renderGrades();
-            else if (tabName === 'ranking') renderRanking();
+            if (tabName === 'disciplines') {
+                renderDisciplines();
+            } else if (tabName === 'schedule') {
+                var container = document.getElementById('schedule-container');
+                if (container && typeof renderScheduleView === 'function') {
+                    renderScheduleView(container);
+                }
+            } else if (tabName === 'grades') {
+                renderGrades();
+            } else if (tabName === 'ranking') {
+                renderRanking();
+            }
         });
     });
 }
@@ -344,65 +279,6 @@ function initCurriculumEvents() {
             var container = document.getElementById('grading-system-container');
             addGradingEntry(container);
         });
-    }
-
-    // Calendar events
-    populateStudentSelector('calendar-student');
-    
-    var calStudent = document.getElementById('calendar-student');
-    if (calStudent) {
-        calStudent.addEventListener('change', function() {
-            selectedStudentId = this.value;
-            renderCalendar();
-        });
-    }
-    
-    var prevCalBtn = document.getElementById('prev-cal-week');
-    if (prevCalBtn) {
-        prevCalBtn.addEventListener('click', function() {
-            if (currentCalendarWeek > 1) {
-                currentCalendarWeek -= 2;
-                if (currentCalendarWeek < 1) currentCalendarWeek = 1;
-                renderCalendar();
-            }
-        });
-    }
-    
-    var nextCalBtn = document.getElementById('next-cal-week');
-    if (nextCalBtn) {
-        nextCalBtn.addEventListener('click', function() {
-            if (currentCalendarWeek < 52) {
-                currentCalendarWeek += 2;
-                if (currentCalendarWeek > 52) currentCalendarWeek = 52;
-                renderCalendar();
-            }
-        });
-    }
-    
-    var setCalBtn = document.getElementById('set-cal-week');
-    if (setCalBtn) {
-        setCalBtn.addEventListener('click', function() {
-            var week = prompt('Enter week number (1-52):', currentCalendarWeek);
-            if (week) {
-                var w = parseInt(week);
-                if (!isNaN(w) && w >= 1 && w <= 52) {
-                    currentCalendarWeek = Math.floor((w - 1) / 2) * 2 + 1;
-                    renderCalendar();
-                } else {
-                    alert('Please enter a valid week (1-52).');
-                }
-            }
-        });
-    }
-    
-    var saveRestBtn = document.getElementById('save-rest-days');
-    if (saveRestBtn) {
-        saveRestBtn.addEventListener('click', saveRestDays);
-    }
-    
-    var exportScheduleBtn = document.getElementById('export-schedule-btn');
-    if (exportScheduleBtn) {
-        exportScheduleBtn.addEventListener('click', exportSchedule);
     }
 
     // Grades events
@@ -475,14 +351,6 @@ function initCurriculumEvents() {
                 alert('Failed to save rankings: ' + err.message);
             });
         });
-    }
-
-    // Set initial student for calendar
-    var calSelect = document.getElementById('calendar-student');
-    if (calSelect && calSelect.options.length > 1) {
-        calSelect.selectedIndex = 1;
-        selectedStudentId = calSelect.value;
-        renderCalendar();
     }
     
     // Set initial student for grades
@@ -755,523 +623,6 @@ function deleteDiscipline(id) {
 }
 
 // ============================================================
-// CALENDAR VIEW
-// ============================================================
-
-/**
- * Render calendar view - FIXED to properly refresh slots
- */
-function renderCalendar() {
-    // Make sure we have fresh data
-    if (!data.curriculum.schedules) {
-        data.curriculum.schedules = {};
-    }
-    
-    var grid = document.querySelector('.calendar-grid');
-    var sidebar = document.querySelector('.calendar-sidebar');
-    
-    if (!selectedStudentId) {
-        if (grid) grid.style.display = 'none';
-        if (sidebar) sidebar.innerHTML = '<p class="empty-state">Please select a student</p>';
-        return;
-    }
-    
-    if (grid) grid.style.display = 'grid';
-    
-    var weekDisplay = document.getElementById('cal-week-display');
-    if (weekDisplay) weekDisplay.textContent = 'Week ' + currentCalendarWeek;
-    
-    var restDays = data.curriculum.restDays[currentCalendarWeek] || [];
-    var examDays = data.curriculum.examDays[currentCalendarWeek] || [];
-    var schedule = getStudentSchedule(selectedStudentId, currentCalendarWeek);
-    
-    var hours = [];
-    for (var h = 5; h <= 24; h++) {
-        hours.push(h);
-    }
-    
-    for (var day = 1; day <= 7; day++) {
-        var column = document.querySelector('.day-column[data-day="' + day + '"]');
-        if (!column) continue;
-        var slots = column.querySelector('.day-slots');
-        if (!slots) continue;
-        var isRestDay = restDays.indexOf(day) !== -1;
-        var isExamDay = examDays.indexOf(day) !== -1;
-        
-        column.classList.toggle('rest-day', isRestDay);
-        column.classList.toggle('exam-day', isExamDay);
-        
-        // Clear all existing slots
-        slots.innerHTML = '';
-        
-        hours.forEach(function(hour) {
-            var slot = document.createElement('div');
-            slot.className = 'time-slot';
-            slot.dataset.day = day;
-            slot.dataset.hour = hour;
-            
-            // Time label
-            var timeLabel = document.createElement('span');
-            timeLabel.className = 'slot-time';
-            var hourDisplay = hour;
-            var ampm = 'AM';
-            if (hour >= 12) {
-                ampm = 'PM';
-                if (hour > 12) hourDisplay = hour - 12;
-            }
-            if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
-            if (hour === 12) { ampm = 'PM'; }
-            timeLabel.textContent = hourDisplay + ':00 ' + ampm;
-            slot.appendChild(timeLabel);
-            
-            if (isRestDay || isExamDay) {
-                slot.classList.add('empty');
-                var statusText = document.createElement('span');
-                statusText.className = 'slot-label';
-                statusText.textContent = isExamDay ? 'Exam' : 'Rest';
-                slot.appendChild(statusText);
-                slots.appendChild(slot);
-                return;
-            }
-            
-            // Check if this slot has a class
-            var disciplineId = null;
-            if (schedule && schedule[day] && schedule[day][hour]) {
-                disciplineId = schedule[day][hour];
-            }
-            
-            if (disciplineId) {
-                var discipline = getDiscipline(disciplineId);
-                if (discipline) {
-                    slot.classList.add('occupied');
-                    var label = document.createElement('span');
-                    label.className = 'slot-label';
-                    label.textContent = discipline.name;
-                    slot.appendChild(label);
-                    
-                    slot.title = discipline.name + ' (Click for details)';
-                    slot.addEventListener('click', function() {
-                        showClassDetails(selectedStudentId, disciplineId, currentCalendarWeek, day, hour);
-                    });
-                    
-                    slot.addEventListener('contextmenu', function(e) {
-                        e.preventDefault();
-                        if (confirm('Remove this class from the schedule?')) {
-                            removeClassFromSchedule(selectedStudentId, currentCalendarWeek, day, hour);
-                        }
-                    });
-                } else {
-                    // Discipline not found - show error
-                    slot.classList.add('empty');
-                    var errorLabel = document.createElement('span');
-                    errorLabel.className = 'slot-label';
-                    errorLabel.textContent = '?';
-                    slot.appendChild(errorLabel);
-                    slot.title = 'Unknown discipline (ID: ' + disciplineId + ')';
-                }
-            } else {
-                slot.classList.add('empty');
-                var plusLabel = document.createElement('span');
-                plusLabel.className = 'slot-label';
-                plusLabel.textContent = '+';
-                slot.appendChild(plusLabel);
-                slot.title = 'Click to add class';
-                slot.addEventListener('click', function() {
-                    showAddClassModal(selectedStudentId, currentCalendarWeek, day, hour);
-                });
-            }
-            
-            slots.appendChild(slot);
-        });
-    }
-    
-    updateCalendarSidebar();
-}
-
-/**
- * Update calendar sidebar
- */
-function updateCalendarSidebar() {
-    var overview = document.getElementById('week-overview');
-    if (!overview) return;
-    
-    var schedule = getStudentSchedule(selectedStudentId, currentCalendarWeek);
-    var classList = [];
-    var totalHours = 0;
-    
-    for (var day in schedule) {
-        for (var hour in schedule[day]) {
-            var disciplineId = schedule[day][hour];
-            if (disciplineId) {
-                var discipline = getDiscipline(disciplineId);
-                if (discipline) {
-                    classList.push({
-                        day: parseInt(day),
-                        hour: parseInt(hour),
-                        discipline: discipline.name,
-                        disciplineId: disciplineId
-                    });
-                    totalHours++;
-                }
-            }
-        }
-    }
-    
-    if (classList.length === 0) {
-        overview.innerHTML = '<p class="empty-state">No classes scheduled</p>';
-    } else {
-        var dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        var html = '';
-        classList.sort(function(a, b) {
-            if (a.day !== b.day) return a.day - b.day;
-            return a.hour - b.hour;
-        });
-        classList.forEach(function(cls) {
-            var hourDisplay = cls.hour;
-            var ampm = 'AM';
-            if (cls.hour >= 12) {
-                ampm = 'PM';
-                if (cls.hour > 12) hourDisplay = cls.hour - 12;
-            }
-            if (cls.hour === 0) { hourDisplay = 12; ampm = 'AM'; }
-            if (cls.hour === 12) { ampm = 'PM'; }
-            html += '<div class="activity-item" style="font-size:0.75rem;padding:4px 8px;">' +
-                dayNames[cls.day] + ' ' + hourDisplay + ':00 ' + ampm + ' - ' + cls.discipline +
-            '</div>';
-        });
-        overview.innerHTML = html;
-    }
-    
-    // Available disciplines
-    var availContainer = document.getElementById('available-disciplines');
-    if (availContainer) {
-        var availableDisciplines = getAvailableDisciplines(currentCalendarWeek);
-        
-        if (availableDisciplines.length === 0) {
-            availContainer.innerHTML = '<p class="empty-state">No disciplines available this week</p>';
-        } else {
-            var disciplineHours = getDisciplineHours(selectedStudentId, currentCalendarWeek);
-            var html = '';
-            availableDisciplines.sort(function(a, b) { return a.name.localeCompare(b.name); });
-            availableDisciplines.forEach(function(d) {
-                var used = disciplineHours[d.id] || 0;
-                var total = d.weeklyHours || 1;
-                var isFull = used >= total;
-                var instructor = data.characters.find(function(c) { return String(c.id) === String(d.instructorId); });
-                var instructorName = instructor ? instructor.firstName : 'TBD';
-                
-                html += '<div class="available-discipline' + (isFull ? ' full' : '') + '">' +
-                    '<span>' + d.name + ' (' + instructorName + ')</span>' +
-                    '<span class="hours">' + used + '/' + total + 'h</span>' +
-                '</div>';
-            });
-            availContainer.innerHTML = html;
-        }
-    }
-    
-    // Hours used
-    var totalEl = document.getElementById('total-hours');
-    var usedEl = document.getElementById('used-hours');
-    if (totalEl && usedEl) {
-        var totalHoursCalc = 0;
-        var availDisc = getAvailableDisciplines(currentCalendarWeek);
-        availDisc.forEach(function(d) {
-            totalHoursCalc += d.weeklyHours || 0;
-        });
-        totalEl.textContent = totalHoursCalc;
-        usedEl.textContent = classList.length;
-    }
-}
-
-/**
- * Show add class modal - FIXED to properly refresh after adding
- */
-function showAddClassModal(studentId, week, day, hour) {
-    var availableDisciplines = getAvailableDisciplines(week);
-    var disciplineHours = getDisciplineHours(studentId, week);
-    
-    var availableFiltered = availableDisciplines.filter(function(d) {
-        var used = disciplineHours[d.id] || 0;
-        var total = d.weeklyHours || 1;
-        return used < total;
-    });
-    
-    if (availableFiltered.length === 0) {
-        alert('All disciplines are full for this week.');
-        return;
-    }
-    
-    var hourDisplay = hour;
-    var ampm = 'AM';
-    if (hour >= 12) {
-        ampm = 'PM';
-        if (hour > 12) hourDisplay = hour - 12;
-    }
-    if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
-    if (hour === 12) { ampm = 'PM'; }
-    var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    
-    var modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-header">
-                <h3>Add Class - Week ${week}, ${dayNames[day]} at ${hourDisplay}:00 ${ampm}</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Select Discipline:</label>
-                    <select id="add-class-discipline" style="width:100%;padding:8px;">
-                        ${availableFiltered.map(function(d) {
-                            var used = disciplineHours[d.id] || 0;
-                            var total = d.weeklyHours || 1;
-                            var instructor = data.characters.find(function(c) { return String(c.id) === String(d.instructorId); });
-                            var instructorName = instructor ? instructor.firstName : 'TBD';
-                            return '<option value="' + d.id + '">' + d.name + ' (' + instructorName + ') - ' + used + '/' + total + 'h</option>';
-                        }).join('')}
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="button" id="cancel-add-class" class="secondary">Cancel</button>
-                    <button type="button" id="confirm-add-class" class="primary">Add Class</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-    modal.querySelector('#cancel-add-class').onclick = function() { modal.remove(); };
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.remove();
-    });
-    
-    modal.querySelector('#confirm-add-class').onclick = function() {
-        var disciplineId = document.getElementById('add-class-discipline').value;
-        if (!disciplineId) { alert('Please select a discipline.'); return; }
-        
-        // Initialize schedule structure
-        if (!data.curriculum.schedules[studentId]) {
-            data.curriculum.schedules[studentId] = {};
-        }
-        if (!data.curriculum.schedules[studentId][week]) {
-            data.curriculum.schedules[studentId][week] = {};
-        }
-        if (!data.curriculum.schedules[studentId][week][day]) {
-            data.curriculum.schedules[studentId][week][day] = {};
-        }
-        
-        if (data.curriculum.schedules[studentId][week][day][hour]) {
-            alert('This slot is already occupied.');
-            modal.remove();
-            return;
-        }
-        
-        data.curriculum.schedules[studentId][week][day][hour] = disciplineId;
-        
-        // Remove the modal first, then save and render
-        modal.remove();
-        
-        // Force save and then render with proper refresh
-        saveData().then(function() {
-            if (typeof logActivity === 'function') {
-                logActivity('Added class to student schedule');
-            }
-            // Force a complete re-render of the calendar
-            renderCalendar();
-        }).catch(function(err) { 
-            console.error('Failed to save:', err); 
-            alert('Failed to save class. Please try again.');
-            // Still try to render even if save failed
-            renderCalendar();
-        });
-    };
-}
-
-/**
- * Show class details
- */
-function showClassDetails(studentId, disciplineId, week, day, hour) {
-    var discipline = getDiscipline(disciplineId);
-    if (!discipline) return;
-    
-    var instructor = data.characters.find(function(c) { return String(c.id) === String(discipline.instructorId); });
-    var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Not assigned';
-    
-    var otherStudents = [];
-    var students = getStudents();
-    students.forEach(function(student) {
-        if (String(student.id) === String(studentId)) return;
-        var schedule = getStudentSchedule(student.id, week);
-        if (schedule[day] && String(schedule[day][hour]) === String(disciplineId)) {
-            otherStudents.push([student.firstName, student.lastName].filter(function(n) { return n; }).join(' '));
-        }
-    });
-    
-    var hourDisplay = hour;
-    var ampm = 'AM';
-    if (hour >= 12) {
-        ampm = 'PM';
-        if (hour > 12) hourDisplay = hour - 12;
-    }
-    if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
-    if (hour === 12) { ampm = 'PM'; }
-    var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    
-    var modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:450px;">
-            <div class="modal-header">
-                <h3>${discipline.name}</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="detail-row"><span class="label">Instructor:</span> <span>${instructorName}</span></div>
-                <div class="detail-row"><span class="label">Curriculum:</span> <span>${discipline.curriculum || 'N/A'}</span></div>
-                <div class="detail-row"><span class="label">Week:</span> <span>${week}</span></div>
-                <div class="detail-row"><span class="label">Day/Time:</span> <span>${dayNames[day]} at ${hourDisplay}:00 ${ampm}</span></div>
-                <div class="detail-row"><span class="label">Students:</span> <span>${otherStudents.length > 0 ? otherStudents.join(', ') : 'Only this student'}</span></div>
-                <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" id="remove-class-btn" class="danger small">Remove from Schedule</button>
-                    <button type="button" id="close-detail-btn" class="secondary small">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-    modal.querySelector('#close-detail-btn').onclick = function() { modal.remove(); };
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.remove();
-    });
-    
-    modal.querySelector('#remove-class-btn').onclick = function() {
-        if (confirm('Remove this class from the schedule?')) {
-            removeClassFromSchedule(studentId, week, day, hour);
-            modal.remove();
-        }
-    };
-}
-
-/**
- * Remove class from schedule
- */
-function removeClassFromSchedule(studentId, week, day, hour) {
-    var schedule = getStudentSchedule(studentId, week);
-    if (schedule[day] && schedule[day][hour]) {
-        delete schedule[day][hour];
-        saveData().catch(function(err) { console.error('Failed to save:', err); });
-        renderCalendar();
-        if (typeof logActivity === 'function') {
-            logActivity('Removed class from schedule');
-        }
-    }
-}
-
-/**
- * Save rest days
- */
-function saveRestDays() {
-    var checkboxes = document.querySelectorAll('.rest-day');
-    var restDays = [];
-    checkboxes.forEach(function(cb) {
-        if (cb.checked) {
-            restDays.push(parseInt(cb.dataset.day));
-        }
-    });
-    data.curriculum.restDays[currentCalendarWeek] = restDays;
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    renderCalendar();
-    if (typeof logActivity === 'function') {
-        logActivity('Saved rest days for week ' + currentCalendarWeek);
-    }
-}
-
-/**
- * Export schedule
- */
-function exportSchedule() {
-    if (!selectedStudentId) {
-        alert('Please select a student first.');
-        return;
-    }
-    
-    var student = data.characters.find(function(c) { return String(c.id) === String(selectedStudentId); });
-    var studentName = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-    var schedule = getStudentSchedule(selectedStudentId, currentCalendarWeek);
-    var restDays = data.curriculum.restDays[currentCalendarWeek] || [];
-    var examDays = data.curriculum.examDays[currentCalendarWeek] || [];
-    
-    var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    var hours = [];
-    for (var h = 5; h <= 24; h++) {
-        hours.push(h);
-    }
-    
-    var table = '<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;">';
-    table += '<tr><th style="background:#eee;">Time</th>';
-    for (var d = 1; d <= 7; d++) {
-        var isRest = restDays.indexOf(d) !== -1;
-        var isExam = examDays.indexOf(d) !== -1;
-        var label = dayNames[d];
-        if (isRest) label += ' (Rest)';
-        if (isExam) label += ' (Exam)';
-        table += '<th style="background:#eee;">' + label + '</th>';
-    }
-    table += '</tr>';
-    
-    hours.forEach(function(hour) {
-        var hourDisplay = hour;
-        var ampm = 'AM';
-        if (hour >= 12) {
-            ampm = 'PM';
-            if (hour > 12) hourDisplay = hour - 12;
-        }
-        if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
-        if (hour === 12) { ampm = 'PM'; }
-        var timeLabel = hourDisplay + ':00 ' + ampm;
-        table += '<tr><td style="font-weight:bold;">' + timeLabel + '</td>';
-        for (var d = 1; d <= 7; d++) {
-            var isRest = restDays.indexOf(d) !== -1;
-            var isExam = examDays.indexOf(d) !== -1;
-            var cell = '';
-            if (isRest) {
-                cell = 'Rest';
-            } else if (isExam) {
-                cell = 'Exam';
-            } else if (schedule[d] && schedule[d][hour]) {
-                var discipline = getDiscipline(schedule[d][hour]);
-                if (discipline) {
-                    var instructor = data.characters.find(function(c) { return String(c.id) === String(discipline.instructorId); });
-                    var instructorName = instructor ? instructor.firstName : 'TBD';
-                    cell = discipline.name + ' (' + instructorName + ')';
-                } else {
-                    cell = '—';
-                }
-            } else {
-                cell = '—';
-            }
-            table += '<td>' + cell + '</td>';
-        }
-        table += '</tr>';
-    });
-    table += '</table>';
-    
-    var win = window.open('', '_blank');
-    win.document.write('<html><head><title>Schedule - ' + studentName + ' Week ' + currentCalendarWeek + '</title></head><body>');
-    win.document.write('<h2>Schedule for ' + studentName + ' - Week ' + currentCalendarWeek + '</h2>');
-    win.document.write(table);
-    win.document.write('</body></html>');
-    win.document.close();
-    win.print();
-}
-
-// ============================================================
 // GRADES VIEW
 // ============================================================
 
@@ -1304,6 +655,7 @@ function renderGrades() {
         return;
     }
     
+    // Get student's schedule for this week
     var schedule = getStudentSchedule(selectedGradeStudentId, currentGradeWeek);
     var studentDisciplines = [];
     for (var day in schedule) {
@@ -1315,6 +667,7 @@ function renderGrades() {
         }
     }
     
+    if (!data.curriculum.grades) data.curriculum.grades = {};
     if (!data.curriculum.grades[selectedGradeStudentId]) {
         data.curriculum.grades[selectedGradeStudentId] = {};
     }
@@ -1421,6 +774,7 @@ function saveGrades() {
         }
     });
     
+    if (!data.curriculum.grades) data.curriculum.grades = {};
     if (!data.curriculum.grades[selectedGradeStudentId]) {
         data.curriculum.grades[selectedGradeStudentId] = {};
     }
@@ -1445,7 +799,7 @@ function updateGradeSummary() {
         return;
     }
     
-    var grades = data.curriculum.grades[selectedGradeStudentId] && data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] ? 
+    var grades = data.curriculum.grades && data.curriculum.grades[selectedGradeStudentId] && data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] ? 
         data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] : {};
     
     var disciplines = getAvailableDisciplines(currentGradeWeek);
@@ -1495,7 +849,7 @@ function renderRanking() {
     // Calculate averages for each student
     var rankings = [];
     students.forEach(function(student) {
-        var grades = data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
+        var grades = data.curriculum.grades && data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
             data.curriculum.grades[student.id][currentRankWeek] : {};
         
         var disciplines = getAvailableDisciplines(currentRankWeek);
@@ -1530,6 +884,7 @@ function renderRanking() {
     });
     
     // Get existing rankings for this week
+    if (!data.curriculum.rankings) data.curriculum.rankings = {};
     var existingRankings = data.curriculum.rankings[currentRankWeek] || [];
     
     // If no rankings exist, create them
@@ -1651,7 +1006,7 @@ function autoRank() {
     var rankings = [];
     
     students.forEach(function(student) {
-        var grades = data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
+        var grades = data.curriculum.grades && data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
             data.curriculum.grades[student.id][currentRankWeek] : {};
         
         var disciplines = getAvailableDisciplines(currentRankWeek);
@@ -1691,6 +1046,7 @@ function autoRank() {
         });
     });
     
+    if (!data.curriculum.rankings) data.curriculum.rankings = {};
     data.curriculum.rankings[currentRankWeek] = newRankings;
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     renderRanking();
@@ -1702,7 +1058,6 @@ function autoRank() {
 // Make functions globally available
 window.renderCurriculumView = renderCurriculumView;
 window.renderDisciplines = renderDisciplines;
-window.renderCalendar = renderCalendar;
 window.renderGrades = renderGrades;
 window.renderRanking = renderRanking;
 window.showDisciplineForm = showDisciplineForm;
@@ -1711,11 +1066,6 @@ window.addGradingEntry = addGradingEntry;
 window.saveDiscipline = saveDiscipline;
 window.deleteDiscipline = deleteDiscipline;
 window.populateStudentSelector = populateStudentSelector;
-window.showAddClassModal = showAddClassModal;
-window.showClassDetails = showClassDetails;
-window.removeClassFromSchedule = removeClassFromSchedule;
-window.saveRestDays = saveRestDays;
-window.exportSchedule = exportSchedule;
 window.saveGrades = saveGrades;
 window.getGradeLetter = getGradeLetter;
 window.autoRank = autoRank;
