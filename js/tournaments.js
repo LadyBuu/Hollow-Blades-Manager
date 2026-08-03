@@ -23,219 +23,223 @@ function renderTournamentsView(container) {
                 <button class="tab-btn" data-tab="weekly">Weekly View</button>
             </div>
             <div class="tab-content">
-                <div id="tab-teams" class="tab-panel active" style="display:block;"></div>
-                <div id="tab-tournaments" class="tab-panel" style="display:none;"></div>
-                <div id="tab-weekly" class="tab-panel" style="display:none;"></div>
-            </div>
-        </div>
+                <!-- TAB 1: Teams -->
+                <div id="tab-teams" class="tab-panel active">
+                    <!-- Team Form -->
+                    <div id="team-form" class="form-container hidden">
+                        <h3 id="team-form-title">Add Team</h3>
+                        <form id="team-form-inner">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Team Name *</label>
+                                    <input type="text" id="team-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Team Type *</label>
+                                    <select id="team-type" required>
+                                        <option value="">Select type...</option>
+                                        <option value="academic">Academic (weeks)</option>
+                                        <option value="professional">Professional (years)</option>
+                                        <option value="internship">Internship (one-time)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Start Week/Year</label>
+                                    <input type="number" id="team-start" placeholder="Week or Year">
+                                </div>
+                                <div class="form-group">
+                                    <label>End Week/Year</label>
+                                    <input type="number" id="team-end" placeholder="Week or Year (optional)">
+                                </div>
+                                <div class="form-group">
+                                    <label>Current Ranking</label>
+                                    <input type="number" id="team-ranking" placeholder="Rank (e.g., 1, 2, 3...)" min="1">
+                                    <span style="font-size:0.7rem;color:var(--text-dim);">For academic teams: ranking applies to the current 2-week block</span>
+                                </div>
+                                <div class="form-group">
+                                    <label>Status</label>
+                                    <select id="team-status">
+                                        <option value="active">Active</option>
+                                        <option value="deprecated">Deprecated (history kept)</option>
+                                        <option value="deleted">Deleted (permanent)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Name History</label>
+                                    <div id="name-history-container">
+                                        <div class="name-history-entry">
+                                            <input type="text" class="name-history-name" placeholder="Team Name">
+                                            <input type="number" class="name-history-start" placeholder="Start Week/Year">
+                                            <input type="number" class="name-history-end" placeholder="End Week/Year">
+                                            <button type="button" class="small danger remove-name">✕</button>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="add-name-history-btn" class="small" style="margin-top:8px;">+ Add Name Period</button>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="cancel-team-btn" class="secondary">Cancel</button>
+                                <button type="submit" id="save-team-btn" class="primary">Save Team</button>
+                            </div>
+                        </form>
+                    </div>
 
-        <!-- Team Form -->
-        <div id="team-form" class="form-container hidden">
-            <h3 id="team-form-title">Add Team</h3>
-            <form id="team-form-inner">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Team Name *</label>
-                        <input type="text" id="team-name" required>
+                    <!-- Team List -->
+                    <div id="team-list">
+                        <div class="filter-section">
+                            <label for="team-filter-week">Filter by Week:</label>
+                            <input type="number" id="team-filter-week" value="1" min="1" max="52" style="width:80px;">
+                            <button id="apply-filter-btn" class="small primary">Apply</button>
+                            <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active during this 2-week block</span>
+                        </div>
+                        <div class="list-header team-header">
+                            <span>Team Name</span>
+                            <span>Type</span>
+                            <span>Period</span>
+                            <span>Rank</span>
+                            <span>Members</span>
+                            <span>Actions</span>
+                        </div>
+                        <div id="teams-container"></div>
                     </div>
-                    <div class="form-group">
-                        <label>Team Type *</label>
-                        <select id="team-type" required>
-                            <option value="">Select type...</option>
-                            <option value="academic">Academic (weeks)</option>
-                            <option value="professional">Professional (years)</option>
-                            <option value="internship">Internship (one-time)</option>
-                        </select>
+                </div>
+
+                <!-- TAB 2: Tournaments -->
+                <div id="tab-tournaments" class="tab-panel">
+                    <!-- Tournament Form -->
+                    <div id="tournament-form" class="form-container hidden">
+                        <h3 id="tournament-form-title">Create Tournament</h3>
+                        <form id="tournament-form-inner">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Tournament Name *</label>
+                                    <input type="text" id="tournament-name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tournament Mode *</label>
+                                    <select id="tournament-mode" required>
+                                        <option value="team">Team Tournament</option>
+                                        <option value="single">Single Player Tournament</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Academic Year</label>
+                                    <input type="text" id="tournament-year" placeholder="e.g., 2025-2026">
+                                </div>
+                                <div class="form-group">
+                                    <label>Start Week</label>
+                                    <input type="number" id="tournament-start-week" min="1" max="52">
+                                </div>
+                                <div class="form-group">
+                                    <label>End Week</label>
+                                    <input type="number" id="tournament-end-week" min="1" max="52">
+                                </div>
+                                <div class="form-group">
+                                    <label>Eliminations per Round</label>
+                                    <input type="number" id="tournament-eliminations" value="4" min="1">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Description</label>
+                                    <textarea id="tournament-description" rows="3" placeholder="Tournament details..."></textarea>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="cancel-tournament-btn" class="secondary">Cancel</button>
+                                <button type="submit" id="save-tournament-btn" class="primary">Save Tournament</button>
+                            </div>
+                        </form>
                     </div>
-                    <div class="form-group">
-                        <label>Start Week/Year</label>
-                        <input type="number" id="team-start" placeholder="Week or Year">
+
+                    <!-- Tournament List -->
+                    <div id="tournament-list">
+                        <div class="list-header tourn-header">
+                            <span>Tournament</span>
+                            <span>Mode</span>
+                            <span>Weeks</span>
+                            <span>Participants</span>
+                            <span>Status</span>
+                            <span>Actions</span>
+                        </div>
+                        <div id="tournaments-container"></div>
                     </div>
-                    <div class="form-group">
-                        <label>End Week/Year</label>
-                        <input type="number" id="team-end" placeholder="Week or Year (optional)">
-                    </div>
-                    <div class="form-group">
-                        <label>Current Ranking</label>
-                        <input type="number" id="team-ranking" placeholder="Rank (e.g., 1, 2, 3...)" min="1">
-                        <span style="font-size:0.7rem;color:var(--text-dim);">For academic teams: ranking applies to the current 2-week block</span>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select id="team-status">
-                            <option value="active">Active</option>
-                            <option value="deprecated">Deprecated (history kept)</option>
-                            <option value="deleted">Deleted (permanent)</option>
-                        </select>
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Name History</label>
-                        <div id="name-history-container">
-                            <div class="name-history-entry">
-                                <input type="text" class="name-history-name" placeholder="Team Name">
-                                <input type="number" class="name-history-start" placeholder="Start Week/Year">
-                                <input type="number" class="name-history-end" placeholder="End Week/Year">
-                                <button type="button" class="small danger remove-name">✕</button>
+                </div>
+
+                <!-- TAB 3: Weekly View -->
+                <div id="tab-weekly" class="tab-panel">
+                    <div id="weekly-view">
+                        <div class="weekly-nav">
+                            <button id="prev-weeks-btn" class="small">← Previous</button>
+                            <span id="weekly-range-display" style="font-size:1.1rem;font-weight:600;min-width:200px;text-align:center;">Weeks 1-16</span>
+                            <button id="next-weeks-btn" class="small">Next →</button>
+                        </div>
+                        <div class="weekly-container">
+                            <div class="weekly-scroll-wrapper">
+                                <table class="weekly-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="team-header">Team</th>
+                                            <th class="week-header" data-week="1">Wk 1-2</th>
+                                            <th class="week-header" data-week="3">Wk 3-4</th>
+                                            <th class="week-header" data-week="5">Wk 5-6</th>
+                                            <th class="week-header" data-week="7">Wk 7-8</th>
+                                            <th class="week-header" data-week="9">Wk 9-10</th>
+                                            <th class="week-header" data-week="11">Wk 11-12</th>
+                                            <th class="week-header" data-week="13">Wk 13-14</th>
+                                            <th class="week-header" data-week="15">Wk 15-16</th>
+                                            <th class="week-header" data-week="17">Wk 17-18</th>
+                                            <th class="week-header" data-week="19">Wk 19-20</th>
+                                            <th class="week-header" data-week="21">Wk 21-22</th>
+                                            <th class="week-header" data-week="23">Wk 23-24</th>
+                                            <th class="week-header" data-week="25">Wk 25-26</th>
+                                            <th class="week-header" data-week="27">Wk 27-28</th>
+                                            <th class="week-header" data-week="29">Wk 29-30</th>
+                                            <th class="week-header" data-week="31">Wk 31-32</th>
+                                            <th class="week-header" data-week="33">Wk 33-34</th>
+                                            <th class="week-header" data-week="35">Wk 35-36</th>
+                                            <th class="week-header" data-week="37">Wk 37-38</th>
+                                            <th class="week-header" data-week="39">Wk 39-40</th>
+                                            <th class="week-header" data-week="41">Wk 41-42</th>
+                                            <th class="week-header" data-week="43">Wk 43-44</th>
+                                            <th class="week-header" data-week="45">Wk 45-46</th>
+                                            <th class="week-header" data-week="47">Wk 47-48</th>
+                                            <th class="week-header" data-week="49">Wk 49-50</th>
+                                            <th class="week-header" data-week="51">Wk 51-52</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="weekly-teams-body"></tbody>
+                                </table>
                             </div>
                         </div>
-                        <button type="button" id="add-name-history-btn" class="small" style="margin-top:8px;">+ Add Name Period</button>
+                        <div class="weekly-legend">
+                            <span class="legend-item">
+                                <span class="legend-color active-member"></span> Active Member
+                            </span>
+                            <span class="legend-item">
+                                <span class="legend-color inactive-member"></span> Inactive/Left
+                            </span>
+                            <span class="legend-item">
+                                <span class="legend-color eliminated-member"></span> Eliminated
+                            </span>
+                            <span class="legend-item">
+                                <span class="legend-color team-inactive"></span> Team Not Active
+                            </span>
+                        </div>
+                        <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                            <div class="dashboard-section">
+                                <h3>Unassigned Characters</h3>
+                                <div id="unassigned-characters"></div>
+                            </div>
+                            <div class="dashboard-section">
+                                <h3>Eliminated This Block</h3>
+                                <div id="eliminated-characters"></div>
+                            </div>
+                        </div>
+                        <div class="dashboard-section" style="margin-top:20px;">
+                            <h3>Team Rankings - <span id="ranking-week-label">Weeks 1-2</span></h3>
+                            <div id="team-rankings"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="form-actions">
-                    <button type="button" id="cancel-team-btn" class="secondary">Cancel</button>
-                    <button type="submit" id="save-team-btn" class="primary">Save Team</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Team List -->
-        <div id="team-list">
-            <div class="filter-section">
-                <label for="team-filter-week">Filter by Week:</label>
-                <input type="number" id="team-filter-week" value="1" min="1" max="52" style="width:80px;">
-                <button id="apply-filter-btn" class="small primary">Apply</button>
-                <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active during this 2-week block</span>
-            </div>
-            <div class="list-header team-header">
-                <span>Team Name</span>
-                <span>Type</span>
-                <span>Period</span>
-                <span>Rank</span>
-                <span>Members</span>
-                <span>Actions</span>
-            </div>
-            <div id="teams-container"></div>
-        </div>
-
-        <!-- Tournament Form -->
-        <div id="tournament-form" class="form-container hidden">
-            <h3 id="tournament-form-title">Create Tournament</h3>
-            <form id="tournament-form-inner">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Tournament Name *</label>
-                        <input type="text" id="tournament-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Tournament Mode *</label>
-                        <select id="tournament-mode" required>
-                            <option value="team">Team Tournament</option>
-                            <option value="single">Single Player Tournament</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Academic Year</label>
-                        <input type="text" id="tournament-year" placeholder="e.g., 2025-2026">
-                    </div>
-                    <div class="form-group">
-                        <label>Start Week</label>
-                        <input type="number" id="tournament-start-week" min="1" max="52">
-                    </div>
-                    <div class="form-group">
-                        <label>End Week</label>
-                        <input type="number" id="tournament-end-week" min="1" max="52">
-                    </div>
-                    <div class="form-group">
-                        <label>Eliminations per Round</label>
-                        <input type="number" id="tournament-eliminations" value="4" min="1">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Description</label>
-                        <textarea id="tournament-description" rows="3" placeholder="Tournament details..."></textarea>
-                    </div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" id="cancel-tournament-btn" class="secondary">Cancel</button>
-                    <button type="submit" id="save-tournament-btn" class="primary">Save Tournament</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Tournament List -->
-        <div id="tournament-list">
-            <div class="list-header tourn-header">
-                <span>Tournament</span>
-                <span>Mode</span>
-                <span>Weeks</span>
-                <span>Participants</span>
-                <span>Status</span>
-                <span>Actions</span>
-            </div>
-            <div id="tournaments-container"></div>
-        </div>
-
-        <!-- Weekly View -->
-        <div id="weekly-view">
-            <div class="weekly-nav">
-                <button id="prev-weeks-btn" class="small">← Previous</button>
-                <span id="weekly-range-display" style="font-size:1.1rem;font-weight:600;min-width:200px;text-align:center;">Weeks 1-16</span>
-                <button id="next-weeks-btn" class="small">Next →</button>
-            </div>
-            <div class="weekly-container">
-                <div class="weekly-scroll-wrapper">
-                    <table class="weekly-table">
-                        <thead>
-                            <tr>
-                                <th class="team-header">Team</th>
-                                <th class="week-header" data-week="1">Wk 1-2</th>
-                                <th class="week-header" data-week="3">Wk 3-4</th>
-                                <th class="week-header" data-week="5">Wk 5-6</th>
-                                <th class="week-header" data-week="7">Wk 7-8</th>
-                                <th class="week-header" data-week="9">Wk 9-10</th>
-                                <th class="week-header" data-week="11">Wk 11-12</th>
-                                <th class="week-header" data-week="13">Wk 13-14</th>
-                                <th class="week-header" data-week="15">Wk 15-16</th>
-                                <th class="week-header" data-week="17">Wk 17-18</th>
-                                <th class="week-header" data-week="19">Wk 19-20</th>
-                                <th class="week-header" data-week="21">Wk 21-22</th>
-                                <th class="week-header" data-week="23">Wk 23-24</th>
-                                <th class="week-header" data-week="25">Wk 25-26</th>
-                                <th class="week-header" data-week="27">Wk 27-28</th>
-                                <th class="week-header" data-week="29">Wk 29-30</th>
-                                <th class="week-header" data-week="31">Wk 31-32</th>
-                                <th class="week-header" data-week="33">Wk 33-34</th>
-                                <th class="week-header" data-week="35">Wk 35-36</th>
-                                <th class="week-header" data-week="37">Wk 37-38</th>
-                                <th class="week-header" data-week="39">Wk 39-40</th>
-                                <th class="week-header" data-week="41">Wk 41-42</th>
-                                <th class="week-header" data-week="43">Wk 43-44</th>
-                                <th class="week-header" data-week="45">Wk 45-46</th>
-                                <th class="week-header" data-week="47">Wk 47-48</th>
-                                <th class="week-header" data-week="49">Wk 49-50</th>
-                                <th class="week-header" data-week="51">Wk 51-52</th>
-                            </tr>
-                        </thead>
-                        <tbody id="weekly-teams-body"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="weekly-legend">
-                <span class="legend-item">
-                    <span class="legend-color active-member"></span> Active Member
-                </span>
-                <span class="legend-item">
-                    <span class="legend-color inactive-member"></span> Inactive/Left
-                </span>
-                <span class="legend-item">
-                    <span class="legend-color eliminated-member"></span> Eliminated
-                </span>
-                <span class="legend-item">
-                    <span class="legend-color team-inactive"></span> Team Not Active
-                </span>
-            </div>
-            <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-                <div class="dashboard-section">
-                    <h3>Unassigned Characters</h3>
-                    <div id="unassigned-characters"></div>
-                </div>
-                <div class="dashboard-section">
-                    <h3>Eliminated This Block</h3>
-                    <div id="eliminated-characters"></div>
-                </div>
-            </div>
-            <div class="dashboard-section" style="margin-top:20px;">
-                <h3>Team Rankings - <span id="ranking-week-label">Weeks 1-2</span></h3>
-                <div id="team-rankings"></div>
             </div>
         </div>
 
@@ -402,17 +406,14 @@ function renderTournamentsView(container) {
         </div>
     `;
 
-    // Initialize all tabs and events
+    // Initialize tabs
     initTournamentTabs();
     
-    // Render teams (from teams.js)
+    // Render content
     if (typeof renderTeams === 'function') {
         renderTeams();
     }
-    
     renderTournaments();
-    
-    // Render weekly view (from calendar.js)
     if (typeof renderWeeklyView === 'function') {
         renderWeeklyView();
     }
@@ -422,8 +423,6 @@ function renderTournamentsView(container) {
         initTeamEvents();
     }
     initTournamentEvents();
-    
-    // Initialize weekly events
     if (typeof initWeeklyEvents === 'function') {
         initWeeklyEvents();
     }
@@ -440,35 +439,53 @@ function initTournamentTabs() {
         weekly: document.getElementById('tab-weekly')
     };
 
-    // Show initial tab
-    var activeTab = document.querySelector('.tab-btn.active');
-    if (activeTab) {
-        var initialTab = activeTab.dataset.tab;
-        for (var key in panels) {
-            if (panels[key]) {
-                panels[key].classList.toggle('active', key === initialTab);
-                panels[key].style.display = key === initialTab ? 'block' : 'none';
-            }
+    // Hide all panels first
+    for (var key in panels) {
+        if (panels[key]) {
+            panels[key].style.display = 'none';
+            panels[key].classList.remove('active');
         }
     }
 
+    // Show the active tab's panel
+    var activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab) {
+        var activeTabName = activeTab.dataset.tab;
+        if (panels[activeTabName]) {
+            panels[activeTabName].style.display = 'block';
+            panels[activeTabName].classList.add('active');
+        }
+    } else {
+        // Default to teams
+        if (panels.teams) {
+            panels.teams.style.display = 'block';
+            panels.teams.classList.add('active');
+        }
+    }
+
+    // Add click handlers
     tabs.forEach(function(tab) {
-        tab.addEventListener('click', function() {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Update tab buttons
             tabs.forEach(function(t) { t.classList.remove('active'); });
             this.classList.add('active');
             
             var tabName = this.dataset.tab;
+            
             // Hide all panels
             for (var key in panels) {
                 if (panels[key]) {
-                    panels[key].classList.remove('active');
                     panels[key].style.display = 'none';
+                    panels[key].classList.remove('active');
                 }
             }
-            // Show selected panel
+            
+            // Show the selected panel
             if (panels[tabName]) {
-                panels[tabName].classList.add('active');
                 panels[tabName].style.display = 'block';
+                panels[tabName].classList.add('active');
             }
             
             // Refresh content when switching tabs
