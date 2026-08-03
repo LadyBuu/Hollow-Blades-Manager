@@ -759,7 +759,7 @@ function deleteDiscipline(id) {
 // ============================================================
 
 /**
- * Render calendar view
+ * Render calendar view - FIXED to properly refresh slots
  */
 function renderCalendar() {
     // Make sure we have fresh data
@@ -785,9 +785,6 @@ function renderCalendar() {
     var examDays = data.curriculum.examDays[currentCalendarWeek] || [];
     var schedule = getStudentSchedule(selectedStudentId, currentCalendarWeek);
     
-    // Debug: log what we have
-    console.log('Schedule for student', selectedStudentId, 'week', currentCalendarWeek, schedule);
-    
     var hours = [];
     for (var h = 5; h <= 24; h++) {
         hours.push(h);
@@ -804,6 +801,7 @@ function renderCalendar() {
         column.classList.toggle('rest-day', isRestDay);
         column.classList.toggle('exam-day', isExamDay);
         
+        // Clear all existing slots
         slots.innerHTML = '';
         
         hours.forEach(function(hour) {
@@ -986,7 +984,7 @@ function updateCalendarSidebar() {
 }
 
 /**
- * Show add class modal
+ * Show add class modal - FIXED to properly refresh after adding
  */
 function showAddClassModal(studentId, week, day, hour) {
     var availableDisciplines = getAvailableDisciplines(week);
@@ -1073,17 +1071,22 @@ function showAddClassModal(studentId, week, day, hour) {
         
         data.curriculum.schedules[studentId][week][day][hour] = disciplineId;
         
-        // Force save to ensure data persists
+        // Remove the modal first, then save and render
+        modal.remove();
+        
+        // Force save and then render with proper refresh
         saveData().then(function() {
-            renderCalendar();
             if (typeof logActivity === 'function') {
                 logActivity('Added class to student schedule');
             }
+            // Force a complete re-render of the calendar
+            renderCalendar();
         }).catch(function(err) { 
             console.error('Failed to save:', err); 
             alert('Failed to save class. Please try again.');
+            // Still try to render even if save failed
+            renderCalendar();
         });
-        modal.remove();
     };
 }
 
