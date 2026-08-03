@@ -197,7 +197,7 @@ function logActivity(message, type = 'info') {
 }
 
 /**
- * Get students (trainees from character list)
+ * Get students (trainees, rookies, juniors from character list)
  * @returns {Array} Array of student characters
  */
 function getStudents() {
@@ -207,6 +207,19 @@ function getStudents() {
         const status = getCurrentStatus(c).toLowerCase();
         return status === 'trainee' || status === 'rookie' || 
                status === 'junior' || status === 'student';
+    }).sort((a, b) => a.firstName.localeCompare(b.firstName));
+}
+
+/**
+ * Get non-civilian characters (trainee, rookie, junior, senior, instructor, support)
+ * @returns {Array} Array of non-civilian characters
+ */
+function getNonCivilianCharacters() {
+    if (!data.characters) return [];
+    return data.characters.filter(c => {
+        if (c.deceased) return false;
+        const status = getCurrentStatus(c).toLowerCase();
+        return status !== 'civilian' && status !== '';
     }).sort((a, b) => a.firstName.localeCompare(b.firstName));
 }
 
@@ -256,7 +269,12 @@ function getAvailableDisciplines(week) {
  * @returns {Object} Schedule object
  */
 function getStudentSchedule(studentId, week) {
-    if (!data.curriculum) return {};
+    if (!data.curriculum) {
+        data.curriculum = { disciplines: [], schedules: {}, restDays: {}, examDays: {}, grades: {}, rankings: {}, currentWeek: 1 };
+    }
+    if (!data.curriculum.schedules) {
+        data.curriculum.schedules = {};
+    }
     if (!data.curriculum.schedules[studentId]) {
         data.curriculum.schedules[studentId] = {};
     }
@@ -317,6 +335,7 @@ window.utils = {
     getActiveTeamsForWeek,
     logActivity,
     getStudents,
+    getNonCivilianCharacters,
     getInstructors,
     getDiscipline,
     getAvailableDisciplines,
