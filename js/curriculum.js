@@ -525,7 +525,6 @@ function exportClassView() {
     var disciplineDivs = container.querySelectorAll('.class-view-discipline');
     disciplineDivs.forEach(function(div) {
         var clone = div.cloneNode(true);
-        // Clean up any event listeners or unnecessary elements
         win.document.write(clone.outerHTML);
     });
     
@@ -780,13 +779,434 @@ function deleteDiscipline(id) {
 // GRADES VIEW
 // ============================================================
 
-// ... (keep existing grades functions - renderGrades, getGradeLetter, saveGrades, updateGradeSummary)
+/**
+ * Render grades view
+ */
+function renderGrades() {
+    var container = document.getElementById('grades-container');
+    var summary = document.getElementById('grades-summary-content');
+    
+    var weekDisplay = document.getElementById('grade-week-display');
+    if (weekDisplay) weekDisplay.textContent = 'Week ' + currentGradeWeek;
+    
+    if (!selectedGradeStudentId) {
+        if (container) container.innerHTML = '<p class="empty-state">Select a student to view and manage grades</p>';
+        if (summary) summary.innerHTML = '<p class="empty-state">No grades data available</p>';
+        return;
+    }
+    
+    var student = data.characters.find(function(c) { return String(c.id) === String(selectedGradeStudentId); });
+    if (!student) {
+        if (container) container.innerHTML = '<p class="empty-state">Student not found</p>';
+        return;
+    }
+    
+    var disciplines = getAvailableDisciplines(currentGradeWeek);
+    if (disciplines.length === 0) {
+        if (container) container.innerHTML = '<p class="empty-state">No disciplines available for week ' + currentGradeWeek + '</p>';
+        if (summary) summary.innerHTML = '<p class="empty-state">No grades data available</p>';
+        return;
+    }
+    
+    // Get student's schedule for this week
+    var schedule = getStudentSchedule(selectedGradeStudentId, currentGradeWeek);
+    var studentDisciplines = [];
+    for (var day in schedule) {
+        for (var hour in schedule[day]) {
+            var disciplineId = schedule[day][hour];
+            if (disciplineId && studentDisciplines.indexOf(disciplineId) === -1) {
+                studentDisciplines.push(disciplineId);
+            }
+        }
+    }
+    
+    if (!data.curriculum.grades) data.curriculum.grades = {};
+    if (!data.curriculum.grades[selectedGradeStudentId]) {
+        data.curriculum.grades[selectedGradeStudentId] = {};
+    }
+    if (!data.curriculum.grades[selectedGradeStudentId][currentGradeWeek]) {
+        data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] = {};
+    }
+    var grades = data.curriculum.grades[selectedGradeStudentId][currentGradeWeek];
+    
+    var html = '<table class="grades-table">';
+    html += '<thead><tr>';
+    html += '<th>Discipline</th>';
+    html += '<th>Weight</th>';
+    html += '<th>Score</th>';
+    html += '<th>Grade</th>';
+    html += '<th>Weighted Score</th>';
+    html += '</tr></thead><tbody>';
+    
+    var totalWeighted = 0;
+    var totalWeight = 0;
+    
+    disciplines.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    
+    disciplines.forEach(function(d) {
+        var isInSchedule = studentDisciplines.indexOf(d.id) !== -1;
+        var score = grades[d.id] !== undefined ? grades[d.id] : '';
+        var letter = getGradeLetter(d, score);
+        var weighted = score && d.weight ? score * d.weight : 0;
+        
+        if (score && d.weight) {
+            totalWeighted += weighted;
+            totalWeight += d.weight;
+        }
+        
+        html += '<tr' + (isInSchedule ? '' : ' style="opacity:0.4;"') + '>';
+        html += '<td>' + d.name + (isInSchedule ? '' : ' (not scheduled)') + '</td>';
+        html += '<td class="weight">' + d.weight + '</td>';
+        html += '<td><input type="number" class="grade-input" data-discipline="' + d.id + '" value="' + score + '" min="0" max="100" step="0.1"></td>';
+        html += '<td class="grade-letter">' + (letter || '—') + '</td>';
+        html += '<td>' + (weighted ? weighted.toFixed(1) : '—') + '</td>';
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    html += '<div style="margin-top:12px;"><button id="save-grades-btn" class="primary small">Save Grades</button></div>';
+    if (container) container.innerHTML = html;
+    
+    if (container) {
+        container.querySelectorAll('.grade-input').forEach(function(input) {
+            input.addEventListener('change', function() {
+                var disciplineId = this.dataset.discipline;
+                var value = parseFloat(this.value);
+                var discipline = getDiscipline(disciplineId);
+                var letter = getGradeLetter(discipline, value);
+                var row = this.closest('tr');
+                if (row) {
+                    row.querySelector('.grade-letter').textContent = letter || '—';
+                }
+            });
+        });
+        
+        var saveBtn = container.querySelector('#save-grades-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', function() {
+                saveGrades();
+            });
+        }
+    }
+    
+    updateGradeSummary();
+}
+
+/**
+ * Get grade letter for a score
+ */
+function getGradeLetter(discipline, score) {
+    if (!discipline || !discipline.gradingSystem || discipline.gradingSystem.length === 0 || score === undefined || score === null || score === '') {
+        return '';
+    }
+    var numScore = parseFloat(score);
+    if (isNaN(numScore)) return '';
+    
+    var sorted = discipline.gradingSystem.slice().sort(function(a, b) { return b.min - a.min; });
+    for (var i = 0; i < sorted.length; i++) {
+        var grade = sorted[i];
+        if (numScore >= grade.min && numScore <= grade.max) {
+            return grade.letter;
+        }
+    }
+    return '';
+}
+
+/**
+ * Save grades
+ */
+function saveGrades() {
+    if (!selectedGradeStudentId) return;
+    
+    var grades = {};
+    document.querySelectorAll('.grade-input').forEach(function(input) {
+        var disciplineId = input.dataset.discipline;
+        var value = parseFloat(input.value);
+        if (!isNaN(value)) {
+            grades[disciplineId] = value;
+        }
+    });
+    
+    if (!data.curriculum.grades) data.curriculum.grades = {};
+    if (!data.curriculum.grades[selectedGradeStudentId]) {
+        data.curriculum.grades[selectedGradeStudentId] = {};
+    }
+    data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] = grades;
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    renderGrades();
+    if (typeof logActivity === 'function') {
+        logActivity('Saved grades for student week ' + currentGradeWeek);
+    }
+}
+
+/**
+ * Update grade summary
+ */
+function updateGradeSummary() {
+    var summary = document.getElementById('grades-summary-content');
+    if (!summary) return;
+    
+    if (!selectedGradeStudentId) {
+        summary.innerHTML = '<p class="empty-state">No grades data available</p>';
+        return;
+    }
+    
+    var grades = data.curriculum.grades && data.curriculum.grades[selectedGradeStudentId] && data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] ? 
+        data.curriculum.grades[selectedGradeStudentId][currentGradeWeek] : {};
+    
+    var disciplines = getAvailableDisciplines(currentGradeWeek);
+    var totalWeighted = 0;
+    var totalWeight = 0;
+    var count = 0;
+    
+    disciplines.forEach(function(d) {
+        var score = grades[d.id];
+        if (score !== undefined && score !== null && score !== '' && d.weight) {
+            totalWeighted += parseFloat(score) * d.weight;
+            totalWeight += d.weight;
+            count++;
+        }
+    });
+    
+    var average = totalWeight > 0 ? totalWeighted / totalWeight : 0;
+    
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">' +
+        '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Average</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--accent);">' + average.toFixed(1) + '</span></div>' +
+        '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Disciplines</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--text);">' + count + '/' + disciplines.length + '</span></div>' +
+        '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Status</span><br><span style="font-size:1.8rem;font-weight:700;' + (average >= 70 ? 'color:var(--accent);' : 'color:var(--danger);') + '">' + (average >= 70 ? 'Passing' : 'Needs Work') + '</span></div>' +
+    '</div>';
+    summary.innerHTML = html;
+}
 
 // ============================================================
 // RANKING VIEW
 // ============================================================
 
-// ... (keep existing ranking functions - renderRanking, autoRank)
+/**
+ * Render ranking view
+ */
+function renderRanking() {
+    var container = document.getElementById('ranking-container');
+    var weekDisplay = document.getElementById('rank-week-display');
+    if (weekDisplay) weekDisplay.textContent = 'Week ' + currentRankWeek;
+    
+    if (!container) return;
+    
+    var students = getStudents();
+    if (students.length === 0) {
+        container.innerHTML = '<p class="empty-state">No students found</p>';
+        return;
+    }
+    
+    // Calculate averages for each student
+    var rankings = [];
+    students.forEach(function(student) {
+        var grades = data.curriculum.grades && data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
+            data.curriculum.grades[student.id][currentRankWeek] : {};
+        
+        var disciplines = getAvailableDisciplines(currentRankWeek);
+        var totalWeighted = 0;
+        var totalWeight = 0;
+        var count = 0;
+        
+        disciplines.forEach(function(d) {
+            var score = grades[d.id];
+            if (score !== undefined && score !== null && score !== '' && d.weight) {
+                totalWeighted += parseFloat(score) * d.weight;
+                totalWeight += d.weight;
+                count++;
+            }
+        });
+        
+        var average = totalWeight > 0 ? totalWeighted / totalWeight : 0;
+        rankings.push({
+            studentId: student.id,
+            firstName: student.firstName,
+            lastName: student.lastName || '',
+            average: average,
+            count: count,
+            total: disciplines.length
+        });
+    });
+    
+    // Sort by average (descending)
+    rankings.sort(function(a, b) {
+        if (b.average !== a.average) return b.average - a.average;
+        return a.firstName.localeCompare(b.firstName);
+    });
+    
+    // Get existing rankings for this week
+    if (!data.curriculum.rankings) data.curriculum.rankings = {};
+    var existingRankings = data.curriculum.rankings[currentRankWeek] || [];
+    
+    // If no rankings exist, create them
+    if (existingRankings.length === 0) {
+        rankings.forEach(function(r, index) {
+            existingRankings.push({
+                studentId: r.studentId,
+                rank: index + 1,
+                average: r.average
+            });
+        });
+        data.curriculum.rankings[currentRankWeek] = existingRankings;
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+    }
+    
+    if (rankings.length === 0) {
+        container.innerHTML = '<p class="empty-state">No ranking data available for this week</p>';
+        return;
+    }
+    
+    var previousRankings = data.curriculum.rankings[currentRankWeek - 1] || [];
+    
+    var html = '<table class="ranking-table">';
+    html += '<thead><tr>';
+    html += '<th>Rank</th>';
+    html += '<th>Student</th>';
+    html += '<th>Average</th>';
+    html += '<th>Disciplines</th>';
+    html += '<th>Change</th>';
+    html += '</tr></thead><tbody>';
+    
+    rankings.forEach(function(r) {
+        var existing = existingRankings.find(function(e) { return String(e.studentId) === String(r.studentId); });
+        var rank = existing ? existing.rank : '-';
+        var previous = previousRankings.find(function(e) { return String(e.studentId) === String(r.studentId); });
+        var prevRank = previous ? previous.rank : null;
+        
+        var change = '';
+        var changeClass = '';
+        if (prevRank !== null && prevRank !== undefined) {
+            var diff = prevRank - rank;
+            if (diff > 0) {
+                change = '↑' + diff;
+                changeClass = 'up';
+            } else if (diff < 0) {
+                change = '↓' + Math.abs(diff);
+                changeClass = 'down';
+            } else {
+                change = '—';
+                changeClass = 'same';
+            }
+        }
+        
+        html += '<tr>';
+        html += '<td class="rank-number"><input type="number" class="rank-input" data-student="' + r.studentId + '" value="' + rank + '" min="1" max="' + rankings.length + '"></td>';
+        html += '<td>' + r.firstName + (r.lastName ? ' ' + r.lastName : '') + '</td>';
+        html += '<td style="font-weight:700;color:var(--accent);">' + (r.average > 0 ? r.average.toFixed(1) : '—') + '</td>';
+        html += '<td>' + r.count + '/' + r.total + '</td>';
+        html += '<td><span class="rank-change ' + changeClass + '">' + change + '</span></td>';
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+    
+    // Rank input change handler
+    container.querySelectorAll('.rank-input').forEach(function(input) {
+        input.addEventListener('change', function() {
+            var studentId = this.dataset.student;
+            var newRank = parseInt(this.value);
+            var maxRank = parseInt(this.max);
+            
+            if (isNaN(newRank) || newRank < 1 || newRank > maxRank) {
+                alert('Please enter a rank between 1 and ' + maxRank);
+                this.value = this.defaultValue;
+                return;
+            }
+            
+            var existing = existingRankings.find(function(e) { return String(e.studentId) === String(studentId); });
+            if (existing) {
+                var oldRank = existing.rank;
+                existing.rank = newRank;
+                
+                existingRankings.forEach(function(e) {
+                    if (String(e.studentId) === String(studentId)) return;
+                    if (oldRank < newRank && e.rank > oldRank && e.rank <= newRank) {
+                        e.rank--;
+                    } else if (oldRank > newRank && e.rank >= newRank && e.rank < oldRank) {
+                        e.rank++;
+                    }
+                });
+                
+                var usedRanks = existingRankings.map(function(e) { return e.rank; });
+                var current = 1;
+                var sorted = existingRankings.slice().sort(function(a, b) { return a.rank - b.rank; });
+                sorted.forEach(function(e) {
+                    while (usedRanks.indexOf(current) !== -1 && usedRanks.indexOf(current) !== usedRanks.indexOf(e.rank)) {
+                        current++;
+                    }
+                    e.rank = current;
+                    current++;
+                });
+                
+                saveData().catch(function(err) { console.error('Failed to save:', err); });
+                renderRanking();
+                if (typeof logActivity === 'function') {
+                    logActivity('Updated rankings for week ' + currentRankWeek);
+                }
+            }
+        });
+    });
+}
+
+/**
+ * Auto-rank students
+ */
+function autoRank() {
+    var students = getStudents();
+    var rankings = [];
+    
+    students.forEach(function(student) {
+        var grades = data.curriculum.grades && data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
+            data.curriculum.grades[student.id][currentRankWeek] : {};
+        
+        var disciplines = getAvailableDisciplines(currentRankWeek);
+        var totalWeighted = 0;
+        var totalWeight = 0;
+        
+        disciplines.forEach(function(d) {
+            var score = grades[d.id];
+            if (score !== undefined && score !== null && score !== '' && d.weight) {
+                totalWeighted += parseFloat(score) * d.weight;
+                totalWeight += d.weight;
+            }
+        });
+        
+        var average = totalWeight > 0 ? totalWeighted / totalWeight : 0;
+        rankings.push({
+            studentId: student.id,
+            average: average
+        });
+    });
+    
+    rankings.sort(function(a, b) {
+        if (b.average !== a.average) return b.average - a.average;
+        var aName = data.characters.find(function(c) { return String(c.id) === String(a.studentId); });
+        var bName = data.characters.find(function(c) { return String(c.id) === String(b.studentId); });
+        var aFirstName = aName ? aName.firstName : '';
+        var bFirstName = bName ? bName.firstName : '';
+        return aFirstName.localeCompare(bFirstName);
+    });
+    
+    var newRankings = [];
+    rankings.forEach(function(r, index) {
+        newRankings.push({
+            studentId: r.studentId,
+            rank: index + 1,
+            average: r.average
+        });
+    });
+    
+    if (!data.curriculum.rankings) data.curriculum.rankings = {};
+    data.curriculum.rankings[currentRankWeek] = newRankings;
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    renderRanking();
+    if (typeof logActivity === 'function') {
+        logActivity('Auto-ranked students for week ' + currentRankWeek);
+    }
+}
 
 // ============================================================
 // INITIALIZATION
