@@ -228,13 +228,12 @@ function initScheduleEvents() {
         });
     }
     
-    // Week navigation
+    // Week navigation - FIXED: now moves by 1 week at a time
     var prevBtn = document.getElementById('prev-schedule-week');
     if (prevBtn) {
         prevBtn.addEventListener('click', function() {
             if (scheduleState.currentWeek > 1) {
-                scheduleState.currentWeek -= 2;
-                if (scheduleState.currentWeek < 1) scheduleState.currentWeek = 1;
+                scheduleState.currentWeek--;
                 renderSchedule();
             }
         });
@@ -244,8 +243,7 @@ function initScheduleEvents() {
     if (nextBtn) {
         nextBtn.addEventListener('click', function() {
             if (scheduleState.currentWeek < 52) {
-                scheduleState.currentWeek += 2;
-                if (scheduleState.currentWeek > 52) scheduleState.currentWeek = 52;
+                scheduleState.currentWeek++;
                 renderSchedule();
             }
         });
@@ -258,7 +256,7 @@ function initScheduleEvents() {
             if (week) {
                 var w = parseInt(week);
                 if (!isNaN(w) && w >= 1 && w <= 52) {
-                    scheduleState.currentWeek = Math.floor((w - 1) / 2) * 2 + 1;
+                    scheduleState.currentWeek = w;
                     renderSchedule();
                 } else {
                     alert('Please enter a valid week (1-52).');
@@ -267,7 +265,7 @@ function initScheduleEvents() {
         });
     }
     
-    // Duplicate schedule
+    // Duplicate schedule - FIXED: now duplicates to the very next week (+1)
     var duplicateBtn = document.getElementById('duplicate-schedule-btn');
     if (duplicateBtn) {
         duplicateBtn.addEventListener('click', duplicateSchedule);
@@ -729,7 +727,7 @@ function removeScheduleClass(studentId, week, day, hour) {
 }
 
 /**
- * Duplicate schedule to next week
+ * Duplicate schedule to next week - FIXED: now duplicates to week + 1
  */
 function duplicateSchedule() {
     if (!scheduleState.selectedStudentId) {
@@ -738,7 +736,7 @@ function duplicateSchedule() {
     }
     
     var currentWeek = scheduleState.currentWeek;
-    var nextWeek = currentWeek + 2;
+    var nextWeek = currentWeek + 1;
     
     if (nextWeek > 52) {
         alert('Cannot duplicate beyond week 52.');
