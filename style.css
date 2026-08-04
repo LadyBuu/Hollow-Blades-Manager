@@ -602,116 +602,8 @@ main {
     }
 }
 
-/* Instructor Entry */
-.instructor-entry {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-    flex-wrap: wrap;
-    align-items: center;
-}
-.instructor-entry select {
-    flex: 1;
-    min-width: 120px;
-    background: var(--panel-alt);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.78rem;
-    font-family: Inter, sans-serif;
-}
-.instructor-entry .remove-instructor {
-    padding: 4px 8px;
-    font-size: 0.65rem;
-}
-
-/* Career Status */
-.career-status-entry,
-.name-history-entry {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-    flex-wrap: wrap;
-    align-items: center;
-}
-.career-status-entry select,
-.career-status-entry input,
-.name-history-entry input {
-    flex: 1;
-    min-width: 80px;
-    background: var(--panel-alt);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.78rem;
-    font-family: 'Inter', sans-serif;
-}
-@media (min-width: 600px) {
-    .career-status-entry select,
-    .career-status-entry input,
-    .name-history-entry input {
-        min-width: 100px;
-        padding: 6px 10px;
-        font-size: 0.8rem;
-    }
-}
-
-/* Grading System */
-.grading-entry {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.grading-entry input {
-    background: var(--panel-alt);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.78rem;
-    font-family: 'Inter', sans-serif;
-    flex: 1;
-    min-width: 60px;
-}
-
-/* Filter Section */
-.filter-section {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--panel-alt);
-    border-radius: var(--radius);
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    border: 1px solid var(--border);
-}
-.filter-section label {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-    font-weight: 500;
-}
-.filter-section input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.8rem;
-    font-family: 'Inter', sans-serif;
-    width: 70px;
-}
-.filter-section input:focus {
-    outline: none;
-    border-color: var(--accent);
-}
-
 /* ============================================================
-   DISCIPLINE LIST - FIXED OVERLAPPING TEXT
+   CURRICULUM - Discipline List
    ============================================================ */
 #discipline-list {
     overflow-x: auto;
@@ -800,10 +692,14 @@ main {
         gap: 3px;
         grid-template-columns: 1fr 0.6fr 0.6fr 0.5fr 0.5fr 0.4fr 0.6fr;
     }
+    #discipline-list .list-item .actions button {
+        font-size: 0.45rem;
+        padding: 1px 3px;
+    }
 }
 
 /* ============================================================
-   SCHEDULE GRID - Mobile scroll support
+   CURRICULUM - Schedule Grid
    ============================================================ */
 .schedule-grid-wrapper {
     overflow-x: auto;
@@ -815,7 +711,6 @@ main {
     width: 100%;
     position: relative;
 }
-
 .schedule-grid-wrapper::-webkit-scrollbar {
     height: 8px;
     width: 8px;
@@ -832,7 +727,6 @@ main {
 .schedule-grid-wrapper::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
 }
-
 .schedule-grid-wrapper {
     scrollbar-width: thin;
     scrollbar-color: var(--border) var(--bg);
@@ -932,7 +826,76 @@ main {
     font-weight: 500;
 }
 
-/* Available disciplines */
+@media (max-width: 768px) {
+    .schedule-grid {
+        min-width: 550px;
+        padding: 4px;
+        gap: 3px;
+    }
+    .schedule-sidebar {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .day-column {
+        min-width: 60px;
+    }
+    .day-header {
+        font-size: 0.55rem;
+        padding: 4px 2px;
+    }
+    .day-slots {
+        min-height: 250px;
+    }
+    .time-slot {
+        min-height: 24px;
+        font-size: 0.5rem;
+        padding: 1px 2px;
+    }
+    .time-slot .slot-time {
+        font-size: 0.4rem;
+        min-width: 20px;
+    }
+    .time-slot .slot-label {
+        font-size: 0.45rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .schedule-grid {
+        min-width: 450px;
+        padding: 3px;
+        gap: 2px;
+    }
+    .day-column {
+        min-width: 45px;
+    }
+    .day-header {
+        font-size: 0.45rem;
+        padding: 3px 1px;
+    }
+    .day-slots {
+        min-height: 180px;
+    }
+    .time-slot {
+        min-height: 18px;
+        font-size: 0.4rem;
+        padding: 1px 1px;
+    }
+    .time-slot .slot-time {
+        font-size: 0.35rem;
+        min-width: 15px;
+    }
+    .time-slot .slot-label {
+        font-size: 0.4rem;
+    }
+    .time-slot.occupied {
+        border-left-width: 2px;
+    }
+}
+
+/* ============================================================
+   CURRICULUM - Available Disciplines
+   ============================================================ */
 .available-discipline {
     padding: 4px 8px;
     margin-bottom: 4px;
@@ -954,7 +917,9 @@ main {
     border-left-color: var(--border);
 }
 
-/* Rest days */
+/* ============================================================
+   CURRICULUM - Rest Days
+   ============================================================ */
 .rest-day-controls {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -972,7 +937,61 @@ main {
     width: auto;
 }
 
-/* Calendar controls */
+/* ============================================================
+   CURRICULUM - Instructor Entry
+   ============================================================ */
+.instructor-entry {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.instructor-entry select {
+    flex: 1;
+    min-width: 120px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: Inter, sans-serif;
+}
+.instructor-entry .remove-instructor {
+    padding: 4px 8px;
+    font-size: 0.65rem;
+}
+
+/* ============================================================
+   CURRICULUM - Grading Entry
+   ============================================================ */
+.grading-entry {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.grading-entry input {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: 'Inter', sans-serif;
+    flex: 1;
+    min-width: 60px;
+}
+.grading-entry .remove-grading {
+    padding: 4px 8px;
+    font-size: 0.65rem;
+}
+
+/* ============================================================
+   CURRICULUM - Calendar Controls
+   ============================================================ */
 .calendar-controls {
     display: flex;
     gap: 12px;
@@ -1002,9 +1021,18 @@ main {
     outline: none;
     border-color: var(--accent);
 }
+@media (max-width: 600px) {
+    .calendar-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .calendar-controls select {
+        max-width: 100%;
+    }
+}
 
 /* ============================================================
-   INSTRUCTOR CALENDAR - With scroll support
+   CURRICULUM - Instructor Calendar
    ============================================================ */
 .instructor-calendar-wrapper {
     overflow-x: auto;
@@ -1016,7 +1044,6 @@ main {
     width: 100%;
     position: relative;
 }
-
 .instructor-calendar-wrapper::-webkit-scrollbar {
     height: 8px;
     width: 8px;
@@ -1033,7 +1060,6 @@ main {
 .instructor-calendar-wrapper::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
 }
-
 .instructor-calendar-wrapper {
     scrollbar-width: thin;
     scrollbar-color: var(--border) var(--bg);
@@ -1050,7 +1076,6 @@ main {
     min-width: 700px;
     width: 100%;
 }
-
 .instructor-calendar-grid .header-cell {
     padding: 4px;
     font-weight: 600;
@@ -1074,6 +1099,7 @@ main {
     border-left: 3px solid var(--accent);
     cursor: pointer;
     transition: background 0.15s;
+    min-height: 40px;
 }
 .instructor-calendar-grid .class-cell:hover {
     background: var(--accent-soft);
@@ -1084,9 +1110,14 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     font-weight: 500;
+    font-size: 0.55rem;
+}
+.instructor-calendar-grid .class-cell .student-count {
+    font-size: 0.5rem;
+    color: var(--text-dim);
 }
 .instructor-calendar-grid .class-cell .student-name {
-    font-size: 0.5rem;
+    font-size: 0.45rem;
     color: var(--text-dim);
     white-space: nowrap;
     overflow: hidden;
@@ -1100,7 +1131,6 @@ main {
     text-align: center;
 }
 
-/* Instructor calendar responsive */
 @media (max-width: 768px) {
     .instructor-calendar-grid {
         min-width: 550px;
@@ -1118,6 +1148,13 @@ main {
     .instructor-calendar-grid .class-cell {
         font-size: 0.5rem;
         padding: 3px 2px;
+        min-height: 30px;
+    }
+    .instructor-calendar-grid .class-cell .class-name {
+        font-size: 0.45rem;
+    }
+    .instructor-calendar-grid .class-cell .student-count {
+        font-size: 0.4rem;
     }
     .instructor-calendar-grid .class-cell .student-name {
         font-size: 0.4rem;
@@ -1141,7 +1178,14 @@ main {
     .instructor-calendar-grid .class-cell {
         font-size: 0.4rem;
         padding: 2px 1px;
+        min-height: 24px;
         border-left-width: 2px;
+    }
+    .instructor-calendar-grid .class-cell .class-name {
+        font-size: 0.4rem;
+    }
+    .instructor-calendar-grid .class-cell .student-count {
+        font-size: 0.35rem;
     }
     .instructor-calendar-grid .class-cell .student-name {
         font-size: 0.35rem;
@@ -1149,7 +1193,7 @@ main {
 }
 
 /* ============================================================
-   CLASS VIEW - Grouped by instructor
+   CURRICULUM - Class View
    ============================================================ */
 .class-view-discipline {
     background: var(--panel);
@@ -1204,7 +1248,7 @@ main {
 }
 
 /* ============================================================
-   LISTS
+   LISTS (General)
    ============================================================ */
 .list-header {
     display: grid;
@@ -1323,7 +1367,9 @@ main {
     }
 }
 
-/* Badges */
+/* ============================================================
+   BADGES
+   ============================================================ */
 .deceased-badge {
     color: var(--danger);
     font-size: 0.65rem;
@@ -1340,7 +1386,9 @@ main {
     margin-left: 4px;
 }
 
-/* Team Members Expanded */
+/* ============================================================
+   TEAM MEMBERS EXPANDED
+   ============================================================ */
 .team-members-expanded {
     grid-column: 1 / -1;
     padding: 6px 10px 10px 10px;
@@ -1374,7 +1422,9 @@ main {
     font-style: italic;
 }
 
-/* Member Modal */
+/* ============================================================
+   MEMBER MODAL
+   ============================================================ */
 .member-form {
     display: flex;
     gap: 6px;
@@ -1435,7 +1485,9 @@ main {
     gap: 4px;
 }
 
-/* Ranking Modal */
+/* ============================================================
+   RANKING MODAL
+   ============================================================ */
 .ranking-form {
     display: flex;
     gap: 6px;
@@ -1470,50 +1522,8 @@ main {
 }
 
 /* ============================================================
-   CALENDAR
+   CALENDAR (Legacy)
    ============================================================ */
-.calendar-controls {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-bottom: 12px;
-}
-.calendar-controls .student-selector,
-.calendar-controls .week-nav {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.calendar-controls select {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.78rem;
-    font-family: 'Inter', sans-serif;
-    max-width: 200px;
-}
-.calendar-controls select:focus {
-    outline: none;
-    border-color: var(--accent);
-}
-@media (max-width: 600px) {
-    .calendar-controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .calendar-controls .student-selector,
-    .calendar-controls .week-nav {
-        flex-wrap: wrap;
-    }
-    .calendar-controls select {
-        max-width: 100%;
-    }
-}
-
 .calendar-container {
     display: flex;
     gap: 12px;
@@ -1545,7 +1555,6 @@ main {
         gap: 3px;
     }
 }
-
 .calendar-sidebar {
     flex: 1;
     min-width: 180px;
@@ -1733,7 +1742,7 @@ main {
 }
 
 /* ============================================================
-   RANKING
+   RANKING TABLE
    ============================================================ */
 .ranking-controls {
     display: flex;
@@ -2367,152 +2376,74 @@ main {
 }
 
 /* ============================================================
-   RESPONSIVE FIXES
+   CAREER STATUS
    ============================================================ */
-@media (max-width: 768px) {
-    .schedule-grid-wrapper {
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-    }
-    .schedule-grid {
-        min-width: 550px;
-        padding: 4px;
-        gap: 3px;
-    }
-    .day-column {
-        min-width: 60px;
-    }
-    .day-header {
-        font-size: 0.55rem;
-        padding: 4px 2px;
-    }
-    .day-slots {
-        min-height: 250px;
-    }
-    .time-slot {
-        min-height: 24px;
-        font-size: 0.5rem;
-        padding: 1px 2px;
-    }
-    .time-slot .slot-time {
-        font-size: 0.4rem;
-        min-width: 20px;
-    }
-    .time-slot .slot-label {
-        font-size: 0.45rem;
-    }
-    .schedule-sidebar {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-    .schedule-sidebar .sidebar-section {
-        padding: 10px;
-    }
-    .calendar-controls {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
-    .calendar-controls .student-selector,
-    .calendar-controls .instructor-selector,
-    .calendar-controls .week-nav {
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    .calendar-controls select {
-        max-width: 100%;
-        width: 100%;
-    }
-    .instructor-calendar-grid {
-        min-width: 550px;
-    }
-    .rest-day-controls {
-        grid-template-columns: 1fr 1fr;
+.career-status-entry,
+.name-history-entry {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.career-status-entry select,
+.career-status-entry input,
+.name-history-entry input {
+    flex: 1;
+    min-width: 80px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: 'Inter', sans-serif;
+}
+@media (min-width: 600px) {
+    .career-status-entry select,
+    .career-status-entry input,
+    .name-history-entry input {
+        min-width: 100px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
     }
 }
+.career-status-entry .remove-status,
+.name-history-entry .remove-name {
+    padding: 4px 8px;
+    font-size: 0.65rem;
+}
 
-@media (max-width: 480px) {
-    .schedule-grid {
-        min-width: 450px;
-        padding: 3px;
-        gap: 2px;
-    }
-    .day-column {
-        min-width: 45px;
-    }
-    .day-header {
-        font-size: 0.45rem;
-        padding: 3px 1px;
-    }
-    .day-slots {
-        min-height: 180px;
-    }
-    .time-slot {
-        min-height: 18px;
-        font-size: 0.4rem;
-        padding: 1px 1px;
-    }
-    .time-slot .slot-time {
-        font-size: 0.35rem;
-        min-width: 15px;
-    }
-    .time-slot .slot-label {
-        font-size: 0.4rem;
-    }
-    .time-slot.occupied {
-        border-left-width: 2px;
-    }
-    .instructor-calendar-grid {
-        min-width: 450px;
-        font-size: 0.5rem;
-        padding: 3px;
-        gap: 1px;
-    }
-    .instructor-calendar-grid .header-cell {
-        font-size: 0.4rem;
-        padding: 2px 1px;
-    }
-    .instructor-calendar-grid .time-cell {
-        font-size: 0.4rem;
-        padding: 2px 1px;
-    }
-    .instructor-calendar-grid .class-cell {
-        font-size: 0.4rem;
-        padding: 2px 1px;
-        border-left-width: 2px;
-    }
-    .instructor-calendar-grid .class-cell .student-name {
-        font-size: 0.35rem;
-    }
-    .modal-content {
-        padding: 12px;
-        max-height: 98vh;
-    }
-    .modal-header h3 {
-        font-size: 0.95rem;
-    }
-    .form-grid {
-        gap: 8px;
-    }
-    .form-container {
-        padding: 12px;
-    }
-    #discipline-list .list-header {
-        min-width: 450px;
-        font-size: 0.45rem;
-        padding: 3px 4px;
-        gap: 2px;
-        grid-template-columns: 0.9fr 0.5fr 0.5fr 0.4fr 0.4fr 0.3fr 0.5fr;
-    }
-    #discipline-list .list-item {
-        min-width: 450px;
-        font-size: 0.5rem;
-        padding: 3px 4px;
-        gap: 2px;
-        grid-template-columns: 0.9fr 0.5fr 0.5fr 0.4fr 0.4fr 0.3fr 0.5fr;
-    }
-    #discipline-list .list-item .actions button {
-        font-size: 0.45rem;
-        padding: 1px 3px;
-    }
+/* ============================================================
+   FILTER SECTION
+   ============================================================ */
+.filter-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--panel-alt);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    border: 1px solid var(--border);
+}
+.filter-section label {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+.filter-section input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.8rem;
+    font-family: 'Inter', sans-serif;
+    width: 70px;
+}
+.filter-section input:focus {
+    outline: none;
+    border-color: var(--accent);
 }
