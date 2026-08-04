@@ -8,6 +8,7 @@
  * Added class labels (A, B, etc.)
  * Added instructor conflict checking
  * Added class duration (1-4 hours) support
+ * Integrated with instructor calendar
  */
 
 // Schedule state
@@ -31,7 +32,8 @@ function initScheduleSystem() {
             currentWeek: 1,
             classInstructors: {},
             classLabels: {},
-            classDurations: {} // key: studentId_week_day_hour, value: duration in hours
+            classDurations: {},
+            instructorClasses: {}
         };
     }
     if (!data.curriculum.schedules) {
@@ -48,6 +50,9 @@ function initScheduleSystem() {
     }
     if (!data.curriculum.classDurations) {
         data.curriculum.classDurations = {};
+    }
+    if (!data.curriculum.instructorClasses) {
+        data.curriculum.instructorClasses = {};
     }
 }
 
@@ -147,7 +152,7 @@ function isInstructorAvailable(instructorId, week, day, hour, excludeStudentId, 
         
         var schedule = getStudentSchedule(student.id, week);
         // Check all hours that would be occupied by this class
-        for (var h = hour; h < hour + dur; h++) {
+        for (var h = hour; h < hour + dur && h <= 23; h++) {
             if (schedule[day] && schedule[day][h]) {
                 var disciplineId = schedule[day][h];
                 var discipline = getDiscipline(disciplineId);
@@ -565,20 +570,16 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
     for (var day in sourceSchedule) {
         if (!destSchedule[day]) destSchedule[day] = {};
         for (var hour in sourceSchedule[day]) {
-            // Only copy if slot is empty or we're overwriting
             if (!destSchedule[day][hour] || overwrite) {
                 destSchedule[day][hour] = sourceSchedule[day][hour];
-                // Also copy instructor assignments
                 var instructorId = getClassInstructor(studentId, sourceWeek, parseInt(day), parseInt(hour));
                 if (instructorId) {
                     setClassInstructor(studentId, targetWeek, parseInt(day), parseInt(hour), instructorId);
                 }
-                // Also copy class labels
                 var label = getClassLabel(studentId, sourceWeek, parseInt(day), parseInt(hour));
                 if (label) {
                     setClassLabel(studentId, targetWeek, parseInt(day), parseInt(hour), label);
                 }
-                // Also copy class durations
                 var duration = getClassDuration(studentId, sourceWeek, parseInt(day), parseInt(hour));
                 if (duration) {
                     setClassDuration(studentId, targetWeek, parseInt(day), parseInt(hour), duration);
@@ -588,7 +589,6 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
         }
     }
     
-    // Also copy rest days if they exist
     if (data.curriculum.restDays[sourceWeek]) {
         if (overwrite || !data.curriculum.restDays[targetWeek]) {
             data.curriculum.restDays[targetWeek] = data.curriculum.restDays[sourceWeek].slice();
@@ -599,7 +599,6 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
         if (typeof logActivity === 'function') {
             logActivity('Duplicated schedule from week ' + sourceWeek + ' to ' + targetWeek + ' (' + copiedCount + ' classes)');
         }
-        // Move to the duplicated week
         scheduleState.currentWeek = targetWeek;
         renderSchedule();
         alert('Schedule duplicated from week ' + sourceWeek + ' to week ' + targetWeek + ' (' + copiedCount + ' classes copied)');
@@ -619,7 +618,6 @@ function renderSchedule() {
     var weekDisplay = document.getElementById('schedule-week-display');
     if (weekDisplay) weekDisplay.textContent = 'Week ' + scheduleState.currentWeek;
     
-    // Check if student is selected
     if (!scheduleState.selectedStudentId) {
         var dayColumns = grid.querySelectorAll('.day-column');
         dayColumns.forEach(function(col) {
@@ -632,7 +630,6 @@ function renderSchedule() {
         return;
     }
     
-    // Get schedule data
     var schedule = getStudentSchedule(scheduleState.selectedStudentId, scheduleState.currentWeek);
     var restDays = data.curriculum.restDays[scheduleState.currentWeek] || [];
     var availableDisciplines = getAvailableDisciplinesForStudent(
@@ -640,13 +637,11 @@ function renderSchedule() {
         scheduleState.currentWeek
     );
     
-    // Build hours (5 AM to 11 PM)
     var hours = [];
     for (var h = 5; h <= 23; h++) {
         hours.push(h);
     }
     
-    // Render each day
     var dayColumns = grid.querySelectorAll('.day-column');
     dayColumns.forEach(function(column, index) {
         var day = index + 1;
@@ -656,7 +651,6 @@ function renderSchedule() {
         var isRestDay = restDays.indexOf(day) !== -1;
         column.classList.toggle('rest-day', isRestDay);
         
-        // Clear slots
         slots.innerHTML = '';
         
         if (isRestDay) {
@@ -666,21 +660,16 @@ function renderSchedule() {
             restMsg.style.textAlign = 'center';
             restMsg.textContent = '🛑 Rest Day';
             slots.appendChild(restMsg);
-            
-            // Remove any classes on this day from the schedule
             if (schedule[day]) {
                 delete schedule[day];
             }
             return;
         }
         
-        // Create each time slot
-        var occupiedHours = {}; // Track which hours are already occupied by multi-hour classes
+        var occupiedHours = {};
         
         hours.forEach(function(hour) {
-            // Check if this hour is already occupied by a multi-hour class starting earlier
             if (occupiedHours[hour]) {
-                // This slot is part of a multi-hour class, skip rendering a separate slot
                 return;
             }
             
@@ -689,7 +678,6 @@ function renderSchedule() {
             slot.dataset.day = day;
             slot.dataset.hour = hour;
             
-            // Time label
             var timeLabel = document.createElement('span');
             timeLabel.className = 'slot-time';
             var hourDisplay = hour > 12 ? hour - 12 : hour;
@@ -699,7 +687,6 @@ function renderSchedule() {
             timeLabel.textContent = hourDisplay + ':00 ' + ampm;
             slot.appendChild(timeLabel);
             
-            // Check if this slot has a class
             var disciplineId = null;
             if (schedule[day] && schedule[day][hour]) {
                 disciplineId = schedule[day][hour];
@@ -710,17 +697,17 @@ function renderSchedule() {
                 if (discipline) {
                     var duration = getClassDuration(scheduleState.selectedStudentId, scheduleState.currentWeek, day, hour) || 1;
                     
-                    // Mark occupied hours for this duration
                     for (var h = hour; h < hour + duration && h <= 23; h++) {
                         occupiedHours[h] = true;
                     }
                     
                     slot.classList.add('occupied');
-                    // Set height based on duration
                     slot.style.minHeight = (30 * duration) + 'px';
                     slot.style.height = (30 * duration) + 'px';
+                    if (duration > 1) {
+                        slot.classList.add('duration-' + duration);
+                    }
                     
-                    // Get instructor for this class
                     var instructorId = getClassInstructor(
                         scheduleState.selectedStudentId, 
                         scheduleState.currentWeek, 
@@ -737,7 +724,6 @@ function renderSchedule() {
                         }
                     }
                     
-                    // Get class label
                     var label = getClassLabel(
                         scheduleState.selectedStudentId, 
                         scheduleState.currentWeek, 
@@ -753,7 +739,6 @@ function renderSchedule() {
                     labelEl.textContent = discipline.name + labelDisplay + durationDisplay + (instructorName ? ' (' + instructorName + ')' : '');
                     slot.appendChild(labelEl);
                     
-                    // Click to show details
                     slot.addEventListener('click', (function(discId, d, h) {
                         return function() {
                             showScheduleClassDetails(
@@ -766,7 +751,6 @@ function renderSchedule() {
                         };
                     })(disciplineId, day, hour));
                     
-                    // Right-click to remove
                     slot.addEventListener('contextmenu', function(e) {
                         e.preventDefault();
                         if (confirm('Remove this class from the schedule?')) {
@@ -774,7 +758,6 @@ function renderSchedule() {
                         }
                     });
                 } else {
-                    // Unknown discipline
                     slot.classList.add('empty');
                     var labelEl = document.createElement('span');
                     labelEl.className = 'slot-label';
@@ -783,7 +766,6 @@ function renderSchedule() {
                     occupiedHours[hour] = true;
                 }
             } else {
-                // Empty slot - click to add
                 slot.classList.add('empty');
                 var labelEl = document.createElement('span');
                 labelEl.className = 'slot-label';
@@ -804,11 +786,161 @@ function renderSchedule() {
         });
     });
     
-    // Update sidebar
     updateScheduleSidebar();
 }
 
-// ... (rest of the functions remain the same, but update showAddScheduleClassModal and showScheduleClassDetails)
+/**
+ * Update the schedule sidebar
+ */
+function updateScheduleSidebar() {
+    if (!scheduleState.selectedStudentId) {
+        updateSidebarEmpty();
+        return;
+    }
+    
+    var schedule = getStudentSchedule(scheduleState.selectedStudentId, scheduleState.currentWeek);
+    var available = getAvailableDisciplinesForStudent(
+        scheduleState.selectedStudentId,
+        scheduleState.currentWeek
+    );
+    var restDays = data.curriculum.restDays[scheduleState.currentWeek] || [];
+    
+    var overview = document.getElementById('schedule-overview');
+    if (overview) {
+        var classList = [];
+        for (var day in schedule) {
+            for (var hour in schedule[day]) {
+                var discId = schedule[day][hour];
+                if (discId) {
+                    var discipline = getDiscipline(discId);
+                    if (discipline) {
+                        var instructorId = getClassInstructor(
+                            scheduleState.selectedStudentId, 
+                            scheduleState.currentWeek, 
+                            parseInt(day), 
+                            parseInt(hour)
+                        );
+                        var instructorName = '';
+                        if (instructorId) {
+                            var instructor = data.characters.find(function(c) { 
+                                return String(c.id) === String(instructorId); 
+                            });
+                            if (instructor) {
+                                instructorName = [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ');
+                            }
+                        }
+                        var label = getClassLabel(
+                            scheduleState.selectedStudentId, 
+                            scheduleState.currentWeek, 
+                            parseInt(day), 
+                            parseInt(hour)
+                        );
+                        var labelDisplay = label ? ' [' + label + ']' : '';
+                        var duration = getClassDuration(
+                            scheduleState.selectedStudentId, 
+                            scheduleState.currentWeek, 
+                            parseInt(day), 
+                            parseInt(hour)
+                        );
+                        var durationDisplay = duration && duration > 1 ? ' (' + duration + 'h)' : '';
+                        classList.push({
+                            day: parseInt(day),
+                            hour: parseInt(hour),
+                            name: discipline.name + labelDisplay + durationDisplay,
+                            instructor: instructorName
+                        });
+                    }
+                }
+            }
+        }
+        
+        if (classList.length === 0) {
+            overview.innerHTML = '<p class="empty-state">No classes scheduled</p>';
+        } else {
+            var dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            classList.sort(function(a, b) {
+                if (a.day !== b.day) return a.day - b.day;
+                return a.hour - b.hour;
+            });
+            var html = '';
+            classList.forEach(function(cls) {
+                var hourDisplay = cls.hour > 12 ? cls.hour - 12 : cls.hour;
+                var ampm = cls.hour >= 12 ? 'PM' : 'AM';
+                if (cls.hour === 0) { hourDisplay = 12; ampm = 'AM'; }
+                if (cls.hour === 12) { ampm = 'PM'; }
+                html += '<div class="activity-item">' +
+                    dayNames[cls.day] + ' ' + hourDisplay + ':00 ' + ampm + 
+                    ' - <strong>' + cls.name + '</strong>' +
+                    (cls.instructor ? ' <span style="color:var(--text-dim);font-size:0.7rem;">(' + cls.instructor + ')</span>' : '') +
+                '</div>';
+            });
+            overview.innerHTML = html;
+        }
+    }
+    
+    var availContainer = document.getElementById('schedule-available');
+    if (availContainer) {
+        if (available.length === 0) {
+            availContainer.innerHTML = '<p class="empty-state">All disciplines are full for this week</p>';
+        } else {
+            var html = '';
+            available.forEach(function(item) {
+                var disc = item.discipline;
+                var instructorDisplay = item.instructorNames.length > 0 ? 
+                    item.instructorNames.join(', ') : 'No instructors assigned';
+                var isFull = item.remaining === 0;
+                html += '<div class="available-discipline' + (isFull ? ' full' : '') + '">' +
+                    '<span>' + disc.name + ' <span style="font-size:0.6rem;color:var(--text-dim);">(' + instructorDisplay + ')</span></span>' +
+                    '<span class="hours">' + item.used + '/' + item.maxHours + 'h <span style="color:var(--accent);">(' + item.remaining + ' left)</span></span>' +
+                '</div>';
+            });
+            availContainer.innerHTML = html;
+        }
+    }
+    
+    var usedEl = document.getElementById('schedule-hours-used');
+    var totalEl = document.getElementById('schedule-hours-total');
+    if (usedEl && totalEl) {
+        var totalHours = 0;
+        var usedHours = 0;
+        var allDisciplines = getAvailableDisciplines(scheduleState.currentWeek);
+        allDisciplines.forEach(function(d) {
+            totalHours += d.weeklyHours || 0;
+        });
+        var schedule = getStudentSchedule(scheduleState.selectedStudentId, scheduleState.currentWeek);
+        for (var day in schedule) {
+            for (var hour in schedule[day]) {
+                if (schedule[day][hour]) usedHours++;
+            }
+        }
+        usedEl.textContent = usedHours;
+        totalEl.textContent = totalHours;
+    }
+    
+    var checkboxes = document.querySelectorAll('.rest-day-check');
+    checkboxes.forEach(function(cb) {
+        var day = parseInt(cb.dataset.day);
+        cb.checked = restDays.indexOf(day) !== -1;
+    });
+}
+
+/**
+ * Update sidebar when no student is selected
+ */
+function updateSidebarEmpty() {
+    var overview = document.getElementById('schedule-overview');
+    if (overview) {
+        overview.innerHTML = '<p class="empty-state">Select a student</p>';
+    }
+    var availContainer = document.getElementById('schedule-available');
+    if (availContainer) {
+        availContainer.innerHTML = '<p class="empty-state">Select a student</p>';
+    }
+    var usedEl = document.getElementById('schedule-hours-used');
+    var totalEl = document.getElementById('schedule-hours-total');
+    if (usedEl) usedEl.textContent = '0';
+    if (totalEl) totalEl.textContent = '0';
+}
 
 /**
  * Show add class modal with duration support
@@ -879,7 +1011,6 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
     
     document.body.appendChild(modal);
     
-    // Populate instructor selection when discipline changes
     var disciplineSelect = document.getElementById('add-class-select');
     var instructorGroup = document.getElementById('instructor-selection-group');
     var instructorSelect = document.getElementById('add-class-instructor');
@@ -951,7 +1082,6 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
         
         var duration = parseInt(document.getElementById('add-class-duration').value) || 1;
         
-        // Check if instructor is available for the full duration
         if (selectedInstructor) {
             var instructorBusy = !isInstructorAvailable(selectedInstructor, week, day, hour, studentId, duration);
             if (instructorBusy) {
@@ -963,7 +1093,6 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
             }
         }
         
-        // Check if the time slots are available
         var schedule = getStudentSchedule(studentId, week);
         for (var h = hour; h < hour + duration && h <= 23; h++) {
             if (schedule[day] && schedule[day][h]) {
@@ -974,7 +1103,6 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
         
         var label = document.getElementById('add-class-label').value.trim();
         
-        // Add the class to all hours
         for (var h = hour; h < hour + duration && h <= 23; h++) {
             if (!schedule[day]) schedule[day] = {};
             schedule[day][h] = disciplineId;
@@ -985,7 +1113,6 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
             if (label) {
                 setClassLabel(studentId, week, day, h, label);
             }
-            // Only set duration on the first hour
             if (h === hour) {
                 setClassDuration(studentId, week, day, h, duration);
             }
@@ -1069,9 +1196,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                         </select>
                         <button id="update-class-duration-btn" class="small primary">Update</button>
                     </div>
-                    <div style="font-size:0.6rem;color:var(--text-dim);margin-top:2px;">
-                        Changing duration will add or remove hours from this class.
-                    </div>
                 </div>
                 
                 <!-- Class Label Editor -->
@@ -1102,7 +1226,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 </div>
                 ` : ''}
                 
-                <!-- Add Classmate Section -->
                 ${otherStudents.length > 0 ? `
                 <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
                     <label style="font-size:0.75rem;color:var(--text-dim);">Add Classmate:</label>
@@ -1127,9 +1250,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                         </select>
                         <button id="add-classmate-btn" class="primary small">Add Classmate</button>
                     </div>
-                    <div style="font-size:0.6rem;color:var(--text-dim);margin-top:4px;">
-                        Copies this exact class to the selected student's schedule at the same day/time with the same duration.
-                    </div>
                 </div>
                 ` : '<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);"><span style="color:var(--text-dim);font-size:0.75rem;">No other students available to add as classmates.</span></div>'}
                 
@@ -1149,7 +1269,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
         if (e.target === modal) modal.remove();
     });
     
-    // Update duration
     modal.querySelector('#update-class-duration-btn').onclick = function() {
         var newDuration = parseInt(document.getElementById('edit-class-duration').value);
         var oldDuration = currentDuration;
@@ -1159,10 +1278,8 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
             return;
         }
         
-        // Check if we can extend or shrink
         var schedule = getStudentSchedule(studentId, week);
         if (newDuration > oldDuration) {
-            // Check if new slots are available
             for (var h = hour + oldDuration; h < hour + newDuration && h <= 23; h++) {
                 if (schedule[day] && schedule[day][h]) {
                     alert('Cannot extend duration. Slot at ' + h + ':00 is already occupied.');
@@ -1170,7 +1287,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 }
             }
             
-            // Add new slots
             for (var h = hour + oldDuration; h < hour + newDuration && h <= 23; h++) {
                 if (!schedule[day]) schedule[day] = {};
                 schedule[day][h] = disciplineId;
@@ -1182,7 +1298,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 }
             }
         } else {
-            // Remove extra slots
             for (var h = hour + newDuration; h < hour + oldDuration && h <= 23; h++) {
                 if (schedule[day] && schedule[day][h]) {
                     delete schedule[day][h];
@@ -1207,12 +1322,10 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
         });
     };
     
-    // Update label
     modal.querySelector('#update-class-label-btn').onclick = function() {
         var newLabel = document.getElementById('edit-class-label').value.trim();
         var duration = getClassDuration(studentId, week, day, hour) || 1;
         
-        // Update label for all hours
         for (var h = hour; h < hour + duration && h <= 23; h++) {
             setClassLabel(studentId, week, day, h, newLabel || null);
         }
@@ -1229,7 +1342,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
         });
     };
     
-    // Change instructor
     var changeBtn = document.getElementById('change-instructor-btn');
     if (changeBtn) {
         changeBtn.addEventListener('click', function() {
@@ -1249,7 +1361,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 }
             }
             
-            // Update instructor for all hours
             for (var h = hour; h < hour + duration && h <= 23; h++) {
                 setClassInstructor(studentId, week, day, h, newInstructorId);
             }
@@ -1267,7 +1378,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
         });
     }
     
-    // Remove class
     modal.querySelector('#remove-class-detail').onclick = function() {
         if (confirm('Remove this class from the schedule?')) {
             removeScheduleClass(studentId, week, day, hour);
@@ -1275,7 +1385,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
         }
     };
     
-    // Add Classmate
     var addClassmateBtn = document.getElementById('add-classmate-btn');
     if (addClassmateBtn) {
         addClassmateBtn.addEventListener('click', function() {
@@ -1288,7 +1397,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
             var duration = getClassDuration(studentId, week, day, hour) || 1;
             var targetSchedule = getStudentSchedule(targetStudentId, week);
             
-            // Check all hours
             for (var h = hour; h < hour + duration && h <= 23; h++) {
                 if (targetSchedule[day] && targetSchedule[day][h]) {
                     alert('This student already has a class at ' + h + ':00.');
@@ -1307,7 +1415,6 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 }
             }
             
-            // Add the class
             for (var h = hour; h < hour + duration && h <= 23; h++) {
                 if (!targetSchedule[day]) targetSchedule[day] = {};
                 targetSchedule[day][h] = disciplineId;
@@ -1347,7 +1454,6 @@ function removeScheduleClass(studentId, week, day, hour) {
     var schedule = getStudentSchedule(studentId, week);
     var duration = getClassDuration(studentId, week, day, hour) || 1;
     
-    // Remove all hours
     for (var h = hour; h < hour + duration && h <= 23; h++) {
         if (schedule[day] && schedule[day][h]) {
             delete schedule[day][h];
@@ -1364,7 +1470,89 @@ function removeScheduleClass(studentId, week, day, hour) {
     }
 }
 
-// ... (rest of the functions: clearSchedule, saveRestDays, etc. remain the same)
+/**
+ * Clear the current week's schedule
+ */
+function clearSchedule() {
+    if (!scheduleState.selectedStudentId) {
+        alert('Please select a student first.');
+        return;
+    }
+    
+    if (!confirm('Clear all classes for week ' + scheduleState.currentWeek + '?')) return;
+    
+    var schedule = getStudentSchedule(scheduleState.selectedStudentId, scheduleState.currentWeek);
+    for (var day in schedule) {
+        delete schedule[day];
+    }
+    
+    var week = scheduleState.currentWeek;
+    for (var key in data.curriculum.classInstructors) {
+        var parts = key.split('_');
+        if (parts[1] == week) {
+            delete data.curriculum.classInstructors[key];
+        }
+    }
+    for (var key in data.curriculum.classLabels) {
+        var parts = key.split('_');
+        if (parts[1] == week) {
+            delete data.curriculum.classLabels[key];
+        }
+    }
+    for (var key in data.curriculum.classDurations) {
+        var parts = key.split('_');
+        if (parts[1] == week) {
+            delete data.curriculum.classDurations[key];
+        }
+    }
+    
+    saveData().then(function() {
+        if (typeof logActivity === 'function') {
+            logActivity('Cleared schedule for week ' + scheduleState.currentWeek);
+        }
+        renderSchedule();
+    }).catch(function(err) {
+        console.error('Failed to save:', err);
+        renderSchedule();
+    });
+}
+
+/**
+ * Save rest days - removes classes from rest days
+ */
+function saveRestDays() {
+    if (!scheduleState.selectedStudentId) {
+        alert('Please select a student first.');
+        return;
+    }
+    
+    var checkboxes = document.querySelectorAll('.rest-day-check');
+    var restDays = [];
+    checkboxes.forEach(function(cb) {
+        if (cb.checked) {
+            restDays.push(parseInt(cb.dataset.day));
+        }
+    });
+    
+    data.curriculum.restDays[scheduleState.currentWeek] = restDays;
+    
+    var schedule = getStudentSchedule(scheduleState.selectedStudentId, scheduleState.currentWeek);
+    restDays.forEach(function(day) {
+        if (schedule[day]) {
+            delete schedule[day];
+        }
+    });
+    
+    saveData().then(function() {
+        if (typeof logActivity === 'function') {
+            logActivity('Saved rest days for week ' + scheduleState.currentWeek + ' and removed classes on rest days');
+        }
+        renderSchedule();
+    }).catch(function(err) {
+        console.error('Failed to save:', err);
+        renderSchedule();
+    });
+}
 
 // Make functions globally available
 window.renderScheduleView = renderScheduleView;
