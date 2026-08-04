@@ -36,8 +36,8 @@ function renderDisciplinesView(container) {
                         <label>Discipline Type *</label>
                         <select id="discipline-type" required>
                             <option value="">Select type...</option>
-                            <option value="mandatory">Mandatory / Common</option>
-                            <option value="optional">Optional / Choice</option>
+                            <option value="mandatory">▣ Mandatory / Common</option>
+                            <option value="optional">▢ Optional / Choice</option>
                         </select>
                     </div>
                     <div class="form-group full-width">
@@ -127,7 +127,7 @@ function renderDisciplines() {
         var weekDisplay = d.startWeek ? 'Wk ' + d.startWeek : '?';
         if (d.endWeek) weekDisplay += ' - Wk ' + d.endWeek;
         
-        var typeLabel = d.type === 'mandatory' ? '📚 Mandatory' : (d.type === 'optional' ? '🎯 Optional' : '—');
+        var typeLabel = d.type === 'mandatory' ? '▣ Mandatory' : (d.type === 'optional' ? '▢ Optional' : '—');
         var typeColor = d.type === 'mandatory' ? 'var(--accent)' : (d.type === 'optional' ? 'var(--warning)' : 'var(--text-dim)');
         
         html += '<div class="list-item" data-id="' + d.id + '">' +
