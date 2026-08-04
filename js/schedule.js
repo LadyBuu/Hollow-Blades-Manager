@@ -37,7 +37,8 @@ function initScheduleSystem() {
             classDurations: {},
             instructorClasses: {},
             instructorTemplates: {},
-            instructorBlocks: {}
+            instructorBlocks: {},
+            instructorGroups: {}
         };
     }
     if (!data.curriculum.schedules) {
@@ -66,6 +67,9 @@ function initScheduleSystem() {
     }
     if (!data.curriculum.instructorBlocks) {
         data.curriculum.instructorBlocks = {};
+    }
+    if (!data.curriculum.instructorGroups) {
+        data.curriculum.instructorGroups = {};
     }
 }
 
