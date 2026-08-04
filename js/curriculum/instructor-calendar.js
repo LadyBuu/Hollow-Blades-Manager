@@ -20,7 +20,7 @@ function renderInstructorCalendar(container) {
     
     container.innerHTML = `
         <div class="page-header">
-            <h2>🧑‍🏫 Instructor Calendar</h2>
+            <h2>◷ Instructor Calendar</h2>
             <div class="header-actions">
                 <button id="add-class-to-instructor-btn" class="primary small">+ Add Class</button>
             </div>
@@ -312,18 +312,18 @@ function showInstructorClassDetails(disciplineId, day, hour, studentIds, label) 
             </div>
             <div class="modal-body">
                 <div class="detail-row"><span class="label">Instructor:</span> <span>${instructorName}</span></div>
-                <div class="detail-row"><span class="label">Type:</span> <span>${discipline.type === 'mandatory' ? '📚 Mandatory' : '🎯 Optional'}</span></div>
+                <div class="detail-row"><span class="label">Type:</span> <span>${discipline.type === 'mandatory' ? '▣ Mandatory' : '▢ Optional'}</span></div>
                 <div class="detail-row"><span class="label">Day/Time:</span> <span>${dayNames[day]} at ${hourDisplay}:00 ${ampm}</span></div>
                 <div class="detail-row"><span class="label">Week:</span> <span>${week}</span></div>
                 <div class="detail-row"><span class="label">Students (${studentNames.length}):</span> <span style="font-size:0.8rem;">${studentNames.join(', ')}</span></div>
                 
                 <div style="margin-top:16px;padding:12px;background:var(--danger-soft);border-radius:6px;border:1px solid var(--danger);">
-                    <p style="color:var(--danger);font-size:0.85rem;margin-bottom:4px;font-weight:600;">⚠️ Remove this class?</p>
+                    <p style="color:var(--danger);font-size:0.85rem;margin-bottom:4px;font-weight:600;">⚠ Remove this class?</p>
                     <p style="color:var(--text-dim);font-size:0.75rem;">This will remove the class from <strong>ALL ${studentNames.length} student(s)</strong> listed above.</p>
                 </div>
                 
                 <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" id="remove-class-all" class="danger">🗑️ Remove from All Students</button>
+                    <button type="button" id="remove-class-all" class="danger">✕ Remove from All Students</button>
                     <button type="button" id="close-detail" class="secondary">Close</button>
                 </div>
             </div>
