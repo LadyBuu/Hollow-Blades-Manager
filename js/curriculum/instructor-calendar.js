@@ -3,12 +3,14 @@
  * Works exactly like student calendar with the same data structure
  * Now with group filters and student assignment awareness
  * Auto-assigns students from a group when blocking time with a group label
+ * Shows group list at bottom with student members
  */
 
 var instructorCalendarState = {
     currentWeek: 1,
     selectedInstructorId: null,
-    activeGroupFilter: 'all'
+    activeGroupFilter: 'all',
+    expandedGroups: {}
 };
 
 /**
@@ -83,12 +85,175 @@ function renderInstructorCalendar(container) {
         <div style="margin-top:8px;font-size:0.7rem;color:var(--text-dim);text-align:center;">
             Click a slot to add class • Click a class to manage students • Right-click to remove
         </div>
+        <div id="instructor-groups-container" style="margin-top:16px;"></div>
     `;
     
     populateInstructorCalendarSelector();
     populateGroupFilter();
     initInstructorCalendarEvents();
     renderInstructorCalendarData();
+    renderGroupList();
+}
+
+/**
+ * Render the group list at the bottom
+ */
+function renderGroupList() {
+    var container = document.getElementById('instructor-groups-container');
+    if (!container) return;
+    
+    if (!instructorCalendarState.selectedInstructorId) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    var week = instructorCalendarState.currentWeek;
+    var instructorId = instructorCalendarState.selectedInstructorId;
+    
+    // Collect all groups for this instructor
+    var groups = {};
+    var students = getStudents();
+    
+    students.forEach(function(student) {
+        var schedule = getStudentSchedule(student.id, week);
+        for (var day in schedule) {
+            for (var hour in schedule[day]) {
+                var disciplineId = schedule[day][hour];
+                if (disciplineId) {
+                    var discipline = getDiscipline(disciplineId);
+                    if (discipline) {
+                        var classInstructorId = null;
+                        if (typeof getClassInstructor === 'function') {
+                            classInstructorId = getClassInstructor(student.id, week, parseInt(day), parseInt(hour));
+                        }
+                        var isTeaching = false;
+                        if (classInstructorId) {
+                            isTeaching = String(classInstructorId) === String(instructorId);
+                        } else if (discipline.instructorIds) {
+                            isTeaching = discipline.instructorIds.some(function(id) { 
+                                return String(id) === String(instructorId); 
+                            });
+                        }
+                        if (isTeaching) {
+                            var groupLabel = null;
+                            if (typeof getClassGroupLabel === 'function') {
+                                groupLabel = getClassGroupLabel(student.id, week, parseInt(day), parseInt(hour));
+                            }
+                            if (groupLabel) {
+                                if (!groups[groupLabel]) {
+                                    groups[groupLabel] = {
+                                        students: {},
+                                        disciplines: {}
+                                    };
+                                }
+                                var studentName = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
+                                groups[groupLabel].students[student.id] = studentName;
+                                groups[groupLabel].disciplines[discipline.name] = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Also check templates
+    if (data.curriculum.instructorTemplates) {
+        var templateKey = instructorId + '_' + week;
+        if (data.curriculum.instructorTemplates[templateKey]) {
+            for (var key in data.curriculum.instructorTemplates[templateKey]) {
+                var templateData = data.curriculum.instructorTemplates[templateKey][key];
+                if (templateData.groupLabel) {
+                    if (!groups[templateData.groupLabel]) {
+                        groups[templateData.groupLabel] = {
+                            students: {},
+                            disciplines: {}
+                        };
+                    }
+                    var discipline = getDiscipline(templateData.disciplineId);
+                    if (discipline) {
+                        groups[templateData.groupLabel].disciplines[discipline.name] = true;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Also check blocks
+    if (data.curriculum.instructorBlocks) {
+        var blockKey = instructorId + '_' + week;
+        if (data.curriculum.instructorBlocks[blockKey]) {
+            for (var day in data.curriculum.instructorBlocks[blockKey]) {
+                for (var hour in data.curriculum.instructorBlocks[blockKey][day]) {
+                    var blockData = data.curriculum.instructorBlocks[blockKey][day][hour];
+                    if (blockData.groupLabel) {
+                        if (!groups[blockData.groupLabel]) {
+                            groups[blockData.groupLabel] = {
+                                students: {},
+                                disciplines: {}
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    var groupLabels = Object.keys(groups).sort();
+    
+    if (groupLabels.length === 0) {
+        container.innerHTML = '<div style="padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);text-align:center;color:var(--text-dim);font-size:0.8rem;">No groups created yet. Add classes with group labels to create groups.</div>';
+        return;
+    }
+    
+    var html = '<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">';
+    html += '<h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">📋 Groups</h4>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+    
+    groupLabels.forEach(function(label) {
+        var group = groups[label];
+        var studentCount = Object.keys(group.students).length;
+        var disciplineList = Object.keys(group.disciplines).join(', ');
+        var isExpanded = instructorCalendarState.expandedGroups[label] || false;
+        
+        html += '<div class="group-card" style="background:var(--bg);border:1px solid var(--border-soft);border-radius:var(--radius);padding:8px 12px;flex:1;min-width:150px;max-width:300px;">';
+        html += '<div class="group-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleGroup(\'' + label + '\')">';
+        html += '<span class="group-name" style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
+        html += '<span class="group-meta" style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + ' students' + (disciplineList ? ' · ' + disciplineList : '') + ' ' + (isExpanded ? '▼' : '▶') + '</span>';
+        html += '</div>';
+        
+        if (isExpanded) {
+            html += '<div class="group-students" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);display:flex;flex-wrap:wrap;gap:4px;">';
+            var studentNames = Object.values(group.students);
+            if (studentNames.length > 0) {
+                studentNames.sort().forEach(function(name) {
+                    html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;">' + name + '</span>';
+                });
+            } else {
+                html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned yet</span>';
+            }
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    });
+    
+    html += '</div>';
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+/**
+ * Toggle group expansion
+ */
+function toggleGroup(label) {
+    if (instructorCalendarState.expandedGroups[label]) {
+        delete instructorCalendarState.expandedGroups[label];
+    } else {
+        instructorCalendarState.expandedGroups[label] = true;
+    }
+    renderGroupList();
 }
 
 /**
@@ -205,6 +370,7 @@ function renderInstructorCalendarData() {
                 slots.innerHTML = '<div class="empty-state" style="padding:20px;text-align:center;">Select an instructor</div>';
             }
         });
+        renderGroupList();
         return;
     }
     
@@ -219,6 +385,7 @@ function renderInstructorCalendarData() {
                 slots.innerHTML = '<div class="empty-state" style="padding:20px;text-align:center;">Instructor not found</div>';
             }
         });
+        renderGroupList();
         return;
     }
     
@@ -472,6 +639,8 @@ function renderInstructorCalendarData() {
             slots.appendChild(slot);
         });
     });
+    
+    renderGroupList();
 }
 
 /**
@@ -1480,11 +1649,16 @@ function initInstructorCalendarEvents() {
     }
 }
 
+// Make toggleGroup globally available
+window.toggleGroup = toggleGroup;
+
 // Make functions globally available
 window.renderInstructorCalendar = renderInstructorCalendar;
 window.renderInstructorCalendarData = renderInstructorCalendarData;
 window.populateInstructorCalendarSelector = populateInstructorCalendarSelector;
 window.populateGroupFilter = populateGroupFilter;
+window.renderGroupList = renderGroupList;
+window.toggleGroup = toggleGroup;
 window.initInstructorCalendarEvents = initInstructorCalendarEvents;
 window.showAddClassModal = showAddClassModal;
 window.showAddBlockModal = showAddBlockModal;
