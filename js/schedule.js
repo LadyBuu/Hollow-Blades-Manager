@@ -8,6 +8,7 @@
  * Added class labels (A, B, etc.)
  * Added instructor conflict checking
  * Added class duration (1-4 hours) support
+ * Added group labels for sections
  * Integrated with instructor calendar
  */
 
@@ -32,8 +33,11 @@ function initScheduleSystem() {
             currentWeek: 1,
             classInstructors: {},
             classLabels: {},
+            classGroupLabels: {},
             classDurations: {},
-            instructorClasses: {}
+            instructorClasses: {},
+            instructorTemplates: {},
+            instructorBlocks: {}
         };
     }
     if (!data.curriculum.schedules) {
@@ -48,11 +52,20 @@ function initScheduleSystem() {
     if (!data.curriculum.classLabels) {
         data.curriculum.classLabels = {};
     }
+    if (!data.curriculum.classGroupLabels) {
+        data.curriculum.classGroupLabels = {};
+    }
     if (!data.curriculum.classDurations) {
         data.curriculum.classDurations = {};
     }
     if (!data.curriculum.instructorClasses) {
         data.curriculum.instructorClasses = {};
+    }
+    if (!data.curriculum.instructorTemplates) {
+        data.curriculum.instructorTemplates = {};
+    }
+    if (!data.curriculum.instructorBlocks) {
+        data.curriculum.instructorBlocks = {};
     }
 }
 
@@ -118,6 +131,29 @@ function setClassLabel(studentId, week, day, hour, label) {
 }
 
 /**
+ * Get the group label for a specific class slot
+ */
+function getClassGroupLabel(studentId, week, day, hour) {
+    var key = studentId + '_' + week + '_' + day + '_' + hour;
+    return data.curriculum.classGroupLabels ? data.curriculum.classGroupLabels[key] : null;
+}
+
+/**
+ * Set the group label for a specific class slot
+ */
+function setClassGroupLabel(studentId, week, day, hour, groupLabel) {
+    if (!data.curriculum.classGroupLabels) {
+        data.curriculum.classGroupLabels = {};
+    }
+    var key = studentId + '_' + week + '_' + day + '_' + hour;
+    if (groupLabel) {
+        data.curriculum.classGroupLabels[key] = groupLabel;
+    } else {
+        delete data.curriculum.classGroupLabels[key];
+    }
+}
+
+/**
  * Get the duration for a specific class slot
  */
 function getClassDuration(studentId, week, day, hour) {
@@ -151,7 +187,6 @@ function isInstructorAvailable(instructorId, week, day, hour, excludeStudentId, 
         if (excludeStudentId && String(student.id) === String(excludeStudentId)) continue;
         
         var schedule = getStudentSchedule(student.id, week);
-        // Check all hours that would be occupied by this class
         for (var h = hour; h < hour + dur && h <= 23; h++) {
             if (schedule[day] && schedule[day][h]) {
                 var disciplineId = schedule[day][h];
@@ -172,13 +207,13 @@ function isInstructorAvailable(instructorId, week, day, hour, excludeStudentId, 
                     }
                     
                     if (isTeaching) {
-                        return false; // Instructor is busy
+                        return false;
                     }
                 }
             }
         }
     }
-    return true; // Instructor is available
+    return true;
 }
 
 /**
@@ -286,7 +321,6 @@ function renderScheduleView(container) {
             </div>
         </div>
 
-        <!-- Schedule Grid with scroll wrapper for mobile -->
         <div class="schedule-grid-wrapper" id="schedule-grid-wrapper">
             <div class="schedule-grid" id="schedule-grid">
                 <div class="day-column" data-day="1">
@@ -320,7 +354,6 @@ function renderScheduleView(container) {
             </div>
         </div>
 
-        <!-- Sidebar -->
         <div class="schedule-sidebar">
             <div class="sidebar-section">
                 <h4>Week Overview</h4>
@@ -356,13 +389,8 @@ function renderScheduleView(container) {
         </div>
     `;
 
-    // Populate student selector
     populateScheduleStudentSelector();
-    
-    // Set up events
     initScheduleEvents();
-    
-    // Render the schedule
     renderSchedule();
 }
 
@@ -388,7 +416,6 @@ function populateScheduleStudentSelector() {
  * Initialize schedule events
  */
 function initScheduleEvents() {
-    // Student selector
     var studentSelect = document.getElementById('schedule-student');
     if (studentSelect) {
         studentSelect.addEventListener('change', function() {
@@ -397,7 +424,6 @@ function initScheduleEvents() {
         });
     }
     
-    // Week navigation - moves by 1 week at a time
     var prevBtn = document.getElementById('prev-schedule-week');
     if (prevBtn) {
         prevBtn.addEventListener('click', function() {
@@ -434,25 +460,21 @@ function initScheduleEvents() {
         });
     }
     
-    // Duplicate schedule - now opens a modal to select target week
     var duplicateBtn = document.getElementById('duplicate-schedule-btn');
     if (duplicateBtn) {
         duplicateBtn.addEventListener('click', showDuplicateModal);
     }
     
-    // Clear schedule
     var clearBtn = document.getElementById('clear-schedule-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', clearSchedule);
     }
     
-    // Save rest days
     var saveRestBtn = document.getElementById('save-rest-days-btn');
     if (saveRestBtn) {
         saveRestBtn.addEventListener('click', saveRestDays);
     }
     
-    // Set initial student if available
     if (studentSelect && studentSelect.options.length > 1) {
         studentSelect.selectedIndex = 1;
         scheduleState.selectedStudentId = studentSelect.value;
@@ -536,7 +558,6 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
     
     var studentId = scheduleState.selectedStudentId;
     
-    // Check if target week already has data
     var targetSchedule = getStudentSchedule(studentId, targetWeek);
     var hasData = false;
     for (var day in targetSchedule) {
@@ -558,14 +579,12 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
     var sourceSchedule = getStudentSchedule(studentId, sourceWeek);
     var destSchedule = getStudentSchedule(studentId, targetWeek);
     
-    // Clear destination if overwriting
     if (overwrite) {
         for (var day in destSchedule) {
             delete destSchedule[day];
         }
     }
     
-    // Copy all classes
     var copiedCount = 0;
     for (var day in sourceSchedule) {
         if (!destSchedule[day]) destSchedule[day] = {};
@@ -579,6 +598,10 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
                 var label = getClassLabel(studentId, sourceWeek, parseInt(day), parseInt(hour));
                 if (label) {
                     setClassLabel(studentId, targetWeek, parseInt(day), parseInt(hour), label);
+                }
+                var groupLabel = getClassGroupLabel(studentId, sourceWeek, parseInt(day), parseInt(hour));
+                if (groupLabel) {
+                    setClassGroupLabel(studentId, targetWeek, parseInt(day), parseInt(hour), groupLabel);
                 }
                 var duration = getClassDuration(studentId, sourceWeek, parseInt(day), parseInt(hour));
                 if (duration) {
@@ -609,7 +632,7 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
 }
 
 /**
- * Render the schedule grid with duration support
+ * Render the schedule grid
  */
 function renderSchedule() {
     var grid = document.getElementById('schedule-grid');
@@ -730,13 +753,20 @@ function renderSchedule() {
                         day, 
                         hour
                     );
+                    var groupLabel = getClassGroupLabel(
+                        scheduleState.selectedStudentId, 
+                        scheduleState.currentWeek, 
+                        day, 
+                        hour
+                    );
                     
                     var labelDisplay = label ? ' [' + label + ']' : '';
+                    var groupDisplay = groupLabel ? ' (G' + groupLabel + ')' : '';
                     var durationDisplay = duration > 1 ? ' (' + duration + 'h)' : '';
                     
                     var labelEl = document.createElement('span');
                     labelEl.className = 'slot-label';
-                    labelEl.textContent = discipline.name + labelDisplay + durationDisplay + (instructorName ? ' (' + instructorName + ')' : '');
+                    labelEl.textContent = discipline.name + labelDisplay + groupDisplay + durationDisplay + (instructorName ? ' (' + instructorName + ')' : '');
                     slot.appendChild(labelEl);
                     
                     slot.addEventListener('click', (function(discId, d, h) {
@@ -835,7 +865,14 @@ function updateScheduleSidebar() {
                             parseInt(day), 
                             parseInt(hour)
                         );
+                        var groupLabel = getClassGroupLabel(
+                            scheduleState.selectedStudentId, 
+                            scheduleState.currentWeek, 
+                            parseInt(day), 
+                            parseInt(hour)
+                        );
                         var labelDisplay = label ? ' [' + label + ']' : '';
+                        var groupDisplay = groupLabel ? ' (G' + groupLabel + ')' : '';
                         var duration = getClassDuration(
                             scheduleState.selectedStudentId, 
                             scheduleState.currentWeek, 
@@ -846,7 +883,7 @@ function updateScheduleSidebar() {
                         classList.push({
                             day: parseInt(day),
                             hour: parseInt(hour),
-                            name: discipline.name + labelDisplay + durationDisplay,
+                            name: discipline.name + labelDisplay + groupDisplay + durationDisplay,
                             instructor: instructorName
                         });
                     }
@@ -943,7 +980,7 @@ function updateSidebarEmpty() {
 }
 
 /**
- * Show add class modal with duration support
+ * Show add class modal
  */
 function showAddScheduleClassModal(studentId, week, day, hour) {
     var available = getAvailableDisciplinesForStudent(studentId, week);
@@ -991,6 +1028,10 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
                 <div class="form-group">
                     <label>Class Label (optional):</label>
                     <input type="text" id="add-class-label" placeholder="e.g., A, B, Group 1..." style="width:100%;padding:6px;">
+                </div>
+                <div class="form-group">
+                    <label>Group Label (optional):</label>
+                    <input type="text" id="add-class-group" placeholder="e.g., 1, 2, 3..." style="width:100%;padding:6px;">
                 </div>
                 <div class="form-group">
                     <label>Duration (hours):</label>
@@ -1102,6 +1143,7 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
         }
         
         var label = document.getElementById('add-class-label').value.trim();
+        var groupLabel = document.getElementById('add-class-group').value.trim();
         
         for (var h = hour; h < hour + duration && h <= 23; h++) {
             if (!schedule[day]) schedule[day] = {};
@@ -1112,6 +1154,9 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
             }
             if (label) {
                 setClassLabel(studentId, week, day, h, label);
+            }
+            if (groupLabel) {
+                setClassGroupLabel(studentId, week, day, h, groupLabel);
             }
             if (h === hour) {
                 setClassDuration(studentId, week, day, h, duration);
@@ -1127,6 +1172,7 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
                     (data.characters.find(function(c) { return String(c.id) === String(selectedInstructor); })?.firstName || '') : '';
                 logActivity('Added class ' + (discipline ? discipline.name : '') + 
                     (label ? ' [' + label + ']' : '') +
+                    (groupLabel ? ' (G' + groupLabel + ')' : '') +
                     ' (' + duration + 'h)' +
                     (instructorName ? ' taught by ' + instructorName : '') + ' to schedule');
             }
@@ -1139,7 +1185,7 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
 }
 
 /**
- * Show class details with duration editing
+ * Show class details
  */
 function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
     var discipline = getDiscipline(disciplineId);
@@ -1158,6 +1204,7 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
     var allInstructorsDisplay = allInstructors.length > 0 ? allInstructors.join(', ') : 'None assigned';
     
     var currentLabel = getClassLabel(studentId, week, day, hour) || '';
+    var currentGroupLabel = getClassGroupLabel(studentId, week, day, hour) || '';
     var currentDuration = getClassDuration(studentId, week, day, hour) || 1;
     
     var hourDisplay = hour > 12 ? hour - 12 : hour;
@@ -1173,7 +1220,7 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
     modal.innerHTML = `
         <div class="modal-content" style="max-width:450px;">
             <div class="modal-header">
-                <h3>${discipline.name} ${currentLabel ? '[' + currentLabel + ']' : ''}</h3>
+                <h3>${discipline.name} ${currentLabel ? '[' + currentLabel + ']' : ''} ${currentGroupLabel ? '(G' + currentGroupLabel + ')' : ''}</h3>
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
@@ -1182,9 +1229,9 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 <div class="detail-row"><span class="label">Current Instructor:</span> <span><strong>${instructorName}</strong></span></div>
                 <div class="detail-row"><span class="label">Day/Time:</span> <span>${dayNames[day]} at ${hourDisplay}:00 ${ampm}</span></div>
                 <div class="detail-row"><span class="label">Duration:</span> <span><strong>${currentDuration} hour${currentDuration > 1 ? 's' : ''}</strong></span></div>
+                <div class="detail-row"><span class="label">Group:</span> <span><strong>${currentGroupLabel || 'None'}</strong></span></div>
                 <div class="detail-row"><span class="label">Week:</span> <span>${week}</span></div>
                 
-                <!-- Duration Editor -->
                 <div style="margin-top:12px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
                     <label style="font-size:0.75rem;color:var(--text-dim);">Duration:</label>
                     <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
@@ -1198,12 +1245,19 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                     </div>
                 </div>
                 
-                <!-- Class Label Editor -->
                 <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
                     <label style="font-size:0.75rem;color:var(--text-dim);">Class Label:</label>
                     <div style="display:flex;gap:6px;margin-top:4px;">
                         <input type="text" id="edit-class-label" value="${currentLabel}" placeholder="e.g., A, B, Group 1..." style="flex:1;padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
                         <button id="update-class-label-btn" class="small primary">Update</button>
+                    </div>
+                </div>
+                
+                <div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
+                    <label style="font-size:0.75rem;color:var(--text-dim);">Group Label:</label>
+                    <div style="display:flex;gap:6px;margin-top:4px;">
+                        <input type="text" id="edit-group-label" value="${currentGroupLabel}" placeholder="e.g., 1, 2, 3..." style="flex:1;padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                        <button id="update-group-label-btn" class="small primary">Update</button>
                     </div>
                 </div>
                 
@@ -1296,6 +1350,9 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 if (currentLabel) {
                     setClassLabel(studentId, week, day, h, currentLabel);
                 }
+                if (currentGroupLabel) {
+                    setClassGroupLabel(studentId, week, day, h, currentGroupLabel);
+                }
             }
         } else {
             for (var h = hour + newDuration; h < hour + oldDuration && h <= 23; h++) {
@@ -1303,6 +1360,7 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                     delete schedule[day][h];
                     setClassInstructor(studentId, week, day, h, null);
                     setClassLabel(studentId, week, day, h, null);
+                    setClassGroupLabel(studentId, week, day, h, null);
                     setClassDuration(studentId, week, day, h, null);
                 }
             }
@@ -1339,6 +1397,26 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
         }).catch(function(err) {
             console.error('Failed to save:', err);
             alert('Failed to update label.');
+        });
+    };
+    
+    modal.querySelector('#update-group-label-btn').onclick = function() {
+        var newGroupLabel = document.getElementById('edit-group-label').value.trim();
+        var duration = getClassDuration(studentId, week, day, hour) || 1;
+        
+        for (var h = hour; h < hour + duration && h <= 23; h++) {
+            setClassGroupLabel(studentId, week, day, h, newGroupLabel || null);
+        }
+        
+        saveData().then(function() {
+            if (typeof logActivity === 'function') {
+                logActivity('Updated group label to ' + (newGroupLabel || 'none') + ' for ' + discipline.name);
+            }
+            modal.remove();
+            renderSchedule();
+        }).catch(function(err) {
+            console.error('Failed to save:', err);
+            alert('Failed to update group label.');
         });
     };
     
@@ -1425,6 +1503,10 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 if (label) {
                     setClassLabel(targetStudentId, week, day, h, label);
                 }
+                var groupLabel = getClassGroupLabel(studentId, week, day, hour);
+                if (groupLabel) {
+                    setClassGroupLabel(targetStudentId, week, day, h, groupLabel);
+                }
                 if (h === hour) {
                     setClassDuration(targetStudentId, week, day, h, duration);
                 }
@@ -1448,7 +1530,7 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
 }
 
 /**
- * Remove a class from the schedule (removes all hours)
+ * Remove a class from the schedule
  */
 function removeScheduleClass(studentId, week, day, hour) {
     var schedule = getStudentSchedule(studentId, week);
@@ -1459,6 +1541,7 @@ function removeScheduleClass(studentId, week, day, hour) {
             delete schedule[day][h];
             setClassInstructor(studentId, week, day, h, null);
             setClassLabel(studentId, week, day, h, null);
+            setClassGroupLabel(studentId, week, day, h, null);
             setClassDuration(studentId, week, day, h, null);
         }
     }
@@ -1499,6 +1582,12 @@ function clearSchedule() {
             delete data.curriculum.classLabels[key];
         }
     }
+    for (var key in data.curriculum.classGroupLabels) {
+        var parts = key.split('_');
+        if (parts[1] == week) {
+            delete data.curriculum.classGroupLabels[key];
+        }
+    }
     for (var key in data.curriculum.classDurations) {
         var parts = key.split('_');
         if (parts[1] == week) {
@@ -1518,7 +1607,7 @@ function clearSchedule() {
 }
 
 /**
- * Save rest days - removes classes from rest days
+ * Save rest days
  */
 function saveRestDays() {
     if (!scheduleState.selectedStudentId) {
@@ -1565,6 +1654,8 @@ window.getClassInstructor = getClassInstructor;
 window.setClassInstructor = setClassInstructor;
 window.getClassLabel = getClassLabel;
 window.setClassLabel = setClassLabel;
+window.getClassGroupLabel = getClassGroupLabel;
+window.setClassGroupLabel = setClassGroupLabel;
 window.getClassDuration = getClassDuration;
 window.setClassDuration = setClassDuration;
 window.isInstructorAvailable = isInstructorAvailable;
