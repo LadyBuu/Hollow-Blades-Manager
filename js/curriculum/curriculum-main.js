@@ -8,7 +8,7 @@ var currentGradeWeek = 1;
 var currentRankWeek = 1;
 var selectedGradeStudentId = null;
 var classViewState = { currentWeek: 1, filterDiscipline: 'all' };
-var instructorCalendarState = { currentWeek: 1, selectedInstructorId: null };
+var instructorCalendarState = { currentWeek: 1, selectedInstructorId: null, expandedGroups: {} };
 
 /**
  * Render the full curriculum view
@@ -18,6 +18,7 @@ function renderCurriculumView(container) {
         <div class="tab-container">
             <div class="tab-nav">
                 <button class="tab-btn active" data-tab="disciplines">Disciplines</button>
+                <button class="tab-btn" data-tab="groups">▣ Groups</button>
                 <button class="tab-btn" data-tab="class-view">▤ Class View</button>
                 <button class="tab-btn" data-tab="instructor-calendar">◷ Instructor Calendar</button>
                 <button class="tab-btn" data-tab="schedule">◷ Schedule</button>
@@ -27,6 +28,9 @@ function renderCurriculumView(container) {
             <div class="tab-content">
                 <div id="tab-disciplines" class="tab-panel active">
                     <div id="disciplines-content"></div>
+                </div>
+                <div id="tab-groups" class="tab-panel">
+                    <div id="groups-content"></div>
                 </div>
                 <div id="tab-class-view" class="tab-panel">
                     <div id="class-view-content"></div>
@@ -53,6 +57,9 @@ function renderCurriculumView(container) {
     // Render each section
     if (typeof renderDisciplinesView === 'function') {
         renderDisciplinesView(document.getElementById('disciplines-content'));
+    }
+    if (typeof renderDisciplineGroupsView === 'function') {
+        renderDisciplineGroupsView(document.getElementById('groups-content'));
     }
     if (typeof renderClassView === 'function') {
         renderClassView(document.getElementById('class-view-content'));
@@ -81,6 +88,7 @@ function initCurriculumTabs() {
     var tabs = document.querySelectorAll('.tab-btn');
     var panels = {
         disciplines: document.getElementById('tab-disciplines'),
+        groups: document.getElementById('tab-groups'),
         'class-view': document.getElementById('tab-class-view'),
         'instructor-calendar': document.getElementById('tab-instructor-calendar'),
         schedule: document.getElementById('tab-schedule'),
@@ -136,6 +144,8 @@ function initCurriculumTabs() {
             // Refresh content when switching tabs
             if (tabName === 'disciplines' && typeof renderDisciplinesView === 'function') {
                 renderDisciplinesView(document.getElementById('disciplines-content'));
+            } else if (tabName === 'groups' && typeof renderDisciplineGroupsView === 'function') {
+                renderDisciplineGroupsView(document.getElementById('groups-content'));
             } else if (tabName === 'class-view' && typeof renderClassView === 'function') {
                 renderClassView(document.getElementById('class-view-content'));
             } else if (tabName === 'instructor-calendar' && typeof renderInstructorCalendar === 'function') {
@@ -157,6 +167,7 @@ function initCurriculumTabs() {
 function initCurriculumEvents() {
     // Delegate to individual modules
     if (typeof initDisciplineEvents === 'function') initDisciplineEvents();
+    if (typeof initDisciplineGroupsEvents === 'function') initDisciplineGroupsEvents();
     if (typeof initClassViewEvents === 'function') initClassViewEvents();
     if (typeof initInstructorCalendarEvents === 'function') initInstructorCalendarEvents();
     if (typeof initGradesEvents === 'function') initGradesEvents();
