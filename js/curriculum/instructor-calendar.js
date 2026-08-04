@@ -2,6 +2,7 @@
  * instructor-calendar.js - Instructor Calendar Module
  * Works exactly like student calendar with the same data structure
  * Now with group filters and student assignment awareness
+ * Auto-assigns students from a group when blocking time with a group label
  */
 
 var instructorCalendarState = {
@@ -965,7 +966,7 @@ function showAddClassModal(day, hour) {
 }
 
 /**
- * Show modal to add blocked time
+ * Show modal to add blocked time - with auto-assign students from group
  */
 function showAddBlockModal() {
     if (!instructorCalendarState.selectedInstructorId) {
@@ -982,10 +983,64 @@ function showAddBlockModal() {
     
     var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
+    // Get available disciplines for this week that have this instructor
+    var disciplines = getAvailableDisciplines(week);
+    var availableDisciplines = disciplines.filter(function(d) {
+        return d.instructorIds && d.instructorIds.some(function(id) { return String(id) === String(instructorId); });
+    });
+    
+    // Get existing groups for this instructor
+    var existingGroups = new Set();
+    var students = getStudents();
+    students.forEach(function(student) {
+        var schedule = getStudentSchedule(student.id, week);
+        for (var day in schedule) {
+            for (var hour in schedule[day]) {
+                var disciplineId = schedule[day][hour];
+                if (disciplineId) {
+                    var discipline = getDiscipline(disciplineId);
+                    if (discipline) {
+                        var classInstructorId = null;
+                        if (typeof getClassInstructor === 'function') {
+                            classInstructorId = getClassInstructor(student.id, week, parseInt(day), parseInt(hour));
+                        }
+                        var isTeaching = false;
+                        if (classInstructorId) {
+                            isTeaching = String(classInstructorId) === String(instructorId);
+                        } else if (discipline.instructorIds) {
+                            isTeaching = discipline.instructorIds.some(function(id) { 
+                                return String(id) === String(instructorId); 
+                            });
+                        }
+                        if (isTeaching) {
+                            if (typeof getClassGroupLabel === 'function') {
+                                var groupLabel = getClassGroupLabel(student.id, week, parseInt(day), parseInt(hour));
+                                if (groupLabel) existingGroups.add(groupLabel);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Get groups from templates
+    if (data.curriculum.instructorTemplates) {
+        var templateKey = instructorId + '_' + week;
+        if (data.curriculum.instructorTemplates[templateKey]) {
+            for (var key in data.curriculum.instructorTemplates[templateKey]) {
+                var templateData = data.curriculum.instructorTemplates[templateKey][key];
+                if (templateData.groupLabel) {
+                    existingGroups.add(templateData.groupLabel);
+                }
+            }
+        }
+    }
+    
     var modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
-        <div class="modal-content" style="max-width:400px;">
+        <div class="modal-content" style="max-width:500px;">
             <div class="modal-header">
                 <h3>▣ Block Time - ${instructorName}</h3>
                 <button class="close-modal">&times;</button>
@@ -1030,12 +1085,26 @@ function showAddBlockModal() {
                 </div>
                 <div class="form-group">
                     <label>Group Label (optional):</label>
-                    <input type="text" id="block-group" placeholder="e.g., 1, 2, 3..." style="width:100%;padding:8px;">
-                    <span style="font-size:0.6rem;color:var(--text-dim);">Group labels help identify different sections</span>
+                    <select id="block-group" style="width:100%;padding:8px;">
+                        <option value="">No group (just block time)</option>
+                        ${Array.from(existingGroups).sort().map(function(g) {
+                            return '<option value="' + g + '">Group ' + g + '</option>';
+                        }).join('')}
+                    </select>
+                    <span style="font-size:0.6rem;color:var(--text-dim);">Selecting a group will auto-assign students from that group to this block</span>
                 </div>
-                <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border-soft);">
+                <div class="form-group" id="block-discipline-group" style="display:none;">
+                    <label>Discipline:</label>
+                    <select id="block-discipline" style="width:100%;padding:8px;">
+                        ${availableDisciplines.map(function(d) {
+                            return '<option value="' + d.id + '">' + d.name + '</option>';
+                        }).join('')}
+                    </select>
+                    <span style="font-size:0.6rem;color:var(--text-dim);">Select the discipline for students in this group</span>
+                </div>
+                <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border-soft);" id="auto-assign-info">
                     <p style="font-size:0.75rem;color:var(--text-dim);">
-                        Blocked time will appear as occupied slots on your calendar.
+                        💡 If you select a group, students from that group will be automatically assigned to this block.
                     </p>
                 </div>
                 <div class="form-actions" style="margin-top:16px;">
@@ -1048,6 +1117,21 @@ function showAddBlockModal() {
     
     document.body.appendChild(modal);
     
+    // Show/hide discipline selector based on group selection
+    var groupSelect = document.getElementById('block-group');
+    var disciplineGroup = document.getElementById('block-discipline-group');
+    var autoAssignInfo = document.getElementById('auto-assign-info');
+    
+    groupSelect.addEventListener('change', function() {
+        if (this.value) {
+            disciplineGroup.style.display = 'block';
+            autoAssignInfo.innerHTML = '<p style="font-size:0.75rem;color:var(--accent);">✅ Students from Group ' + this.value + ' will be automatically assigned to this block.</p>';
+        } else {
+            disciplineGroup.style.display = 'none';
+            autoAssignInfo.innerHTML = '<p style="font-size:0.75rem;color:var(--text-dim);">💡 If you select a group, students from that group will be automatically assigned to this block.</p>';
+        }
+    });
+    
     modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
     modal.querySelector('#cancel-block').onclick = function() { modal.remove(); };
     modal.addEventListener('click', function(e) {
@@ -1059,7 +1143,8 @@ function showAddBlockModal() {
         var hour = parseInt(document.getElementById('block-hour').value);
         var duration = parseInt(document.getElementById('block-duration').value) || 1;
         var label = document.getElementById('block-label').value.trim() || 'Blocked Time';
-        var groupLabel = document.getElementById('block-group').value.trim();
+        var groupLabel = document.getElementById('block-group').value;
+        var disciplineId = document.getElementById('block-discipline').value;
         
         if (!data.curriculum.instructorBlocks) {
             data.curriculum.instructorBlocks = {};
@@ -1072,6 +1157,7 @@ function showAddBlockModal() {
             data.curriculum.instructorBlocks[blockKey][day] = {};
         }
         
+        // Check for conflicts
         var hasConflict = false;
         for (var h = hour; h < hour + duration && h <= 23; h++) {
             if (data.curriculum.instructorBlocks[blockKey][day][h]) {
@@ -1086,15 +1172,95 @@ function showAddBlockModal() {
             }
         }
         
+        // Remove any existing blocks in this range
         for (var h = hour; h < hour + duration && h <= 23; h++) {
             delete data.curriculum.instructorBlocks[blockKey][day][h];
         }
         
         data.curriculum.instructorBlocks[blockKey][day][hour] = {
             label: label,
-            groupLabel: groupLabel,
+            groupLabel: groupLabel || null,
             duration: duration
         };
+        
+        // AUTO-ASSIGN STUDENTS FROM GROUP
+        var autoAssignedCount = 0;
+        if (groupLabel && disciplineId) {
+            var discipline = getDiscipline(disciplineId);
+            var students = getStudents();
+            
+            students.forEach(function(student) {
+                // Check if student is in this group for this discipline
+                var isInGroup = false;
+                var schedule = getStudentSchedule(student.id, week);
+                
+                // Check existing classes for this student
+                for (var d in schedule) {
+                    for (var h in schedule[d]) {
+                        var existingDiscId = schedule[d][h];
+                        if (existingDiscId && String(existingDiscId) === String(disciplineId)) {
+                            var studentGroupLabel = null;
+                            if (typeof getClassGroupLabel === 'function') {
+                                studentGroupLabel = getClassGroupLabel(student.id, week, parseInt(d), parseInt(h));
+                            }
+                            if (studentGroupLabel === groupLabel) {
+                                isInGroup = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isInGroup) break;
+                }
+                
+                // Also check templates
+                if (!isInGroup && data.curriculum.instructorTemplates) {
+                    var templateKey = instructorId + '_' + week;
+                    if (data.curriculum.instructorTemplates[templateKey]) {
+                        for (var key in data.curriculum.instructorTemplates[templateKey]) {
+                            var templateData = data.curriculum.instructorTemplates[templateKey][key];
+                            if (templateData.disciplineId === disciplineId && templateData.groupLabel === groupLabel) {
+                                isInGroup = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (isInGroup) {
+                    // Assign this student to the block
+                    var schedule = getStudentSchedule(student.id, week);
+                    // Check if student already has a class at this time
+                    var hasConflict = false;
+                    for (var h = hour; h < hour + duration && h <= 23; h++) {
+                        if (schedule[day] && schedule[day][h]) {
+                            hasConflict = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!hasConflict) {
+                        // Add the class to the student
+                        for (var h = hour; h < hour + duration && h <= 23; h++) {
+                            if (!schedule[day]) schedule[day] = {};
+                            schedule[day][h] = disciplineId;
+                            if (typeof setClassInstructor === 'function') {
+                                setClassInstructor(student.id, week, day, h, instructorId);
+                            }
+                            if (label && typeof setClassLabel === 'function') {
+                                setClassLabel(student.id, week, day, h, label);
+                            }
+                            if (groupLabel && typeof setClassGroupLabel === 'function') {
+                                setClassGroupLabel(student.id, week, day, h, groupLabel);
+                            }
+                            if (h === hour && typeof setClassDuration === 'function') {
+                                setClassDuration(student.id, week, day, h, duration);
+                            }
+                        }
+                        autoAssignedCount++;
+                    }
+                }
+            });
+        }
         
         modal.remove();
         
@@ -1102,11 +1268,21 @@ function showAddBlockModal() {
             if (typeof logActivity === 'function') {
                 logActivity('Blocked time for instructor ' + instructorName + ': ' + label + 
                     (groupLabel ? ' (Group ' + groupLabel + ')' : '') + 
-                    ' (' + duration + 'h)');
+                    ' (' + duration + 'h)' + 
+                    (autoAssignedCount > 0 ? ' - Auto-assigned ' + autoAssignedCount + ' students from group' : ''));
             }
             renderInstructorCalendarData();
             populateGroupFilter();
-            alert('Time blocked successfully!');
+            if (typeof renderSchedule === 'function') {
+                renderSchedule();
+            }
+            var msg = 'Time blocked successfully!';
+            if (autoAssignedCount > 0) {
+                msg += '\n\n✅ ' + autoAssignedCount + ' student(s) from Group ' + groupLabel + ' were automatically assigned to this block.';
+            } else if (groupLabel) {
+                msg += '\n\n⚠ No students found in Group ' + groupLabel + ' for this discipline.';
+            }
+            alert(msg);
         }).catch(function(err) {
             console.error('Failed to save:', err);
             renderInstructorCalendarData();
