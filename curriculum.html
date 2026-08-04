@@ -153,6 +153,7 @@
             border-left: 3px solid var(--accent);
             cursor: pointer;
             transition: background 0.15s;
+            min-height: 40px;
         }
         .instructor-calendar-grid .class-cell:hover {
             background: var(--accent-soft);
@@ -163,9 +164,14 @@
             overflow: hidden;
             text-overflow: ellipsis;
             font-weight: 500;
+            font-size: 0.55rem;
+        }
+        .instructor-calendar-grid .class-cell .student-count {
+            font-size: 0.5rem;
+            color: var(--text-dim);
         }
         .instructor-calendar-grid .class-cell .student-name {
-            font-size: 0.5rem;
+            font-size: 0.45rem;
             color: var(--text-dim);
             white-space: nowrap;
             overflow: hidden;
