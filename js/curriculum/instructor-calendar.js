@@ -177,69 +177,70 @@ function renderGroupList() {
     var groups = getInstructorGroups(instructorId);
     var groupLabels = Object.keys(groups).sort();
     
-    if (groupLabels.length === 0) {
-        container.innerHTML = '<div style="padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);text-align:center;color:var(--text-dim);font-size:0.8rem;">No groups created yet. Click "Manage Groups" to create groups.</div>';
-        return;
-    }
-    
     var html = '<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
     html += '<h4 style="color:var(--accent);font-size:0.9rem;">▣ Groups - ' + instructorName + '</h4>';
     html += '<button id="add-group-btn" class="small primary">+ Add Group</button>';
     html += '</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
     
-    groupLabels.forEach(function(label) {
-        var group = groups[label];
-        var studentCount = group.students ? Object.keys(group.students).length : 0;
-        var isExpanded = instructorCalendarState.expandedGroups[label] || false;
+    if (groupLabels.length === 0) {
+        html += '<div style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:8px;">No groups created yet. Click "Add Group" to create one.</div>';
+    } else {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
         
-        html += '<div class="group-card" style="background:var(--bg);border:1px solid var(--border-soft);border-radius:var(--radius);padding:8px 12px;flex:1;min-width:150px;max-width:300px;">';
-        html += '<div class="group-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleGroup(\'' + label + '\')">';
-        html += '<span class="group-name" style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
-        html += '<span class="group-meta" style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + ' students ' + (isExpanded ? '▼' : '▶') + '</span>';
-        html += '</div>';
-        
-        if (isExpanded) {
-            html += '<div class="group-students" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
-            html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
-            if (group.students) {
-                var studentIds = Object.keys(group.students);
-                if (studentIds.length > 0) {
-                    studentIds.forEach(function(id) {
-                        var student = data.characters.find(function(c) { return String(c.id) === String(id); });
-                        if (student) {
-                            var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                            html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;display:inline-flex;align-items:center;gap:4px;">' + name;
-                            html += '<button class="remove-from-group-btn" data-group="' + label + '" data-student="' + id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
-                            html += '</span>';
-                        }
-                    });
-                } else {
-                    html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
+        groupLabels.forEach(function(label) {
+            var group = groups[label];
+            var studentCount = group.students ? Object.keys(group.students).length : 0;
+            var isExpanded = instructorCalendarState.expandedGroups[label] || false;
+            
+            html += '<div class="group-card" style="background:var(--bg);border:1px solid var(--border-soft);border-radius:var(--radius);padding:8px 12px;flex:1;min-width:150px;max-width:300px;">';
+            html += '<div class="group-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleGroup(\'' + label + '\')">';
+            html += '<span class="group-name" style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
+            html += '<span class="group-meta" style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + ' students ' + (isExpanded ? '▼' : '▶') + '</span>';
+            html += '</div>';
+            
+            if (isExpanded) {
+                html += '<div class="group-students" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
+                if (group.students) {
+                    var studentIds = Object.keys(group.students);
+                    if (studentIds.length > 0) {
+                        studentIds.forEach(function(id) {
+                            var student = data.characters.find(function(c) { return String(c.id) === String(id); });
+                            if (student) {
+                                var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
+                                html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;display:inline-flex;align-items:center;gap:4px;">' + name;
+                                html += '<button class="remove-from-group-btn" data-group="' + label + '" data-student="' + id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
+                                html += '</span>';
+                            }
+                        });
+                    } else {
+                        html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
+                    }
                 }
+                html += '</div>';
+                html += '<div style="display:flex;gap:4px;margin-top:4px;">';
+                html += '<select class="add-student-to-group" data-group="' + label + '" style="flex:1;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
+                html += '<option value="">Add student...</option>';
+                var allStudents = getStudents();
+                allStudents.forEach(function(s) {
+                    var name = [s.firstName, s.lastName].filter(function(n) { return n; }).join(' ');
+                    if (!group.students || !group.students[s.id]) {
+                        html += '<option value="' + s.id + '">' + name + '</option>';
+                    }
+                });
+                html += '</select>';
+                html += '<button class="add-student-to-group-btn small primary" data-group="' + label + '" style="font-size:0.6rem;padding:2px 6px;">Add</button>';
+                html += '</div>';
+                html += '</div>';
             }
+            
             html += '</div>';
-            html += '<div style="display:flex;gap:4px;margin-top:4px;">';
-            html += '<select class="add-student-to-group" data-group="' + label + '" style="flex:1;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
-            html += '<option value="">Add student...</option>';
-            var allStudents = getStudents();
-            allStudents.forEach(function(s) {
-                var name = [s.firstName, s.lastName].filter(function(n) { return n; }).join(' ');
-                if (!group.students || !group.students[s.id]) {
-                    html += '<option value="' + s.id + '">' + name + '</option>';
-                }
-            });
-            html += '</select>';
-            html += '<button class="add-student-to-group-btn small primary" data-group="' + label + '" style="font-size:0.6rem;padding:2px 6px;">Add</button>';
-            html += '</div>';
-            html += '</div>';
-        }
+        });
         
         html += '</div>';
-    });
+    }
     
-    html += '</div>';
     html += '</div>';
     
     container.innerHTML = html;
@@ -268,7 +269,10 @@ function renderGroupList() {
     
     var addGroupBtn = document.getElementById('add-group-btn');
     if (addGroupBtn) {
-        addGroupBtn.addEventListener('click', showAddGroupModal);
+        // Remove existing listeners by cloning
+        var newAddGroupBtn = addGroupBtn.cloneNode(true);
+        addGroupBtn.parentNode.replaceChild(newAddGroupBtn, addGroupBtn);
+        newAddGroupBtn.addEventListener('click', showAddGroupModal);
     }
 }
 
@@ -1807,7 +1811,7 @@ function removeBlockedTime(day, hour) {
 }
 
 /**
- * Initialize instructor calendar events
+ * Initialize instructor calendar events - FIXED with Manage Groups button
  */
 function initInstructorCalendarEvents() {
     var select = document.getElementById('instructor-calendar-select');
@@ -1864,6 +1868,28 @@ function initInstructorCalendarEvents() {
     var addBlockBtn = document.getElementById('add-instructor-block-btn');
     if (addBlockBtn) {
         addBlockBtn.addEventListener('click', showAddBlockModal);
+    }
+    
+    // FIX: Add event listener for Manage Groups button
+    var manageGroupsBtn = document.getElementById('manage-groups-btn');
+    if (manageGroupsBtn) {
+        manageGroupsBtn.addEventListener('click', function() {
+            if (!instructorCalendarState.selectedInstructorId) {
+                alert('Please select an instructor first.');
+                return;
+            }
+            // Scroll to the groups section
+            var groupsContainer = document.getElementById('instructor-groups-container');
+            if (groupsContainer) {
+                groupsContainer.scrollIntoView({ behavior: 'smooth' });
+                // Highlight the groups section
+                groupsContainer.style.border = '2px solid var(--accent)';
+                groupsContainer.style.borderRadius = 'var(--radius)';
+                setTimeout(function() {
+                    groupsContainer.style.border = 'none';
+                }, 2000);
+            }
+        });
     }
     
     var filterSelect = document.getElementById('instructor-group-filter');
