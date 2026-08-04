@@ -1,7 +1,7 @@
 /**
  * instructor-calendar.js - Instructor Calendar Module
  * Shows all classes for a selected instructor
- * Now with class naming, direct class creation, conflict checking, and removal
+ * Click a slot to view details and remove from all students
  */
 
 var instructorCalendarState = {
@@ -23,7 +23,6 @@ function renderInstructorCalendar(container) {
             <h2>🧑‍🏫 Instructor Calendar</h2>
             <div class="header-actions">
                 <button id="add-class-to-instructor-btn" class="primary small">+ Add Class</button>
-                <button id="remove-class-from-instructor-btn" class="danger small">🗑️ Remove Class</button>
             </div>
         </div>
         <div class="calendar-controls">
@@ -84,7 +83,7 @@ function renderInstructorCalendarData() {
     var instructorName = [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ');
     
     // Find all classes taught by this instructor in the current week
-    var classes = [];
+    var classSlots = {}; // key: day_hour, value: array of student info
     var students = getStudents();
     
     students.forEach(function(student) {
@@ -101,7 +100,6 @@ function renderInstructorCalendarData() {
                             classInstructorId = getClassInstructor(student.id, instructorCalendarState.currentWeek, parseInt(day), parseInt(hour));
                         }
                         
-                        // If class has specific instructor, use that. Otherwise check if instructor is in the discipline's instructors list
                         var isTeaching = false;
                         if (classInstructorId) {
                             isTeaching = String(classInstructorId) === String(instructorCalendarState.selectedInstructorId);
@@ -112,21 +110,28 @@ function renderInstructorCalendarData() {
                         }
                         
                         if (isTeaching) {
-                            // Get the class label if it exists
-                            var classLabel = null;
-                            if (typeof getClassLabel === 'function') {
-                                classLabel = getClassLabel(student.id, instructorCalendarState.currentWeek, parseInt(day), parseInt(hour));
+                            var key = day + '_' + hour;
+                            if (!classSlots[key]) {
+                                classSlots[key] = {
+                                    day: parseInt(day),
+                                    hour: parseInt(hour),
+                                    discipline: discipline,
+                                    disciplineId: disciplineId,
+                                    students: [],
+                                    instructorId: classInstructorId || instructorCalendarState.selectedInstructorId,
+                                    label: null
+                                };
                             }
-                            
-                            classes.push({
+                            // Get the class label if it exists
+                            if (typeof getClassLabel === 'function') {
+                                var label = getClassLabel(student.id, instructorCalendarState.currentWeek, parseInt(day), parseInt(hour));
+                                if (label && !classSlots[key].label) {
+                                    classSlots[key].label = label;
+                                }
+                            }
+                            classSlots[key].students.push({
                                 student: student,
-                                discipline: discipline,
-                                day: parseInt(day),
-                                hour: parseInt(hour),
-                                instructorId: classInstructorId || instructorCalendarState.selectedInstructorId,
-                                label: classLabel,
-                                studentId: student.id,
-                                disciplineId: disciplineId
+                                studentId: student.id
                             });
                         }
                     }
@@ -135,7 +140,13 @@ function renderInstructorCalendarData() {
         }
     });
     
-    if (classes.length === 0) {
+    // Convert to array and sort
+    var classArray = Object.values(classSlots).sort(function(a, b) {
+        if (a.day !== b.day) return a.day - b.day;
+        return a.hour - b.hour;
+    });
+    
+    if (classArray.length === 0) {
         container.innerHTML = '<p class="empty-state">' + instructorName + ' has no classes scheduled for week ' + instructorCalendarState.currentWeek + '</p>';
         return;
     }
@@ -165,19 +176,21 @@ function renderInstructorCalendarData() {
         html += '<div class="time-cell">' + hourDisplay + ':00</div>';
         
         for (var d = 1; d <= 7; d++) {
-            var classAtSlot = classes.filter(function(c) { return c.day === d && c.hour === hour; });
-            if (classAtSlot.length > 0) {
-                html += '<div class="class-cell" title="Click to view details">';
-                classAtSlot.forEach(function(c) {
-                    var studentName = [c.student.firstName, c.student.lastName].filter(function(n) { return n; }).join(' ');
-                    // Show label if it exists, otherwise just the discipline name
-                    var displayName = c.label ? c.discipline.name + ' (' + c.label + ')' : c.discipline.name;
-                    html += '<div class="class-name">' + displayName + '</div>';
-                    html += '<div class="student-name">' + studentName + '</div>';
-                    
-                    // Store data for click handler
-                    html += '<div style="display:none;" class="class-data" data-student="' + c.student.id + '" data-discipline="' + c.discipline.id + '" data-day="' + c.day + '" data-hour="' + c.hour + '" data-label="' + (c.label || '') + '"></div>';
+            var slot = classArray.find(function(c) { return c.day === d && c.hour === hour; });
+            if (slot) {
+                var displayName = slot.label ? slot.discipline.name + ' [' + slot.label + ']' : slot.discipline.name;
+                var studentNames = slot.students.map(function(s) {
+                    return [s.student.firstName, s.student.lastName].filter(function(n) { return n; }).join(' ');
                 });
+                
+                html += '<div class="class-cell" data-day="' + d + '" data-hour="' + hour + '" data-discipline="' + slot.disciplineId + '" data-label="' + (slot.label || '') + '" data-students=\'' + JSON.stringify(slot.students.map(function(s) { return s.studentId; })) + '\' title="Click to view/remove">';
+                html += '<div class="class-name">' + displayName + '</div>';
+                html += '<div class="student-count">' + studentNames.length + ' student' + (studentNames.length > 1 ? 's' : '') + '</div>';
+                // Show first 2 student names
+                var displayStudents = studentNames.slice(0, 2);
+                if (displayStudents.length > 0) {
+                    html += '<div class="student-name">' + displayStudents.join(', ') + (studentNames.length > 2 ? ' +' + (studentNames.length - 2) + ' more' : '') + '</div>';
+                }
                 html += '</div>';
             } else {
                 html += '<div class="empty-cell">·</div>';
@@ -188,16 +201,16 @@ function renderInstructorCalendarData() {
     html += '</div>';
     html += '</div>';
     
-    // Summary with remove button
+    // Summary
     html += '<div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">';
     
     // Total classes
     html += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">';
     html += '<h4 style="color:var(--accent);font-size:0.85rem;margin-bottom:8px;">Summary</h4>';
-    html += '<p style="font-size:0.8rem;">Total Classes: <strong>' + classes.length + '</strong></p>';
+    html += '<p style="font-size:0.8rem;">Total Classes: <strong>' + classArray.length + '</strong></p>';
     // Group by discipline
     var disciplineCounts = {};
-    classes.forEach(function(c) {
+    classArray.forEach(function(c) {
         if (!disciplineCounts[c.discipline.name]) disciplineCounts[c.discipline.name] = 0;
         disciplineCounts[c.discipline.name]++;
     });
@@ -208,34 +221,36 @@ function renderInstructorCalendarData() {
     html += '</div>';
     html += '</div>';
     
-    // Students
+    // Total Students
     html += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">';
     html += '<h4 style="color:var(--accent);font-size:0.85rem;margin-bottom:8px;">Students</h4>';
     var studentSet = {};
-    classes.forEach(function(c) {
-        var name = [c.student.firstName, c.student.lastName].filter(function(n) { return n; }).join(' ');
-        studentSet[name] = true;
+    classArray.forEach(function(c) {
+        c.students.forEach(function(s) {
+            var name = [s.student.firstName, s.student.lastName].filter(function(n) { return n; }).join(' ');
+            studentSet[name] = true;
+        });
     });
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+    html += '<p style="font-size:0.8rem;">Total Students: <strong>' + Object.keys(studentSet).length + '</strong></p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:100px;overflow-y:auto;">';
     for (var s in studentSet) {
         html += '<span style="background:var(--bg);padding:2px 8px;border-radius:12px;font-size:0.7rem;">' + s + '</span>';
     }
     html += '</div>';
     html += '</div>';
     
-    // Class Labels with Remove button
+    // Class Labels
     html += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">';
     html += '<h4 style="color:var(--accent);font-size:0.85rem;margin-bottom:8px;">Class Labels</h4>';
     var labels = {};
-    classes.forEach(function(c) {
+    classArray.forEach(function(c) {
         var key = c.discipline.name + (c.label ? ' (' + c.label + ')' : '');
-        if (!labels[key]) labels[key] = [];
-        var studentName = [c.student.firstName, c.student.lastName].filter(function(n) { return n; }).join(' ');
-        labels[key].push(studentName);
+        if (!labels[key]) labels[key] = 0;
+        labels[key] += c.students.length;
     });
-    html += '<div style="font-size:0.75rem;color:var(--text-dim);max-height:150px;overflow-y:auto;">';
+    html += '<div style="font-size:0.75rem;color:var(--text-dim);">';
     for (var label in labels) {
-        html += '<div><strong>' + label + '</strong>: ' + labels[label].join(', ') + '</div>';
+        html += '<div><strong>' + label + '</strong>: ' + labels[label] + ' student' + (labels[label] > 1 ? 's' : '') + '</div>';
     }
     html += '</div>';
     html += '</div>';
@@ -244,38 +259,125 @@ function renderInstructorCalendarData() {
     
     container.innerHTML = html;
     
-    // Add click handlers to class cells for details
+    // Add click handlers to class cells - opens details modal with remove option
     container.querySelectorAll('.class-cell').forEach(function(cell) {
         cell.addEventListener('click', function() {
-            var dataEl = this.querySelector('.class-data');
-            if (dataEl) {
-                var studentId = dataEl.dataset.student;
-                var disciplineId = dataEl.dataset.discipline;
-                var day = parseInt(dataEl.dataset.day);
-                var hour = parseInt(dataEl.dataset.hour);
-                var week = instructorCalendarState.currentWeek;
-                var label = dataEl.dataset.label || '';
-                
-                // Find and show the class details with remove option
-                if (typeof showScheduleClassDetails === 'function') {
-                    showScheduleClassDetails(studentId, disciplineId, week, day, hour);
-                } else {
-                    // Fallback: show alert with class info and remove option
-                    var discipline = getDiscipline(disciplineId);
-                    var student = data.characters.find(function(c) { return String(c.id) === String(studentId); });
-                    var studentName = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                    var hourDisplay = hour > 12 ? hour - 12 : hour;
-                    var ampm = hour >= 12 ? 'PM' : 'AM';
-                    if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
-                    if (hour === 12) { ampm = 'PM'; }
-                    
-                    if (confirm((label ? label + ' - ' : '') + discipline.name + ' with ' + studentName + ' at ' + dayNames[day] + ' ' + hourDisplay + ':00 ' + ampm + '\n\nRemove this class?')) {
-                        removeClassFromInstructor(studentId, week, day, hour);
-                    }
-                }
-            }
+            var day = parseInt(this.dataset.day);
+            var hour = parseInt(this.dataset.hour);
+            var disciplineId = this.dataset.discipline;
+            var label = this.dataset.label || '';
+            var studentIds = JSON.parse(this.dataset.students);
+            
+            showInstructorClassDetails(disciplineId, day, hour, studentIds, label);
         });
     });
+}
+
+/**
+ * Show class details modal with remove option
+ */
+function showInstructorClassDetails(disciplineId, day, hour, studentIds, label) {
+    var discipline = getDiscipline(disciplineId);
+    if (!discipline) return;
+    
+    var week = instructorCalendarState.currentWeek;
+    var instructorId = instructorCalendarState.selectedInstructorId;
+    var instructor = data.characters.find(function(c) { 
+        return String(c.id) === String(instructorId); 
+    });
+    var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+    
+    var hourDisplay = hour > 12 ? hour - 12 : hour;
+    var ampm = hour >= 12 ? 'PM' : 'AM';
+    if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
+    if (hour === 12) { ampm = 'PM'; }
+    var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    
+    // Get student names
+    var studentNames = [];
+    studentIds.forEach(function(id) {
+        var student = data.characters.find(function(c) { return String(c.id) === String(id); });
+        if (student) {
+            studentNames.push([student.firstName, student.lastName].filter(function(n) { return n; }).join(' '));
+        }
+    });
+    
+    var modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:450px;">
+            <div class="modal-header">
+                <h3>${discipline.name} ${label ? '[' + label + ']' : ''}</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-row"><span class="label">Instructor:</span> <span>${instructorName}</span></div>
+                <div class="detail-row"><span class="label">Type:</span> <span>${discipline.type === 'mandatory' ? '📚 Mandatory' : '🎯 Optional'}</span></div>
+                <div class="detail-row"><span class="label">Day/Time:</span> <span>${dayNames[day]} at ${hourDisplay}:00 ${ampm}</span></div>
+                <div class="detail-row"><span class="label">Week:</span> <span>${week}</span></div>
+                <div class="detail-row"><span class="label">Students (${studentNames.length}):</span> <span style="font-size:0.8rem;">${studentNames.join(', ')}</span></div>
+                
+                <div style="margin-top:16px;padding:12px;background:var(--danger-soft);border-radius:6px;border:1px solid var(--danger);">
+                    <p style="color:var(--danger);font-size:0.85rem;margin-bottom:4px;font-weight:600;">⚠️ Remove this class?</p>
+                    <p style="color:var(--text-dim);font-size:0.75rem;">This will remove the class from <strong>ALL ${studentNames.length} student(s)</strong> listed above.</p>
+                </div>
+                
+                <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" id="remove-class-all" class="danger">🗑️ Remove from All Students</button>
+                    <button type="button" id="close-detail" class="secondary">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
+    modal.querySelector('#close-detail').onclick = function() { modal.remove(); };
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) modal.remove();
+    });
+    
+    modal.querySelector('#remove-class-all').onclick = function() {
+        var studentCount = studentNames.length;
+        var confirmMsg = 'Remove this class from ALL ' + studentCount + ' student(s)?\n\n' + studentNames.join('\n');
+        if (!confirm(confirmMsg)) return;
+        
+        // Remove from all students
+        var removedCount = 0;
+        studentIds.forEach(function(studentId) {
+            var schedule = getStudentSchedule(studentId, week);
+            if (schedule[day] && schedule[day][hour]) {
+                delete schedule[day][hour];
+                
+                // Remove instructor assignment
+                if (typeof setClassInstructor === 'function') {
+                    setClassInstructor(studentId, week, day, hour, null);
+                }
+                // Remove class label
+                if (typeof setClassLabel === 'function') {
+                    setClassLabel(studentId, week, day, hour, null);
+                }
+                removedCount++;
+            }
+        });
+        
+        saveData().then(function() {
+            if (typeof logActivity === 'function') {
+                logActivity('Removed class ' + discipline.name + (label ? ' [' + label + ']' : '') + ' from ' + removedCount + ' student(s) (instructor: ' + instructorName + ')');
+            }
+            modal.remove();
+            renderInstructorCalendarData();
+            // Also refresh student schedule if on that page
+            if (typeof renderSchedule === 'function') {
+                renderSchedule();
+            }
+            alert('Class removed from ' + removedCount + ' student(s)!');
+        }).catch(function(err) {
+            console.error('Failed to save:', err);
+            alert('Failed to remove class.');
+        });
+    };
 }
 
 /**
@@ -358,179 +460,6 @@ function initInstructorCalendarEvents() {
     var addBtn = document.getElementById('add-class-to-instructor-btn');
     if (addBtn) {
         addBtn.addEventListener('click', showAddClassToInstructorModal);
-    }
-    
-    // Remove Class button
-    var removeBtn = document.getElementById('remove-class-from-instructor-btn');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', showRemoveClassFromInstructorModal);
-    }
-}
-
-/**
- * Show modal to remove a class from instructor
- */
-function showRemoveClassFromInstructorModal() {
-    if (!instructorCalendarState.selectedInstructorId) {
-        alert('Please select an instructor first.');
-        return;
-    }
-    
-    var week = instructorCalendarState.currentWeek;
-    var instructorId = instructorCalendarState.selectedInstructorId;
-    var instructor = data.characters.find(function(c) { 
-        return String(c.id) === String(instructorId); 
-    });
-    var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-    
-    // Find all classes for this instructor
-    var classes = [];
-    var students = getStudents();
-    
-    students.forEach(function(student) {
-        var schedule = getStudentSchedule(student.id, week);
-        for (var day in schedule) {
-            for (var hour in schedule[day]) {
-                var disciplineId = schedule[day][hour];
-                if (disciplineId) {
-                    var discipline = getDiscipline(disciplineId);
-                    if (discipline) {
-                        var classInstructorId = null;
-                        if (typeof getClassInstructor === 'function') {
-                            classInstructorId = getClassInstructor(student.id, week, parseInt(day), parseInt(hour));
-                        }
-                        
-                        var isTeaching = false;
-                        if (classInstructorId) {
-                            isTeaching = String(classInstructorId) === String(instructorId);
-                        } else if (discipline.instructorIds) {
-                            isTeaching = discipline.instructorIds.some(function(id) { 
-                                return String(id) === String(instructorId); 
-                            });
-                        }
-                        
-                        if (isTeaching) {
-                            var label = null;
-                            if (typeof getClassLabel === 'function') {
-                                label = getClassLabel(student.id, week, parseInt(day), parseInt(hour));
-                            }
-                            classes.push({
-                                student: student,
-                                discipline: discipline,
-                                day: parseInt(day),
-                                hour: parseInt(hour),
-                                label: label,
-                                studentId: student.id,
-                                disciplineId: disciplineId,
-                                display: (label ? '[' + label + '] ' : '') + discipline.name + ' with ' + 
-                                    [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') +
-                                    ' at ' + ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][parseInt(day)-1] +
-                                    ' ' + (parseInt(hour) > 12 ? parseInt(hour)-12 : parseInt(hour)) + ':00 ' + (parseInt(hour) >= 12 ? 'PM' : 'AM')
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    });
-    
-    if (classes.length === 0) {
-        alert('No classes found for ' + instructorName + ' in week ' + week);
-        return;
-    }
-    
-    var modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:500px;">
-            <div class="modal-header">
-                <h3>Remove Class - ${instructorName}</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom:12px;">
-                    <p style="color:var(--text-dim);font-size:0.85rem;">Select a class to remove from ${instructorName}'s schedule (Week ${week}):</p>
-                </div>
-                <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;background:var(--bg);">
-                    ${classes.map(function(c, index) {
-                        return '<label style="display:block;padding:4px 8px;font-size:0.8rem;cursor:pointer;border-bottom:1px solid var(--border-soft);">' +
-                            '<input type="radio" name="remove-class" value="' + index + '"> ' + c.display +
-                        '</label>';
-                    }).join('')}
-                </div>
-                <div style="margin-top:12px;padding:8px;background:var(--danger-soft);border-radius:6px;border:1px solid var(--danger);">
-                    <span style="color:var(--danger);font-size:0.75rem;">⚠️ This will remove the class from the selected student's schedule. The student will no longer have this class.</span>
-                </div>
-                <div class="form-actions" style="margin-top:16px;">
-                    <button type="button" id="cancel-remove-instructor-class" class="secondary">Cancel</button>
-                    <button type="button" id="confirm-remove-instructor-class" class="danger">Remove Class</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-    modal.querySelector('#cancel-remove-instructor-class').onclick = function() { modal.remove(); };
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.remove();
-    });
-    
-    modal.querySelector('#confirm-remove-instructor-class').onclick = function() {
-        var selected = modal.querySelector('input[name="remove-class"]:checked');
-        if (!selected) {
-            alert('Please select a class to remove.');
-            return;
-        }
-        
-        var index = parseInt(selected.value);
-        var classData = classes[index];
-        if (!classData) return;
-        
-        if (confirm('Remove this class from ' + [classData.student.firstName, classData.student.lastName].filter(function(n) { return n; }).join(' ') + '\'s schedule?')) {
-            removeClassFromInstructor(classData.studentId, week, classData.day, classData.hour);
-            modal.remove();
-        }
-    };
-}
-
-/**
- * Remove a class from a student's schedule (called from instructor calendar)
- */
-function removeClassFromInstructor(studentId, week, day, hour) {
-    var schedule = getStudentSchedule(studentId, week);
-    if (schedule[day] && schedule[day][hour]) {
-        var disciplineId = schedule[day][hour];
-        var discipline = getDiscipline(disciplineId);
-        
-        delete schedule[day][hour];
-        
-        // Also remove instructor assignment
-        if (typeof setClassInstructor === 'function') {
-            setClassInstructor(studentId, week, day, hour, null);
-        }
-        
-        // Also remove class label
-        if (typeof setClassLabel === 'function') {
-            setClassLabel(studentId, week, day, hour, null);
-        }
-        
-        saveData().then(function() {
-            if (typeof logActivity === 'function') {
-                var student = data.characters.find(function(c) { return String(c.id) === String(studentId); });
-                var studentName = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                logActivity('Removed class ' + (discipline ? discipline.name : '') + ' from ' + studentName + '\'s schedule (via instructor calendar)');
-            }
-            renderInstructorCalendarData();
-            // Also refresh student schedule if on that page
-            if (typeof renderSchedule === 'function') {
-                renderSchedule();
-            }
-        }).catch(function(err) {
-            console.error('Failed to save:', err);
-            alert('Failed to remove class.');
-        });
     }
 }
 
@@ -708,28 +637,6 @@ function showAddClassToInstructorModal() {
             return;
         }
         
-        // Check for conflicts with instructor's existing classes
-        var conflicts = [];
-        selectedStudents.forEach(function(studentId) {
-            // Check if instructor already has a class at this time with another student
-            var instructorClasses = getInstructorClassesAtTime(instructorId, week, day, hour);
-            instructorClasses.forEach(function(cls) {
-                if (String(cls.studentId) !== String(studentId)) {
-                    var student = data.characters.find(function(c) { return String(c.id) === String(studentId); });
-                    var studentName = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                    var existingStudent = data.characters.find(function(c) { return String(c.id) === String(cls.studentId); });
-                    var existingName = existingStudent ? [existingStudent.firstName, existingStudent.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                    conflicts.push(studentName + ' conflicts with ' + existingName + '\'s class');
-                }
-            });
-        });
-        
-        if (conflicts.length > 0) {
-            if (!confirm('The following conflicts were detected:\n\n' + conflicts.join('\n') + '\n\nContinue anyway?')) {
-                return;
-            }
-        }
-        
         // Add the class to each selected student
         var addedCount = 0;
         selectedStudents.forEach(function(studentId) {
@@ -738,7 +645,6 @@ function showAddClassToInstructorModal() {
             
             // Check if slot is already occupied
             if (schedule[day][hour]) {
-                // Skip - already handled by conflict check
                 return;
             }
             
@@ -784,55 +690,11 @@ function showAddClassToInstructorModal() {
     };
 }
 
-/**
- * Get all classes an instructor has at a specific time
- */
-function getInstructorClassesAtTime(instructorId, week, day, hour) {
-    var result = [];
-    var students = getStudents();
-    
-    students.forEach(function(student) {
-        var schedule = getStudentSchedule(student.id, week);
-        if (schedule[day] && schedule[day][hour]) {
-            var disciplineId = schedule[day][hour];
-            var discipline = getDiscipline(disciplineId);
-            if (discipline) {
-                // Check if this instructor is assigned to this class
-                var classInstructorId = null;
-                if (typeof getClassInstructor === 'function') {
-                    classInstructorId = getClassInstructor(student.id, week, day, hour);
-                }
-                
-                var isTeaching = false;
-                if (classInstructorId) {
-                    isTeaching = String(classInstructorId) === String(instructorId);
-                } else if (discipline.instructorIds) {
-                    isTeaching = discipline.instructorIds.some(function(id) { 
-                        return String(id) === String(instructorId); 
-                    });
-                }
-                
-                if (isTeaching) {
-                    result.push({
-                        studentId: student.id,
-                        disciplineId: disciplineId,
-                        disciplineName: discipline.name
-                    });
-                }
-            }
-        }
-    });
-    
-    return result;
-}
-
 // Make functions globally available
 window.renderInstructorCalendar = renderInstructorCalendar;
 window.renderInstructorCalendarData = renderInstructorCalendarData;
 window.populateInstructorCalendarSelector = populateInstructorCalendarSelector;
 window.initInstructorCalendarEvents = initInstructorCalendarEvents;
 window.showAddClassToInstructorModal = showAddClassToInstructorModal;
-window.showRemoveClassFromInstructorModal = showRemoveClassFromInstructorModal;
-window.removeClassFromInstructor = removeClassFromInstructor;
-window.getInstructorClassesAtTime = getInstructorClassesAtTime;
+window.showInstructorClassDetails = showInstructorClassDetails;
 window.instructorCalendarState = instructorCalendarState;
