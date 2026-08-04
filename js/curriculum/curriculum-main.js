@@ -163,10 +163,46 @@ function initCurriculumEvents() {
     if (typeof initRankingEvents === 'function') initRankingEvents();
 }
 
+/**
+ * Populate student selector dropdown - SHARED UTILITY
+ */
+function populateStudentSelector(id) {
+    var select = document.getElementById(id);
+    if (!select) return;
+    
+    var students = getStudents();
+    select.innerHTML = '<option value="">Select a student...</option>';
+    students.forEach(function(student) {
+        var name = [student.firstName, student.middleName, student.lastName].filter(function(n) { return n; }).join(' ');
+        var option = document.createElement('option');
+        option.value = student.id;
+        option.textContent = name;
+        select.appendChild(option);
+    });
+}
+
+/**
+ * Get instructor names for a discipline - SHARED UTILITY
+ */
+function getInstructorNames(discipline) {
+    var names = [];
+    if (discipline && discipline.instructorIds) {
+        discipline.instructorIds.forEach(function(id) {
+            var instructor = data.characters.find(function(c) { return String(c.id) === String(id); });
+            if (instructor) {
+                names.push([instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' '));
+            }
+        });
+    }
+    return names;
+}
+
 // Make functions globally available
 window.renderCurriculumView = renderCurriculumView;
 window.initCurriculumTabs = initCurriculumTabs;
 window.initCurriculumEvents = initCurriculumEvents;
+window.populateStudentSelector = populateStudentSelector;
+window.getInstructorNames = getInstructorNames;
 window.currentGradeWeek = currentGradeWeek;
 window.currentRankWeek = currentRankWeek;
 window.selectedGradeStudentId = selectedGradeStudentId;
