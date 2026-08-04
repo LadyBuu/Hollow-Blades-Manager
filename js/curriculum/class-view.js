@@ -21,7 +21,7 @@ function renderClassView(container) {
         <div class="page-header">
             <h2>Class View</h2>
             <div class="header-actions">
-                <button id="export-class-view-btn" class="small primary">📊 Export</button>
+                <button id="export-class-view-btn" class="small primary">↓ Export</button>
             </div>
         </div>
         <div class="calendar-controls">
@@ -35,8 +35,8 @@ function renderClassView(container) {
                 <label for="class-discipline-filter" style="font-size:0.75rem;color:var(--text-dim);">Filter:</label>
                 <select id="class-discipline-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:0.75rem;">
                     <option value="all">All Disciplines</option>
-                    <option value="mandatory">📚 Mandatory Only</option>
-                    <option value="optional">🎯 Optional Only</option>
+                    <option value="mandatory">▣ Mandatory Only</option>
+                    <option value="optional">▢ Optional Only</option>
                 </select>
             </div>
         </div>
@@ -136,7 +136,7 @@ function renderClassData() {
             return;
         }
         
-        var typeLabel = discipline.type === 'mandatory' ? '📚 Mandatory' : '🎯 Optional';
+        var typeLabel = discipline.type === 'mandatory' ? '▣ Mandatory' : '▢ Optional';
         var typeColor = discipline.type === 'mandatory' ? 'var(--accent)' : 'var(--warning)';
         
         html += '<div class="class-view-discipline">';
@@ -165,7 +165,7 @@ function renderClassData() {
             }
             
             html += '<div class="instructor-group">';
-            html += '<div class="instructor-name">🧑‍🏫 ' + instructorName + '</div>';
+            html += '<div class="instructor-name">⚇ ' + instructorName + '</div>';
             
             // Sort classes by day then hour
             var classKeys = Object.keys(group.classes).sort(function(a, b) {
@@ -224,8 +224,8 @@ function populateClassFilter() {
     var currentValue = select.value;
     select.innerHTML = `
         <option value="all">All Disciplines</option>
-        <option value="mandatory">📚 Mandatory Only</option>
-        <option value="optional">🎯 Optional Only</option>
+        <option value="mandatory">▣ Mandatory Only</option>
+        <option value="optional">▢ Optional Only</option>
     `;
     
     if (currentValue) {
@@ -311,8 +311,6 @@ function exportClassView() {
     win.document.write('.student-tag{background:#fff;padding:2px 10px;border-radius:12px;font-size:0.7rem;display:inline-block;margin:2px;}');
     win.document.write('.student-tag .status{color:#666;font-size:0.6rem;}');
     win.document.write('.full{color:#d32f2f;}');
-    win.document.write('.mandatory-badge{color:#2E7D32;font-weight:bold;}');
-    win.document.write('.optional-badge{color:#ED6C02;font-weight:bold;}');
     win.document.write('</style></head><body>');
     win.document.write('<h1>Class View - Week ' + week + '</h1>');
     win.document.write('<p>Generated: ' + new Date().toLocaleString() + '</p>');
