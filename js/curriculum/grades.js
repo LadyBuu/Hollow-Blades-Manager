@@ -31,7 +31,25 @@ function renderGradesView(container) {
         </div>
     `;
     
-    populateStudentSelector('grades-student');
+    // Use the shared populateStudentSelector function
+    if (typeof populateStudentSelector === 'function') {
+        populateStudentSelector('grades-student');
+    } else {
+        // Fallback: define locally
+        var select = document.getElementById('grades-student');
+        if (select) {
+            var students = getStudents();
+            select.innerHTML = '<option value="">Select a student...</option>';
+            students.forEach(function(student) {
+                var name = [student.firstName, student.middleName, student.lastName].filter(function(n) { return n; }).join(' ');
+                var option = document.createElement('option');
+                option.value = student.id;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+        }
+    }
+    
     initGradesEvents();
     renderGrades();
 }
