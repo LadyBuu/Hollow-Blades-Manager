@@ -38,7 +38,6 @@ function renderRanking() {
         return;
     }
     
-    // Calculate averages for each student
     var rankings = [];
     students.forEach(function(student) {
         var grades = data.curriculum.grades && data.curriculum.grades[student.id] && data.curriculum.grades[student.id][currentRankWeek] ? 
@@ -107,8 +106,8 @@ function renderRanking() {
     html += '<th>Rank</th>';
     html += '<th>Student</th>';
     html += '<th>Average</th>';
-    html += '<th>📚 Mandatory</th>';
-    html += '<th>🎯 Optional</th>';
+    html += '<th>▣ Mandatory</th>';
+    html += '<th>▢ Optional</th>';
     html += '<th>Change</th>';
     html += '</tr></thead><tbody>';
     
@@ -286,7 +285,6 @@ function initRankingEvents() {
     }
 }
 
-// Make functions globally available
 window.renderRankingView = renderRankingView;
 window.renderRanking = renderRanking;
 window.autoRank = autoRank;
