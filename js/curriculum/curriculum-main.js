@@ -18,9 +18,9 @@ function renderCurriculumView(container) {
         <div class="tab-container">
             <div class="tab-nav">
                 <button class="tab-btn active" data-tab="disciplines">Disciplines</button>
-                <button class="tab-btn" data-tab="class-view">👨‍🏫 Class View</button>
-                <button class="tab-btn" data-tab="instructor-calendar">🧑‍🏫 Instructor Calendar</button>
-                <button class="tab-btn" data-tab="schedule">📅 Schedule</button>
+                <button class="tab-btn" data-tab="class-view">▤ Class View</button>
+                <button class="tab-btn" data-tab="instructor-calendar">◷ Instructor Calendar</button>
+                <button class="tab-btn" data-tab="schedule">◷ Schedule</button>
                 <button class="tab-btn" data-tab="grades">Grades</button>
                 <button class="tab-btn" data-tab="ranking">Ranking</button>
             </div>
