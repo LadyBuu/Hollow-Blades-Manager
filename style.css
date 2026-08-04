@@ -790,6 +790,7 @@ main {
     transition: background 0.15s;
     position: relative;
     gap: 4px;
+    flex-shrink: 0;
 }
 .time-slot:hover {
     background: var(--panel-alt);
@@ -820,10 +821,24 @@ main {
     border-left: 3px solid var(--accent);
     color: var(--text);
     font-weight: 500;
+    flex-shrink: 0;
 }
 .time-slot.occupied .slot-label {
     color: var(--text);
     font-weight: 500;
+}
+/* Multi-hour slot stretching */
+.time-slot.occupied.duration-2 {
+    min-height: 60px !important;
+    height: 60px !important;
+}
+.time-slot.occupied.duration-3 {
+    min-height: 90px !important;
+    height: 90px !important;
+}
+.time-slot.occupied.duration-4 {
+    min-height: 120px !important;
+    height: 120px !important;
 }
 
 @media (max-width: 768px) {
@@ -858,6 +873,18 @@ main {
     .time-slot .slot-label {
         font-size: 0.45rem;
     }
+    .time-slot.occupied.duration-2 {
+        min-height: 48px !important;
+        height: 48px !important;
+    }
+    .time-slot.occupied.duration-3 {
+        min-height: 72px !important;
+        height: 72px !important;
+    }
+    .time-slot.occupied.duration-4 {
+        min-height: 96px !important;
+        height: 96px !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -890,6 +917,18 @@ main {
     }
     .time-slot.occupied {
         border-left-width: 2px;
+    }
+    .time-slot.occupied.duration-2 {
+        min-height: 36px !important;
+        height: 36px !important;
+    }
+    .time-slot.occupied.duration-3 {
+        min-height: 54px !important;
+        height: 54px !important;
+    }
+    .time-slot.occupied.duration-4 {
+        min-height: 72px !important;
+        height: 72px !important;
     }
 }
 
@@ -1100,6 +1139,10 @@ main {
     cursor: pointer;
     transition: background 0.15s;
     min-height: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
 }
 .instructor-calendar-grid .class-cell:hover {
     background: var(--accent-soft);
