@@ -72,9 +72,6 @@ function renderInstructorCalendar(container) {
                 </div>
             </div>
         </div>
-        <div id="instructor-calendar-container">
-            <p class="empty-state">Select an instructor to view their schedule</p>
-        </div>
     `;
     
     // Populate instructor selector
@@ -138,6 +135,40 @@ function renderInstructorCalendarData() {
         }
     }
     
+    // First, check instructorClasses for scheduled classes (even without students)
+    if (data.curriculum.instructorClasses) {
+        var instructorId = instructorCalendarState.selectedInstructorId;
+        var week = instructorCalendarState.currentWeek;
+        
+        for (var key in data.curriculum.instructorClasses) {
+            var parts = key.split('_');
+            if (parts[0] === instructorId && parseInt(parts[1]) === week) {
+                var classData = data.curriculum.instructorClasses[key];
+                var day = parseInt(parts[2]);
+                var hour = parseInt(parts[3]);
+                var classKey = day + '_' + hour;
+                
+                if (!classSlots[classKey]) {
+                    var discipline = getDiscipline(classData.disciplineId);
+                    if (discipline) {
+                        classSlots[classKey] = {
+                            day: day,
+                            hour: hour,
+                            discipline: discipline,
+                            disciplineId: classData.disciplineId,
+                            students: [],
+                            instructorId: instructorId,
+                            label: classData.label || null,
+                            duration: classData.duration || 1,
+                            fromInstructorClasses: true
+                        };
+                    }
+                }
+            }
+        }
+    }
+    
+    // Then check student schedules for assigned students
     students.forEach(function(student) {
         var schedule = getStudentSchedule(student.id, instructorCalendarState.currentWeek);
         for (var day in schedule) {
@@ -171,7 +202,8 @@ function renderInstructorCalendarData() {
                                     students: [],
                                     instructorId: classInstructorId || instructorCalendarState.selectedInstructorId,
                                     label: null,
-                                    duration: 1
+                                    duration: 1,
+                                    fromInstructorClasses: false
                                 };
                             }
                             if (typeof getClassLabel === 'function') {
@@ -262,7 +294,7 @@ function renderInstructorCalendarData() {
                 
                 var labelEl = document.createElement('span');
                 labelEl.className = 'slot-label';
-                labelEl.textContent = slotData.discipline.name + labelDisplay + durationDisplay + ' (' + studentCount + ' students)';
+                labelEl.textContent = slotData.discipline.name + labelDisplay + durationDisplay + (studentCount > 0 ? ' (' + studentCount + ' students)' : ' (no students)');
                 slot.appendChild(labelEl);
                 
                 slot.addEventListener('click', (function(data, d, h) {
@@ -286,13 +318,12 @@ function renderInstructorCalendarData() {
                 }
                 
                 slot.classList.add('occupied');
+                slot.classList.add('blocked');
                 slot.style.minHeight = (30 * blockDuration) + 'px';
                 slot.style.height = (30 * blockDuration) + 'px';
                 if (blockDuration > 1) {
                     slot.classList.add('duration-' + blockDuration);
                 }
-                slot.style.borderLeftColor = 'var(--warning)';
-                slot.style.background = 'var(--warning-soft)';
                 
                 var labelEl = document.createElement('span');
                 labelEl.className = 'slot-label';
@@ -465,46 +496,6 @@ function showAddClassModal(day, hour) {
             return;
         }
         
-        // Check if slots are available
-        var hasConflict = false;
-        var students = getStudents();
-        var conflictDetails = [];
-        
-        students.forEach(function(student) {
-            var schedule = getStudentSchedule(student.id, week);
-            for (var h = hour; h < hour + duration && h <= 23; h++) {
-                if (schedule[day] && schedule[day][h]) {
-                    var discId = schedule[day][h];
-                    var disc = getDiscipline(discId);
-                    if (disc) {
-                        var classInstructorId = null;
-                        if (typeof getClassInstructor === 'function') {
-                            classInstructorId = getClassInstructor(student.id, week, day, h);
-                        }
-                        var isTeaching = false;
-                        if (classInstructorId) {
-                            isTeaching = String(classInstructorId) === String(instructorId);
-                        } else if (disc.instructorIds) {
-                            isTeaching = disc.instructorIds.some(function(id) { 
-                                return String(id) === String(instructorId); 
-                            });
-                        }
-                        if (isTeaching) {
-                            var studentName = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                            conflictDetails.push(studentName + ' has ' + disc.name + ' at ' + h + ':00');
-                            hasConflict = true;
-                        }
-                    }
-                }
-            }
-        });
-        
-        if (hasConflict) {
-            if (!confirm('⚠ The instructor already has classes at this time for these students:\n\n' + conflictDetails.join('\n') + '\n\nAdd anyway?')) {
-                return;
-            }
-        }
-        
         // Store the class in instructorClasses
         if (!data.curriculum.instructorClasses) {
             data.curriculum.instructorClasses = {};
@@ -530,8 +521,9 @@ function showAddClassModal(day, hour) {
             alert('Class added successfully! Click on the class slot to assign students.');
         }).catch(function(err) {
             console.error('Failed to save:', err);
+            // Still render to show the class even if save failed
             renderInstructorCalendarData();
-            alert('Class was added but there was a save error.');
+            alert('Class was added but there was a save error. Please check your data.');
         });
     };
 }
@@ -714,7 +706,6 @@ function removeBlockedTime(day, hour) {
     if (data.curriculum.instructorBlocks && data.curriculum.instructorBlocks[blockKey]) {
         if (data.curriculum.instructorBlocks[blockKey][day]) {
             delete data.curriculum.instructorBlocks[blockKey][day][hour];
-            // Clean up empty days
             if (Object.keys(data.curriculum.instructorBlocks[blockKey][day]).length === 0) {
                 delete data.curriculum.instructorBlocks[blockKey][day];
             }
@@ -906,7 +897,12 @@ function showClassManagementModal(disciplineId, day, hour, studentIds, label, du
         var confirmMsg = 'Remove this class from ALL ' + studentCount + ' student(s)?\n\n' + studentNames.join('\n');
         if (!confirm(confirmMsg)) return;
         
-        removeInstructorClass(day, hour, { disciplineId: disciplineId, label: label, duration: duration, students: assignedStudentIds.map(function(id) { return { studentId: id }; }) });
+        removeInstructorClass(day, hour, { 
+            disciplineId: disciplineId, 
+            label: label, 
+            duration: duration, 
+            students: assignedStudentIds.map(function(id) { return { studentId: id }; }) 
+        });
         modal.remove();
     };
 }
