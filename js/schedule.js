@@ -38,7 +38,8 @@ function initScheduleSystem() {
             instructorClasses: {},
             instructorTemplates: {},
             instructorBlocks: {},
-            instructorGroups: {}
+            instructorGroups: {},
+            disciplineGroups: {}
         };
     }
     if (!data.curriculum.schedules) {
@@ -70,6 +71,18 @@ function initScheduleSystem() {
     }
     if (!data.curriculum.instructorGroups) {
         data.curriculum.instructorGroups = {};
+    }
+    if (!data.curriculum.disciplineGroups) {
+        data.curriculum.disciplineGroups = {};
+    }
+    
+    // Ensure eliminatedWeeks exists on characters
+    if (data.characters) {
+        data.characters.forEach(function(char) {
+            if (!char.eliminatedWeeks) {
+                char.eliminatedWeeks = [];
+            }
+        });
     }
 }
 
