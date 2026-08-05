@@ -102,7 +102,7 @@ function renderDisciplinesView(container) {
 }
 
 /**
- * Render disciplines list
+ * Render disciplines list - FIXED with proper edit buttons
  */
 function renderDisciplines() {
     var container = document.getElementById('disciplines-container');
@@ -145,11 +145,18 @@ function renderDisciplines() {
     });
     container.innerHTML = html;
     
+    // FIX: Properly attach event listeners with stopPropagation
     container.querySelectorAll('.edit-discipline').forEach(function(btn) {
-        btn.addEventListener('click', function() { showDisciplineForm(btn.dataset.id); });
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showDisciplineForm(btn.dataset.id);
+        });
     });
     container.querySelectorAll('.delete-discipline').forEach(function(btn) {
-        btn.addEventListener('click', function() { deleteDiscipline(btn.dataset.id); });
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            deleteDiscipline(btn.dataset.id);
+        });
     });
 }
 
