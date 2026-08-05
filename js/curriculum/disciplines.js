@@ -1,624 +1,478 @@
 /**
- * groups.js - Discipline Group Management
- * Groups are connected to disciplines, not instructors
- * Each group has a label (A, B, C) and a list of students
- * Groups enforce max students per discipline
- * Shows ALL disciplines and ALL students in groups
+ * disciplines.js - Discipline Management
+ * CRUD operations for disciplines
  */
 
 /**
- * Get groups for a specific discipline
+ * Render the disciplines view
  */
-function getDisciplineGroups(disciplineId) {
-    if (!data.curriculum.disciplineGroups) {
-        data.curriculum.disciplineGroups = {};
-    }
-    if (!data.curriculum.disciplineGroups[disciplineId]) {
-        data.curriculum.disciplineGroups[disciplineId] = {};
-    }
-    return data.curriculum.disciplineGroups[disciplineId];
-}
-
-/**
- * Get all groups across all disciplines
- */
-function getAllGroups() {
-    if (!data.curriculum.disciplineGroups) {
-        data.curriculum.disciplineGroups = {};
-    }
-    return data.curriculum.disciplineGroups;
-}
-
-/**
- * Get students in a specific group
- */
-function getStudentsInDisciplineGroup(disciplineId, groupLabel) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (!groups[groupLabel] || !groups[groupLabel].students) {
-        return [];
-    }
-    return Object.keys(groups[groupLabel].students);
-}
-
-/**
- * Check if a student is in a specific group
- */
-function isStudentInGroup(disciplineId, groupLabel, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (!groups[groupLabel] || !groups[groupLabel].students) {
-        return false;
-    }
-    return !!groups[groupLabel].students[studentId];
-}
-
-/**
- * Get the group a student is in for a specific discipline
- */
-function getStudentDisciplineGroup(disciplineId, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    for (var label in groups) {
-        if (groups[label].students && groups[label].students[studentId]) {
-            return label;
-        }
-    }
-    return null;
-}
-
-/**
- * Check if a character is eliminated in a specific week
- */
-function isCharacterEliminatedInWeek(charId, week) {
-    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
-    if (!char) return false;
-    if (char.deceased) return true;
-    
-    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
-        var weekNum = parseInt(week) || 1;
-        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
-            var elimWeek = parseInt(char.eliminatedWeeks[i]);
-            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-/**
- * Check if a discipline is active in a specific week
- */
-function isDisciplineActiveInWeek(disciplineId, week) {
-    var discipline = getDiscipline(disciplineId);
-    if (!discipline) return false;
-    var weekNum = parseInt(week) || 1;
-    var start = parseInt(discipline.startWeek);
-    var end = parseInt(discipline.endWeek);
-    if (isNaN(start)) return true;
-    return start <= weekNum && (isNaN(end) || end >= weekNum);
-}
-
-/**
- * Get all students for a discipline (from group assignments)
- */
-function getAllStudentsForDiscipline(disciplineId) {
-    var allStudents = getStudents();
-    var result = [];
-    
-    allStudents.forEach(function(student) {
-        // Check if student is in any group for this discipline
-        var group = getStudentDisciplineGroup(disciplineId, student.id);
-        if (group) {
-            result.push(student);
-        }
-    });
-    
-    return result;
-}
-
-/**
- * Get all students with their group info for a discipline
- */
-function getStudentsWithGroupsForDiscipline(disciplineId) {
-    var groups = getDisciplineGroups(disciplineId);
-    var allStudents = getStudents();
-    var result = {
-        groups: {},
-        unassigned: []
-    };
-    
-    // Initialize group structure
-    for (var label in groups) {
-        result.groups[label] = [];
-    }
-    
-    allStudents.forEach(function(student) {
-        var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
-        if (groupLabel && result.groups[groupLabel] !== undefined) {
-            result.groups[groupLabel].push(student);
-        } else {
-            result.unassigned.push(student);
-        }
-    });
-    
-    return result;
-}
-
-/**
- * Add a student to a group
- */
-function addStudentToDisciplineGroup(disciplineId, groupLabel, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    
-    if (!groups[groupLabel]) {
-        groups[groupLabel] = { students: {} };
-    }
-    
-    // Check if student is already in this group
-    if (groups[groupLabel].students && groups[groupLabel].students[studentId]) {
-        return { success: false, message: 'Student is already in this group.' };
-    }
-    
-    // Check if student is in another group for this discipline
-    var currentGroup = getStudentDisciplineGroup(disciplineId, studentId);
-    if (currentGroup) {
-        // Remove from old group
-        delete groups[currentGroup].students[studentId];
-    }
-    
-    // Check discipline max students limit
-    var discipline = getDiscipline(disciplineId);
-    if (discipline && discipline.maxStudents) {
-        var currentCount = Object.keys(groups[groupLabel].students || {}).length;
-        if (currentCount >= discipline.maxStudents) {
-            return { 
-                success: false, 
-                message: 'Group ' + groupLabel + ' already has ' + currentCount + ' students (max ' + discipline.maxStudents + ').' 
-            };
-        }
-    }
-    
-    if (!groups[groupLabel].students) {
-        groups[groupLabel].students = {};
-    }
-    groups[groupLabel].students[studentId] = true;
-    
-    return { success: true, message: 'Student added to group.' };
-}
-
-/**
- * Remove a student from a group
- */
-function removeStudentFromDisciplineGroup(disciplineId, groupLabel, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (groups[groupLabel] && groups[groupLabel].students) {
-        delete groups[groupLabel].students[studentId];
-        return { success: true };
-    }
-    return { success: false, message: 'Student not found in group.' };
-}
-
-/**
- * Remove a group entirely
- */
-function removeDisciplineGroup(disciplineId, groupLabel) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (groups[groupLabel]) {
-        delete groups[groupLabel];
-        return { success: true };
-    }
-    return { success: false, message: 'Group not found.' };
-}
-
-/**
- * Render the discipline groups view
- */
-function renderDisciplineGroupsView(container) {
-    if (!container) {
-        container = document.getElementById('groups-content');
-    }
-    if (!container) return;
-    
+function renderDisciplinesView(container) {
     container.innerHTML = `
         <div class="page-header">
-            <h2>▣ Discipline Groups</h2>
+            <h2>Disciplines</h2>
+            <button id="add-discipline-btn" class="primary">+ Add Discipline</button>
         </div>
-        <div id="discipline-groups-container">
-            <p class="empty-state">No disciplines available. Create a discipline first.</p>
+        <div id="discipline-list">
+            <div class="list-header">
+                <span>Discipline</span>
+                <span>Type</span>
+                <span>Instructors</span>
+                <span>Weeks</span>
+                <span>Hours/Week</span>
+                <span>Students</span>
+                <span>Actions</span>
+            </div>
+            <div id="disciplines-container"></div>
         </div>
-    `;
-    
-    renderDisciplineGroups();
-    initDisciplineGroupsEvents();
-}
-
-/**
- * Render the discipline groups
- */
-function renderDisciplineGroups() {
-    var container = document.getElementById('discipline-groups-container');
-    if (!container) return;
-    
-    var disciplines = data.curriculum.disciplines || [];
-    if (disciplines.length === 0) {
-        container.innerHTML = '<p class="empty-state">No disciplines created yet. Create a discipline first.</p>';
-        return;
-    }
-    
-    var week = instructorCalendarState ? instructorCalendarState.currentWeek || 1 : 1;
-    
-    var html = '<div style="display:flex;flex-direction:column;gap:16px;">';
-    
-    disciplines.sort(function(a, b) { return a.name.localeCompare(b.name); });
-    
-    disciplines.forEach(function(discipline) {
-        var isActive = isDisciplineActiveInWeek(discipline.id, week);
-        var groups = getDisciplineGroups(discipline.id);
-        var groupLabels = Object.keys(groups).sort();
-        var maxStudents = discipline.maxStudents || 'Unlimited';
-        
-        // Get all students with their group info
-        var studentData = getStudentsWithGroupsForDiscipline(discipline.id);
-        var totalStudents = Object.values(studentData.groups).reduce(function(sum, arr) { return sum + arr.length; }, 0) + studentData.unassigned.length;
-        
-        html += '<div class="discipline-groups-card" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);' + (!isActive ? 'opacity:0.6;' : '') + '">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
-        html += '<h3 style="color:var(--accent);">' + discipline.name + '</h3>';
-        html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-        html += '<span style="font-size:0.7rem;color:var(--text-dim);">Max: ' + maxStudents + ' | Total: ' + totalStudents + '</span>';
-        if (!isActive) {
-            html += '<span style="font-size:0.65rem;color:var(--warning);padding:2px 8px;border:1px solid var(--warning);border-radius:10px;">Inactive (Wk ' + (discipline.startWeek || '?') + '-' + (discipline.endWeek || '?') + ')</span>';
-        }
-        html += '<button class="add-discipline-group-btn small primary" data-discipline="' + discipline.id + '">+ Add Group</button>';
-        html += '</div>';
-        html += '</div>';
-        
-        if (groupLabels.length === 0) {
-            html += '<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:8px;">No groups created for this discipline. Click "Add Group" to create one.</p>';
-        } else {
-            html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
-            groupLabels.forEach(function(label) {
-                var group = groups[label];
-                var studentCount = group.students ? Object.keys(group.students).length : 0;
-                var isFull = discipline.maxStudents && studentCount >= discipline.maxStudents;
-                var isExpanded = instructorCalendarState && instructorCalendarState.expandedGroups ? 
-                    instructorCalendarState.expandedGroups[discipline.id + '_' + label] || false : false;
-                
-                // Get students in this group
-                var studentsInGroup = studentData.groups[label] || [];
-                
-                html += '<div class="discipline-group-card" style="background:var(--bg);border:1px solid ' + (isFull ? 'var(--danger)' : 'var(--border-soft)') + ';border-radius:var(--radius);padding:8px 12px;flex:1;min-width:120px;max-width:250px;">';
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleDisciplineGroup(\'' + discipline.id + '\', \'' + label + '\')">';
-                html += '<span style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
-                html += '<span style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + '/' + (discipline.maxStudents || '∞') + (isExpanded ? ' ▼' : ' ▶') + '</span>';
-                html += '</div>';
-                
-                if (isExpanded) {
-                    html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
-                    
-                    // Show students in this group
-                    if (studentsInGroup.length > 0) {
-                        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
-                        studentsInGroup.forEach(function(student) {
-                            var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                            var isEliminated = isCharacterEliminatedInWeek(student.id, week);
-                            html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;display:inline-flex;align-items:center;gap:4px;' + (isEliminated ? 'opacity:0.4;text-decoration:line-through;' : '') + '">' + name;
-                            html += '<button class="remove-from-discipline-group-btn" data-discipline="' + discipline.id + '" data-group="' + label + '" data-student="' + student.id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
-                            html += '</span>';
-                        });
-                        html += '</div>';
-                    } else {
-                        html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
-                    }
-                    
-                    // Add student dropdown
-                    html += '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">';
-                    html += '<select class="add-student-to-discipline-group" data-discipline="' + discipline.id + '" data-group="' + label + '" style="flex:1;min-width:100px;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
-                    html += '<option value="">Add student...</option>';
-                    
-                    // Show unassigned students
-                    studentData.unassigned.forEach(function(student) {
-                        var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                        var inGroup = isStudentInGroup(discipline.id, label, student.id);
-                        if (!inGroup) {
-                            var isEliminated = isCharacterEliminatedInWeek(student.id, week);
-                            html += '<option value="' + student.id + '" ' + (isEliminated ? 'style="opacity:0.4;"' : '') + '>' + name + (isEliminated ? ' (eliminated)' : '') + '</option>';
-                        }
-                    });
-                    
-                    // Also show students in other groups with a warning
-                    for (var otherLabel in groups) {
-                        if (otherLabel === label) continue;
-                        if (groups[otherLabel].students) {
-                            Object.keys(groups[otherLabel].students).forEach(function(id) {
-                                var student = data.characters.find(function(c) { return String(c.id) === String(id); });
-                                if (student) {
-                                    var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                                    var isEliminated = isCharacterEliminatedInWeek(id, week);
-                                    html += '<option value="' + id + '" style="color:var(--warning);' + (isEliminated ? 'opacity:0.4;' : '') + '">' + name + ' (in Group ' + otherLabel + ')' + (isEliminated ? ' (eliminated)' : '') + '</option>';
-                                }
-                            });
-                        }
-                    }
-                    html += '</select>';
-                    html += '<button class="add-student-to-discipline-group-btn small primary" data-discipline="' + discipline.id + '" data-group="' + label + '" style="font-size:0.6rem;padding:2px 6px;">Add</button>';
-                    html += '</div>';
-                    
-                    html += '</div>';
-                }
-                
-                html += '</div>';
-            });
-            html += '</div>';
-            
-            // Show unassigned students
-            if (studentData.unassigned.length > 0) {
-                html += '<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:var(--radius);border:1px dashed var(--border);">';
-                html += '<span style="font-size:0.7rem;color:var(--text-dim);">Unassigned (' + studentData.unassigned.length + '): </span>';
-                studentData.unassigned.forEach(function(student) {
-                    var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                    var isEliminated = isCharacterEliminatedInWeek(student.id, week);
-                    html += '<span style="background:var(--panel-alt);padding:2px 6px;border-radius:10px;font-size:0.65rem;margin:2px;display:inline-block;' + (isEliminated ? 'opacity:0.4;text-decoration:line-through;' : '') + '">' + name + '</span>';
-                });
-                html += '</div>';
-            }
-        }
-        
-        html += '</div>';
-    });
-    
-    html += '</div>';
-    container.innerHTML = html;
-    
-    // Event listeners for group management
-    container.querySelectorAll('.add-student-to-discipline-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            var groupLabel = this.dataset.group;
-            var select = this.parentElement.querySelector('.add-student-to-discipline-group');
-            var studentId = select.value;
-            if (studentId) {
-                var result = addStudentToDisciplineGroup(disciplineId, groupLabel, studentId);
-                if (result.success) {
-                    saveData().then(function() {
-                        if (typeof logActivity === 'function') {
-                            logActivity('Added student to group ' + groupLabel);
-                        }
-                        renderDisciplineGroups();
-                    }).catch(function(err) {
-                        console.error('Failed to save:', err);
-                        alert('Failed to add student to group.');
-                    });
-                } else {
-                    alert(result.message);
-                }
-            }
-        });
-    });
-    
-    container.querySelectorAll('.remove-from-discipline-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            var groupLabel = this.dataset.group;
-            var studentId = this.dataset.student;
-            if (confirm('Remove this student from the group?')) {
-                var result = removeStudentFromDisciplineGroup(disciplineId, groupLabel, studentId);
-                if (result.success) {
-                    saveData().then(function() {
-                        if (typeof logActivity === 'function') {
-                            logActivity('Removed student from group');
-                        }
-                        renderDisciplineGroups();
-                    }).catch(function(err) {
-                        console.error('Failed to save:', err);
-                        alert('Failed to remove student from group.');
-                    });
-                }
-            }
-        });
-    });
-    
-    // Add group buttons per discipline
-    container.querySelectorAll('.add-discipline-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            showAddDisciplineGroupModal(disciplineId);
-        });
-    });
-}
-
-/**
- * Toggle discipline group expansion
- */
-function toggleDisciplineGroup(disciplineId, groupLabel) {
-    if (!instructorCalendarState) {
-        instructorCalendarState = { expandedGroups: {} };
-    }
-    var key = disciplineId + '_' + groupLabel;
-    if (instructorCalendarState.expandedGroups[key]) {
-        delete instructorCalendarState.expandedGroups[key];
-    } else {
-        instructorCalendarState.expandedGroups[key] = true;
-    }
-    renderDisciplineGroups();
-}
-
-/**
- * Show add group modal for a specific discipline
- */
-function showAddDisciplineGroupModal(disciplineId) {
-    var disciplines = data.curriculum.disciplines || [];
-    if (disciplines.length === 0) {
-        alert('No disciplines available. Create a discipline first.');
-        return;
-    }
-    
-    // If no disciplineId provided, show a dropdown
-    if (!disciplineId) {
-        var modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width:400px;">
-                <div class="modal-header">
-                    <h3>Add Group to Discipline</h3>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body">
+        <div id="discipline-form" class="form-container hidden">
+            <h3 id="discipline-form-title">Add Discipline</h3>
+            <form id="discipline-form-inner">
+                <div class="form-grid">
                     <div class="form-group">
-                        <label>Discipline *</label>
-                        <select id="add-group-discipline-select" style="width:100%;padding:8px;">
-                            ${disciplines.map(function(d) {
-                                return '<option value="' + d.id + '">' + d.name + '</option>';
-                            }).join('')}
+                        <label>Discipline Name *</label>
+                        <input type="text" id="discipline-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Discipline Type *</label>
+                        <select id="discipline-type" required>
+                            <option value="">Select type...</option>
+                            <option value="mandatory">▣ Mandatory / Common</option>
+                            <option value="optional">▢ Optional / Choice</option>
                         </select>
                     </div>
+                    <div class="form-group full-width">
+                        <label>Instructors *</label>
+                        <div id="instructors-container">
+                            <div class="instructor-entry">
+                                <select class="instructor-select">
+                                    <option value="">Select instructor...</option>
+                                </select>
+                                <button type="button" class="small danger remove-instructor">✕</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-instructor-btn" class="small" style="margin-top:8px;">+ Add Instructor</button>
+                    </div>
                     <div class="form-group">
-                        <label>Group Label *</label>
-                        <input type="text" id="add-group-label" placeholder="e.g., A, B, 1, 2..." style="width:100%;padding:8px;">
+                        <label>Curriculum (free text)</label>
+                        <input type="text" id="discipline-curriculum" placeholder="e.g., Mathematics, Physics...">
                     </div>
-                    <div class="form-actions" style="margin-top:16px;">
-                        <button type="button" id="cancel-add-group" class="secondary">Cancel</button>
-                        <button type="button" id="confirm-add-group" class="primary">Add Group</button>
+                    <div class="form-group">
+                        <label>Start Week</label>
+                        <input type="number" id="discipline-start-week" min="1" max="52">
+                    </div>
+                    <div class="form-group">
+                        <label>End Week</label>
+                        <input type="number" id="discipline-end-week" min="1" max="52">
+                    </div>
+                    <div class="form-group">
+                        <label>Weekly Hours</label>
+                        <input type="number" id="discipline-hours" min="1" max="40" step="0.5">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Students per Class</label>
+                        <input type="number" id="discipline-students" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Weight (for grade calculation)</label>
+                        <input type="number" id="discipline-weight" min="0.1" max="10" step="0.1" value="1">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Grading System</label>
+                        <div id="grading-system-container">
+                            <div class="grading-entry">
+                                <input type="text" class="grading-letter" placeholder="Letter" style="width:80px;">
+                                <input type="number" class="grading-min" placeholder="Min %" min="0" max="100" style="width:80px;">
+                                <input type="number" class="grading-max" placeholder="Max %" min="0" max="100" style="width:80px;">
+                                <button type="button" class="small danger remove-grading">✕</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-grading-btn" class="small" style="margin-top:8px;">+ Add Grade Level</button>
                     </div>
                 </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-        modal.querySelector('#cancel-add-group').onclick = function() { modal.remove(); };
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) modal.remove();
-        });
-        
-        modal.querySelector('#confirm-add-group').onclick = function() {
-            var selectedDisciplineId = document.getElementById('add-group-discipline-select').value;
-            var label = document.getElementById('add-group-label').value.trim().toUpperCase();
-            
-            if (!selectedDisciplineId) {
-                alert('Please select a discipline.');
-                return;
-            }
-            if (!label) {
-                alert('Please enter a group label.');
-                return;
-            }
-            
-            var groups = getDisciplineGroups(selectedDisciplineId);
-            if (groups[label]) {
-                alert('Group "' + label + '" already exists for this discipline.');
-                return;
-            }
-            
-            groups[label] = { students: {} };
-            
-            saveData().then(function() {
-                if (typeof logActivity === 'function') {
-                    var discipline = getDiscipline(selectedDisciplineId);
-                    logActivity('Created group ' + label + ' for discipline ' + (discipline ? discipline.name : ''));
-                }
-                modal.remove();
-                renderDisciplineGroups();
-            }).catch(function(err) {
-                console.error('Failed to save:', err);
-                alert('Failed to create group.');
-            });
-        };
-        return;
-    }
-    
-    // If disciplineId provided, use it directly
-    var discipline = getDiscipline(disciplineId);
-    if (!discipline) {
-        alert('Discipline not found.');
-        return;
-    }
-    
-    var groups = getDisciplineGroups(disciplineId);
-    var existingLabels = Object.keys(groups);
-    
-    var modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-header">
-                <h3>Add Group to ${discipline.name}</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Discipline:</label>
-                    <span style="padding:6px 0;display:block;">${discipline.name}</span>
+                <div class="form-actions">
+                    <button type="button" id="cancel-discipline-btn" class="secondary">Cancel</button>
+                    <button type="submit" id="save-discipline-btn" class="primary">Save Discipline</button>
                 </div>
-                <div class="form-group">
-                    <label>Group Label *</label>
-                    <input type="text" id="add-group-label" placeholder="e.g., A, B, 1, 2..." style="width:100%;padding:8px;">
-                    ${existingLabels.length > 0 ? '<span style="font-size:0.6rem;color:var(--text-dim);">Existing groups: ' + existingLabels.join(', ') + '</span>' : ''}
-                </div>
-                <div class="form-actions" style="margin-top:16px;">
-                    <button type="button" id="cancel-add-group" class="secondary">Cancel</button>
-                    <button type="button" id="confirm-add-group" class="primary">Add Group</button>
-                </div>
-            </div>
+            </form>
         </div>
     `;
     
-    document.body.appendChild(modal);
+    renderDisciplines();
+    initDisciplineEvents();
+}
+
+/**
+ * Render disciplines list - FIXED with proper edit buttons
+ */
+function renderDisciplines() {
+    var container = document.getElementById('disciplines-container');
+    if (!container) return;
     
-    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-    modal.querySelector('#cancel-add-group').onclick = function() { modal.remove(); };
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.remove();
+    if (!data.curriculum) {
+        data.curriculum = { disciplines: [], schedules: {}, restDays: {}, examDays: {}, grades: {}, rankings: {}, currentWeek: 1 };
+    }
+    if (!data.curriculum.disciplines) {
+        data.curriculum.disciplines = [];
+    }
+    
+    if (data.curriculum.disciplines.length === 0) {
+        container.innerHTML = '<p class="empty-state">No disciplines created yet. Add your first discipline!</p>';
+        return;
+    }
+    
+    var html = '';
+    data.curriculum.disciplines.forEach(function(d) {
+        var instructors = getInstructorNames(d);
+        var instructorDisplay = instructors.length > 0 ? instructors.join(', ') : 'Not assigned';
+        var weekDisplay = d.startWeek ? 'Wk ' + d.startWeek : '?';
+        if (d.endWeek) weekDisplay += ' - Wk ' + d.endWeek;
+        
+        var typeLabel = d.type === 'mandatory' ? '▣ Mandatory' : (d.type === 'optional' ? '▢ Optional' : '—');
+        var typeColor = d.type === 'mandatory' ? 'var(--accent)' : (d.type === 'optional' ? 'var(--warning)' : 'var(--text-dim)');
+        
+        html += '<div class="list-item" data-id="' + d.id + '">' +
+            '<span><strong>' + d.name + '</strong></span>' +
+            '<span style="color:' + typeColor + ';font-size:0.75rem;">' + typeLabel + '</span>' +
+            '<span style="font-size:0.75rem;">' + instructorDisplay + '</span>' +
+            '<span>' + weekDisplay + '</span>' +
+            '<span>' + (d.weeklyHours || '-') + 'h</span>' +
+            '<span>' + (d.maxStudents || '-') + '</span>' +
+            '<span class="actions">' +
+                '<button class="small edit-discipline" data-id="' + d.id + '">Edit</button>' +
+                '<button class="small danger delete-discipline" data-id="' + d.id + '">Delete</button>' +
+            '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+    
+    // FIX: Properly attach event listeners with stopPropagation
+    container.querySelectorAll('.edit-discipline').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showDisciplineForm(btn.dataset.id);
+        });
+    });
+    container.querySelectorAll('.delete-discipline').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            deleteDiscipline(btn.dataset.id);
+        });
+    });
+}
+
+/**
+ * Show discipline form
+ */
+function showDisciplineForm(editId) {
+    var form = document.getElementById('discipline-form');
+    var title = document.getElementById('discipline-form-title');
+    var formElement = document.getElementById('discipline-form-inner');
+    form.classList.remove('hidden');
+    
+    populateInstructorSelects();
+    
+    if (editId) {
+        title.textContent = 'Edit Discipline';
+        var discipline = data.curriculum.disciplines.find(function(d) { return String(d.id) === String(editId); });
+        if (discipline) {
+            document.getElementById('discipline-name').value = discipline.name || '';
+            document.getElementById('discipline-type').value = discipline.type || '';
+            document.getElementById('discipline-curriculum').value = discipline.curriculum || '';
+            document.getElementById('discipline-start-week').value = discipline.startWeek || '';
+            document.getElementById('discipline-end-week').value = discipline.endWeek || '';
+            document.getElementById('discipline-hours').value = discipline.weeklyHours || '';
+            document.getElementById('discipline-students').value = discipline.maxStudents || '';
+            document.getElementById('discipline-weight').value = discipline.weight || 1;
+            
+            var container = document.getElementById('instructors-container');
+            container.innerHTML = '';
+            if (discipline.instructorIds && discipline.instructorIds.length > 0) {
+                discipline.instructorIds.forEach(function(id) {
+                    addInstructorEntry(container, id);
+                });
+            } else {
+                addInstructorEntry(container);
+            }
+            
+            var gradingContainer = document.getElementById('grading-system-container');
+            gradingContainer.innerHTML = '';
+            if (discipline.gradingSystem && discipline.gradingSystem.length > 0) {
+                discipline.gradingSystem.forEach(function(g) {
+                    addGradingEntry(gradingContainer, g.letter, g.min, g.max);
+                });
+            } else {
+                addGradingEntry(gradingContainer);
+            }
+            formElement.dataset.editId = editId;
+        }
+    } else {
+        title.textContent = 'Add Discipline';
+        formElement.reset();
+        document.getElementById('discipline-weight').value = 1;
+        
+        var container = document.getElementById('instructors-container');
+        container.innerHTML = '';
+        addInstructorEntry(container);
+        
+        var gradingContainer = document.getElementById('grading-system-container');
+        gradingContainer.innerHTML = '';
+        addGradingEntry(gradingContainer);
+        delete formElement.dataset.editId;
+    }
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Hide discipline form
+ */
+function hideDisciplineForm() {
+    document.getElementById('discipline-form').classList.add('hidden');
+}
+
+/**
+ * Populate instructor selects
+ */
+function populateInstructorSelects() {
+    var selects = document.querySelectorAll('.instructor-select');
+    var instructors = getInstructors();
+    
+    selects.forEach(function(select) {
+        var currentValue = select.value;
+        select.innerHTML = '<option value="">Select instructor...</option>';
+        instructors.forEach(function(instructor) {
+            var name = [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ');
+            var option = document.createElement('option');
+            option.value = instructor.id;
+            option.textContent = name;
+            select.appendChild(option);
+        });
+        if (currentValue) select.value = currentValue;
+    });
+}
+
+/**
+ * Add instructor entry
+ */
+function addInstructorEntry(container, selectedId) {
+    var entry = document.createElement('div');
+    entry.className = 'instructor-entry';
+    entry.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center;';
+    
+    var select = document.createElement('select');
+    select.className = 'instructor-select';
+    select.style.cssText = 'flex:1;min-width:120px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;font-family:Inter,sans-serif;';
+    select.innerHTML = '<option value="">Select instructor...</option>';
+    
+    var instructors = getInstructors();
+    instructors.forEach(function(instructor) {
+        var name = [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ');
+        var option = document.createElement('option');
+        option.value = instructor.id;
+        option.textContent = name;
+        if (selectedId && String(instructor.id) === String(selectedId)) {
+            option.selected = true;
+        }
+        select.appendChild(option);
     });
     
-    modal.querySelector('#confirm-add-group').onclick = function() {
-        var label = document.getElementById('add-group-label').value.trim().toUpperCase();
-        
-        if (!label) {
-            alert('Please enter a group label.');
-            return;
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'small danger remove-instructor';
+    removeBtn.textContent = '✕';
+    removeBtn.style.cssText = 'padding:4px 8px;font-size:0.65rem;';
+    removeBtn.onclick = function() {
+        if (container.children.length > 1) {
+            entry.remove();
+        } else {
+            alert('You need at least one instructor.');
         }
-        if (existingLabels.indexOf(label) !== -1) {
-            alert('Group "' + label + '" already exists for this discipline.');
-            return;
-        }
-        
-        var groups = getDisciplineGroups(disciplineId);
-        groups[label] = { students: {} };
-        
-        saveData().then(function() {
-            if (typeof logActivity === 'function') {
-                logActivity('Created group ' + label + ' for discipline ' + discipline.name);
-            }
-            modal.remove();
-            renderDisciplineGroups();
-        }).catch(function(err) {
-            console.error('Failed to save:', err);
-            alert('Failed to create group.');
-        });
+    };
+    
+    entry.appendChild(select);
+    entry.appendChild(removeBtn);
+    container.appendChild(entry);
+}
+
+/**
+ * Add grading entry
+ */
+function addGradingEntry(container, letter, min, max) {
+    var entry = document.createElement('div');
+    entry.className = 'grading-entry';
+    entry.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center;';
+    entry.innerHTML = `
+        <input type="text" class="grading-letter" placeholder="Letter" value="${letter || ''}" style="width:80px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;">
+        <input type="number" class="grading-min" placeholder="Min %" value="${min || ''}" style="width:80px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;" min="0" max="100">
+        <input type="number" class="grading-max" placeholder="Max %" value="${max || ''}" style="width:80px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;" min="0" max="100">
+        <button type="button" class="small danger remove-grading" style="padding:4px 8px;font-size:0.65rem;">✕</button>
+    `;
+    container.appendChild(entry);
+    entry.querySelector('.remove-grading').onclick = function() {
+        if (container.children.length > 1) entry.remove();
+        else alert('You need at least one grade level.');
     };
 }
 
 /**
- * Initialize discipline groups events
+ * Save discipline
  */
-function initDisciplineGroupsEvents() {
-    // No global add button needed anymore
+function saveDiscipline(e) {
+    e.preventDefault();
+    var form = e.target;
+    var editId = form.dataset.editId;
+    
+    var instructorIds = [];
+    document.querySelectorAll('.instructor-select').forEach(function(select) {
+        if (select.value) {
+            instructorIds.push(select.value);
+        }
+    });
+    
+    if (instructorIds.length === 0) {
+        alert('Please select at least one instructor.');
+        return;
+    }
+    
+    var gradingSystem = [];
+    document.querySelectorAll('.grading-entry').forEach(function(entry) {
+        var letter = entry.querySelector('.grading-letter').value.trim();
+        var min = entry.querySelector('.grading-min').value;
+        var max = entry.querySelector('.grading-max').value;
+        if (letter && min && max) {
+            gradingSystem.push({ letter: letter, min: parseFloat(min), max: parseFloat(max) });
+        }
+    });
+    
+    var disciplineData = {
+        name: document.getElementById('discipline-name').value.trim(),
+        type: document.getElementById('discipline-type').value,
+        instructorIds: instructorIds,
+        curriculum: document.getElementById('discipline-curriculum').value.trim(),
+        startWeek: document.getElementById('discipline-start-week').value || '',
+        endWeek: document.getElementById('discipline-end-week').value || '',
+        weeklyHours: parseFloat(document.getElementById('discipline-hours').value) || '',
+        maxStudents: parseInt(document.getElementById('discipline-students').value) || '',
+        weight: parseFloat(document.getElementById('discipline-weight').value) || 1,
+        gradingSystem: gradingSystem
+    };
+    
+    if (!disciplineData.name) { alert('Discipline name is required.'); return; }
+    if (!disciplineData.type) { alert('Please select a discipline type.'); return; }
+    
+    if (!data.curriculum) {
+        data.curriculum = { disciplines: [], schedules: {}, restDays: {}, examDays: {}, grades: {}, rankings: {}, currentWeek: 1 };
+    }
+    
+    if (editId) {
+        var index = data.curriculum.disciplines.findIndex(function(d) { return String(d.id) === String(editId); });
+        if (index !== -1) {
+            data.curriculum.disciplines[index] = Object.assign({}, data.curriculum.disciplines[index], disciplineData);
+            if (typeof logActivity === 'function') {
+                logActivity('Updated discipline: ' + disciplineData.name);
+            }
+        }
+    } else {
+        var newDiscipline = {
+            id: generateId('disc'),
+            name: disciplineData.name,
+            type: disciplineData.type,
+            instructorIds: disciplineData.instructorIds,
+            curriculum: disciplineData.curriculum,
+            startWeek: disciplineData.startWeek,
+            endWeek: disciplineData.endWeek,
+            weeklyHours: disciplineData.weeklyHours,
+            maxStudents: disciplineData.maxStudents,
+            weight: disciplineData.weight,
+            gradingSystem: disciplineData.gradingSystem,
+            createdAt: new Date().toISOString()
+        };
+        data.curriculum.disciplines.push(newDiscipline);
+        if (typeof logActivity === 'function') {
+            logActivity('Added discipline: ' + disciplineData.name + ' (' + disciplineData.type + ')');
+        }
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    renderDisciplines();
+    hideDisciplineForm();
+}
+
+/**
+ * Delete discipline
+ */
+function deleteDiscipline(id) {
+    if (!confirm('Delete this discipline permanently? This will remove it from all schedules.')) return;
+    
+    var discipline = data.curriculum.disciplines.find(function(d) { return String(d.id) === String(id); });
+    if (!discipline) return;
+    
+    // Remove from all schedules
+    if (data.curriculum.schedules) {
+        for (var studentId in data.curriculum.schedules) {
+            for (var week in data.curriculum.schedules[studentId]) {
+                var schedule = data.curriculum.schedules[studentId][week];
+                for (var day in schedule) {
+                    for (var hour in schedule[day]) {
+                        if (String(schedule[day][hour]) === String(id)) {
+                            delete schedule[day][hour];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    data.curriculum.disciplines = data.curriculum.disciplines.filter(function(d) { return String(d.id) !== String(id); });
+    if (typeof logActivity === 'function') {
+        logActivity('Deleted discipline: ' + discipline.name);
+    }
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    renderDisciplines();
+}
+
+/**
+ * Initialize discipline events
+ */
+function initDisciplineEvents() {
+    var addBtn = document.getElementById('add-discipline-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', function() { showDisciplineForm(); });
+    }
+    
+    var cancelBtn = document.getElementById('cancel-discipline-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', hideDisciplineForm);
+    }
+    
+    var form = document.getElementById('discipline-form-inner');
+    if (form) {
+        form.addEventListener('submit', saveDiscipline);
+    }
+    
+    var addGradingBtn = document.getElementById('add-grading-btn');
+    if (addGradingBtn) {
+        addGradingBtn.addEventListener('click', function() {
+            var container = document.getElementById('grading-system-container');
+            addGradingEntry(container);
+        });
+    }
+    
+    var addInstructorBtn = document.getElementById('add-instructor-btn');
+    if (addInstructorBtn) {
+        addInstructorBtn.addEventListener('click', function() {
+            var container = document.getElementById('instructors-container');
+            addInstructorEntry(container);
+        });
+    }
 }
 
 // Make functions globally available
-window.renderDisciplineGroupsView = renderDisciplineGroupsView;
-window.renderDisciplineGroups = renderDisciplineGroups;
-window.getDisciplineGroups = getDisciplineGroups;
-window.getStudentsInDisciplineGroup = getStudentsInDisciplineGroup;
-window.isStudentInGroup = isStudentInGroup;
-window.getStudentDisciplineGroup = getStudentDisciplineGroup;
-window.addStudentToDisciplineGroup = addStudentToDisciplineGroup;
-window.removeStudentFromDisciplineGroup = removeStudentFromDisciplineGroup;
-window.removeDisciplineGroup = removeDisciplineGroup;
-window.toggleDisciplineGroup = toggleDisciplineGroup;
-window.getAllStudentsForDiscipline = getAllStudentsForDiscipline;
-window.getStudentsWithGroupsForDiscipline = getStudentsWithGroupsForDiscipline;
-window.isCharacterEliminatedInWeek = isCharacterEliminatedInWeek;
-window.isDisciplineActiveInWeek = isDisciplineActiveInWeek;
-window.showAddDisciplineGroupModal = showAddDisciplineGroupModal;
-window.initDisciplineGroupsEvents = initDisciplineGroupsEvents;
+window.renderDisciplinesView = renderDisciplinesView;
+window.renderDisciplines = renderDisciplines;
+window.showDisciplineForm = showDisciplineForm;
+window.hideDisciplineForm = hideDisciplineForm;
+window.saveDiscipline = saveDiscipline;
+window.deleteDiscipline = deleteDiscipline;
+window.addGradingEntry = addGradingEntry;
+window.addInstructorEntry = addInstructorEntry;
+window.initDisciplineEvents = initDisciplineEvents;
