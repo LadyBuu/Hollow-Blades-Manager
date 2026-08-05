@@ -3,7 +3,7 @@
  * Groups are connected to disciplines, not instructors
  * Each group has a label (A, B, C) and a list of students
  * Groups enforce max students per discipline
- * Respects character elimination weeks and class active weeks
+ * Shows ALL disciplines and ALL students in groups
  */
 
 /**
@@ -65,24 +65,23 @@ function getStudentDisciplineGroup(disciplineId, studentId) {
 }
 
 /**
- * Check if a character is active in a specific week
+ * Check if a character is eliminated in a specific week
  */
-function isCharacterActiveInWeek(charId, week) {
+function isCharacterEliminatedInWeek(charId, week) {
     var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
     if (!char) return false;
-    if (char.deceased) return false;
+    if (char.deceased) return true;
     
-    // Check if character has eliminated weeks
     if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
         var weekNum = parseInt(week) || 1;
         for (var i = 0; i < char.eliminatedWeeks.length; i++) {
             var elimWeek = parseInt(char.eliminatedWeeks[i]);
             if (!isNaN(elimWeek) && elimWeek <= weekNum) {
-                return false;
+                return true;
             }
         }
     }
-    return true;
+    return false;
 }
 
 /**
@@ -99,46 +98,16 @@ function isDisciplineActiveInWeek(disciplineId, week) {
 }
 
 /**
- * Get active students for a discipline in a specific week
- * (students who are not eliminated and are scheduled for this discipline)
+ * Get all students for a discipline (from group assignments)
  */
-function getActiveStudentsForDiscipline(disciplineId, week) {
+function getAllStudentsForDiscipline(disciplineId) {
     var allStudents = getStudents();
     var result = [];
-    var weekNum = parseInt(week) || 1;
     
     allStudents.forEach(function(student) {
-        // Check if student is active in this week
-        if (!isCharacterActiveInWeek(student.id, weekNum)) return;
-        
-        // Check if student has this discipline in their schedule
-        var schedule = getStudentSchedule(student.id, weekNum);
-        var hasDiscipline = false;
-        for (var day in schedule) {
-            for (var hour in schedule[day]) {
-                if (String(schedule[day][hour]) === String(disciplineId)) {
-                    hasDiscipline = true;
-                    break;
-                }
-            }
-            if (hasDiscipline) break;
-        }
-        
-        // Also check templates
-        if (!hasDiscipline && data.curriculum.instructorTemplates) {
-            for (var key in data.curriculum.instructorTemplates) {
-                var templateData = data.curriculum.instructorTemplates[key];
-                for (var classKey in templateData) {
-                    if (templateData[classKey].disciplineId === disciplineId) {
-                        hasDiscipline = true;
-                        break;
-                    }
-                }
-                if (hasDiscipline) break;
-            }
-        }
-        
-        if (hasDiscipline) {
+        // Check if student is in any group for this discipline
+        var group = getStudentDisciplineGroup(disciplineId, student.id);
+        if (group) {
             result.push(student);
         }
     });
@@ -147,12 +116,11 @@ function getActiveStudentsForDiscipline(disciplineId, week) {
 }
 
 /**
- * Get active students for a discipline in a specific week
- * (students who are not eliminated and have the discipline, grouped by their current group)
+ * Get all students with their group info for a discipline
  */
-function getActiveStudentsWithGroups(disciplineId, week) {
-    var students = getActiveStudentsForDiscipline(disciplineId, week);
+function getStudentsWithGroupsForDiscipline(disciplineId) {
     var groups = getDisciplineGroups(disciplineId);
+    var allStudents = getStudents();
     var result = {
         groups: {},
         unassigned: []
@@ -163,7 +131,7 @@ function getActiveStudentsWithGroups(disciplineId, week) {
         result.groups[label] = [];
     }
     
-    students.forEach(function(student) {
+    allStudents.forEach(function(student) {
         var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
         if (groupLabel && result.groups[groupLabel] !== undefined) {
             result.groups[groupLabel].push(student);
@@ -283,26 +251,23 @@ function renderDisciplineGroups() {
     disciplines.sort(function(a, b) { return a.name.localeCompare(b.name); });
     
     disciplines.forEach(function(discipline) {
-        // Check if discipline is active in this week
         var isActive = isDisciplineActiveInWeek(discipline.id, week);
-        if (!isActive) {
-            // Skip inactive disciplines
-            return;
-        }
-        
         var groups = getDisciplineGroups(discipline.id);
         var groupLabels = Object.keys(groups).sort();
         var maxStudents = discipline.maxStudents || 'Unlimited';
         
-        // Get active students for this discipline in this week
-        var activeData = getActiveStudentsWithGroups(discipline.id, week);
-        var unassignedStudents = activeData.unassigned;
+        // Get all students with their group info
+        var studentData = getStudentsWithGroupsForDiscipline(discipline.id);
+        var totalStudents = Object.values(studentData.groups).reduce(function(sum, arr) { return sum + arr.length; }, 0) + studentData.unassigned.length;
         
-        html += '<div class="discipline-groups-card" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);">';
+        html += '<div class="discipline-groups-card" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);' + (!isActive ? 'opacity:0.6;' : '') + '">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
         html += '<h3 style="color:var(--accent);">' + discipline.name + '</h3>';
         html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-        html += '<span style="font-size:0.7rem;color:var(--text-dim);">Max: ' + maxStudents + ' | Active: ' + (unassignedStudents.length + Object.values(activeData.groups).reduce(function(sum, arr) { return sum + arr.length; }, 0)) + '</span>';
+        html += '<span style="font-size:0.7rem;color:var(--text-dim);">Max: ' + maxStudents + ' | Total: ' + totalStudents + '</span>';
+        if (!isActive) {
+            html += '<span style="font-size:0.65rem;color:var(--warning);padding:2px 8px;border:1px solid var(--warning);border-radius:10px;">Inactive (Wk ' + (discipline.startWeek || '?') + '-' + (discipline.endWeek || '?') + ')</span>';
+        }
         html += '<button class="add-discipline-group-btn small primary" data-discipline="' + discipline.id + '">+ Add Group</button>';
         html += '</div>';
         html += '</div>';
@@ -314,48 +279,52 @@ function renderDisciplineGroups() {
             groupLabels.forEach(function(label) {
                 var group = groups[label];
                 var studentCount = group.students ? Object.keys(group.students).length : 0;
-                var activeInGroup = activeData.groups[label] ? activeData.groups[label].length : 0;
                 var isFull = discipline.maxStudents && studentCount >= discipline.maxStudents;
                 var isExpanded = instructorCalendarState && instructorCalendarState.expandedGroups ? 
                     instructorCalendarState.expandedGroups[discipline.id + '_' + label] || false : false;
                 
+                // Get students in this group
+                var studentsInGroup = studentData.groups[label] || [];
+                
                 html += '<div class="discipline-group-card" style="background:var(--bg);border:1px solid ' + (isFull ? 'var(--danger)' : 'var(--border-soft)') + ';border-radius:var(--radius);padding:8px 12px;flex:1;min-width:120px;max-width:250px;">';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleDisciplineGroup(\'' + discipline.id + '\', \'' + label + '\')">';
                 html += '<span style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
-                html += '<span style="font-size:0.7rem;color:var(--text-dim);">' + activeInGroup + '/' + (discipline.maxStudents || '∞') + (isExpanded ? ' ▼' : ' ▶') + '</span>';
+                html += '<span style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + '/' + (discipline.maxStudents || '∞') + (isExpanded ? ' ▼' : ' ▶') + '</span>';
                 html += '</div>';
                 
                 if (isExpanded) {
                     html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
                     
-                    // Show students in this group (only active ones)
-                    var studentsInGroup = activeData.groups[label] || [];
+                    // Show students in this group
                     if (studentsInGroup.length > 0) {
                         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
                         studentsInGroup.forEach(function(student) {
                             var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                            // Check if student is eliminated
-                            var isEliminated = !isCharacterActiveInWeek(student.id, week);
+                            var isEliminated = isCharacterEliminatedInWeek(student.id, week);
                             html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;display:inline-flex;align-items:center;gap:4px;' + (isEliminated ? 'opacity:0.4;text-decoration:line-through;' : '') + '">' + name;
                             html += '<button class="remove-from-discipline-group-btn" data-discipline="' + discipline.id + '" data-group="' + label + '" data-student="' + student.id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
                             html += '</span>';
                         });
                         html += '</div>';
                     } else {
-                        html += '<span style="font-size:0.7rem;color:var(--text-dim);">No active students assigned</span>';
+                        html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
                     }
                     
                     // Add student dropdown
                     html += '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">';
                     html += '<select class="add-student-to-discipline-group" data-discipline="' + discipline.id + '" data-group="' + label + '" style="flex:1;min-width:100px;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
                     html += '<option value="">Add student...</option>';
-                    unassignedStudents.forEach(function(student) {
+                    
+                    // Show unassigned students
+                    studentData.unassigned.forEach(function(student) {
                         var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
                         var inGroup = isStudentInGroup(discipline.id, label, student.id);
                         if (!inGroup) {
-                            html += '<option value="' + student.id + '">' + name + '</option>';
+                            var isEliminated = isCharacterEliminatedInWeek(student.id, week);
+                            html += '<option value="' + student.id + '" ' + (isEliminated ? 'style="opacity:0.4;"' : '') + '>' + name + (isEliminated ? ' (eliminated)' : '') + '</option>';
                         }
                     });
+                    
                     // Also show students in other groups with a warning
                     for (var otherLabel in groups) {
                         if (otherLabel === label) continue;
@@ -364,11 +333,8 @@ function renderDisciplineGroups() {
                                 var student = data.characters.find(function(c) { return String(c.id) === String(id); });
                                 if (student) {
                                     var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                                    // Check if student is active in this week
-                                    var isActive = isCharacterActiveInWeek(id, week);
-                                    if (isActive) {
-                                        html += '<option value="' + id + '" style="color:var(--warning);">' + name + ' (in Group ' + otherLabel + ')</option>';
-                                    }
+                                    var isEliminated = isCharacterEliminatedInWeek(id, week);
+                                    html += '<option value="' + id + '" style="color:var(--warning);' + (isEliminated ? 'opacity:0.4;' : '') + '">' + name + ' (in Group ' + otherLabel + ')' + (isEliminated ? ' (eliminated)' : '') + '</option>';
                                 }
                             });
                         }
@@ -385,12 +351,12 @@ function renderDisciplineGroups() {
             html += '</div>';
             
             // Show unassigned students
-            if (unassignedStudents.length > 0) {
+            if (studentData.unassigned.length > 0) {
                 html += '<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:var(--radius);border:1px dashed var(--border);">';
-                html += '<span style="font-size:0.7rem;color:var(--text-dim);">Unassigned (' + unassignedStudents.length + '): </span>';
-                unassignedStudents.forEach(function(student) {
+                html += '<span style="font-size:0.7rem;color:var(--text-dim);">Unassigned (' + studentData.unassigned.length + '): </span>';
+                studentData.unassigned.forEach(function(student) {
                     var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                    var isEliminated = !isCharacterActiveInWeek(student.id, week);
+                    var isEliminated = isCharacterEliminatedInWeek(student.id, week);
                     html += '<span style="background:var(--panel-alt);padding:2px 6px;border-radius:10px;font-size:0.65rem;margin:2px;display:inline-block;' + (isEliminated ? 'opacity:0.4;text-decoration:line-through;' : '') + '">' + name + '</span>';
                 });
                 html += '</div>';
@@ -650,9 +616,9 @@ window.addStudentToDisciplineGroup = addStudentToDisciplineGroup;
 window.removeStudentFromDisciplineGroup = removeStudentFromDisciplineGroup;
 window.removeDisciplineGroup = removeDisciplineGroup;
 window.toggleDisciplineGroup = toggleDisciplineGroup;
-window.getActiveStudentsForDiscipline = getActiveStudentsForDiscipline;
-window.getActiveStudentsWithGroups = getActiveStudentsWithGroups;
-window.isCharacterActiveInWeek = isCharacterActiveInWeek;
+window.getAllStudentsForDiscipline = getAllStudentsForDiscipline;
+window.getStudentsWithGroupsForDiscipline = getStudentsWithGroupsForDiscipline;
+window.isCharacterEliminatedInWeek = isCharacterEliminatedInWeek;
 window.isDisciplineActiveInWeek = isDisciplineActiveInWeek;
 window.showAddDisciplineGroupModal = showAddDisciplineGroupModal;
 window.initDisciplineGroupsEvents = initDisciplineGroupsEvents;
