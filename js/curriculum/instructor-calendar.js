@@ -1,7 +1,7 @@
 /**
  * instructor-calendar.js - Instructor Calendar Module
  * Works exactly like student calendar with the same data structure
- * Groups are created per-instructor (from the Groups tab)
+ * Groups are pulled from the discipline groups system (groups.js)
  * When clicking a class slot, you can add individual students OR select a group to add all at once
  */
 
@@ -144,6 +144,52 @@ function populateInstructorCalendarSelector() {
 }
 
 /**
+ * Get discipline groups for a specific instructor - PULLS FROM GROUPS.JS
+ */
+function getDisciplineGroupsForInstructor(instructorId, week) {
+    var weekNum = parseInt(week) || 1;
+    var result = {};
+    
+    // Get all disciplines this instructor teaches in this week
+    var disciplines = getAvailableDisciplines(weekNum);
+    var instructorDisciplines = disciplines.filter(function(d) {
+        return d.instructorIds && d.instructorIds.some(function(id) { return String(id) === String(instructorId); });
+    });
+    
+    // For each discipline, get its groups from the discipline groups system
+    instructorDisciplines.forEach(function(discipline) {
+        if (typeof getDisciplineGroups === 'function') {
+            var groups = getDisciplineGroups(discipline.id);
+            for (var label in groups) {
+                // Key format: disciplineId_groupLabel
+                var key = discipline.id + '_' + label;
+                result[key] = {
+                    disciplineId: discipline.id,
+                    disciplineName: discipline.name,
+                    groupLabel: label,
+                    students: Object.keys(groups[label].students || {})
+                };
+            }
+        }
+    });
+    
+    return result;
+}
+
+/**
+ * Get students in a specific group for a discipline
+ */
+function getStudentsInDisciplineGroup(disciplineId, groupLabel) {
+    if (typeof getDisciplineGroups === 'function') {
+        var groups = getDisciplineGroups(disciplineId);
+        if (groups[groupLabel] && groups[groupLabel].students) {
+            return Object.keys(groups[groupLabel].students);
+        }
+    }
+    return [];
+}
+
+/**
  * Render the group list at the bottom
  */
 function renderGroupList() {
@@ -156,81 +202,52 @@ function renderGroupList() {
     }
     
     var instructorId = instructorCalendarState.selectedInstructorId;
+    var week = instructorCalendarState.currentWeek;
     var instructor = data.characters.find(function(c) { 
         return String(c.id) === String(instructorId); 
     });
     var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
     
-    // Get groups for this instructor
-    var groups = getInstructorGroups(instructorId);
-    var groupLabels = Object.keys(groups).sort();
+    // Get groups for this instructor from the discipline groups system
+    var groups = getDisciplineGroupsForInstructor(instructorId, week);
+    var groupKeys = Object.keys(groups).sort();
     
     var html = '<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
     html += '<h4 style="color:var(--accent);font-size:0.9rem;">▣ Groups - ' + instructorName + '</h4>';
-    html += '<button id="add-group-btn" class="small primary">+ Add Group</button>';
+    html += '<span style="font-size:0.7rem;color:var(--text-dim);">Groups are managed in the Groups tab</span>';
     html += '</div>';
     
-    if (groupLabels.length === 0) {
-        html += '<div style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:8px;">No groups created yet. Click "Add Group" to create one.</div>';
+    if (groupKeys.length === 0) {
+        html += '<div style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:8px;">No groups found for this instructor. Create groups in the Groups tab.</div>';
     } else {
         html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
         
-        groupLabels.forEach(function(label) {
-            var group = groups[label];
-            var studentCount = group.students ? Object.keys(group.students).length : 0;
-            var isExpanded = instructorCalendarState.expandedGroups[label] || false;
+        groupKeys.forEach(function(key) {
+            var group = groups[key];
+            var studentCount = group.students.length;
+            var isExpanded = instructorCalendarState.expandedGroups[key] || false;
             
             html += '<div class="group-card" style="background:var(--bg);border:1px solid var(--border-soft);border-radius:var(--radius);padding:8px 12px;flex:1;min-width:150px;max-width:300px;">';
-            html += '<div class="group-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleGroup(\'' + label + '\')">';
-            html += '<span class="group-name" style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
+            html += '<div class="group-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleGroup(\'' + key + '\')">';
+            html += '<span class="group-name" style="font-weight:600;color:var(--accent);">' + group.disciplineName + ' - G' + group.groupLabel + '</span>';
             html += '<span class="group-meta" style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + ' students ' + (isExpanded ? '▼' : '▶') + '</span>';
             html += '</div>';
             
             if (isExpanded) {
                 html += '<div class="group-students" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
-                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
-                if (group.students) {
-                    var studentIds = Object.keys(group.students);
-                    if (studentIds.length > 0) {
-                        studentIds.forEach(function(id) {
-                            var student = data.characters.find(function(c) { return String(c.id) === String(id); });
-                            if (student) {
-                                var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                                html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;display:inline-flex;align-items:center;gap:4px;">' + name;
-                                html += '<button class="remove-from-group-btn" data-group="' + label + '" data-student="' + id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
-                                html += '</span>';
-                            }
-                        });
-                    } else {
-                        html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
-                    }
-                }
-                html += '</div>';
-                
-                // Add student dropdown
-                html += '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">';
-                html += '<select class="add-student-to-group" data-group="' + label + '" style="flex:1;min-width:120px;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
-                html += '<option value="">Add student...</option>';
-                var allStudents = getStudents();
-                allStudents.forEach(function(s) {
-                    var name = [s.firstName, s.lastName].filter(function(n) { return n; }).join(' ');
-                    var inThisGroup = group.students && group.students[s.id];
-                    if (!inThisGroup) {
-                        var inOtherGroup = false;
-                        for (var otherLabel in groups) {
-                            if (otherLabel === label) continue;
-                            if (groups[otherLabel].students && groups[otherLabel].students[s.id]) {
-                                inOtherGroup = true;
-                                break;
-                            }
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+                if (group.students.length > 0) {
+                    group.students.forEach(function(id) {
+                        var student = data.characters.find(function(c) { return String(c.id) === String(id); });
+                        if (student) {
+                            var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
+                            html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;">' + name + '</span>';
                         }
-                        var status = inOtherGroup ? ' (in other group)' : '';
-                        html += '<option value="' + s.id + '">' + name + status + '</option>';
-                    }
-                });
-                html += '</select>';
-                html += '<button class="add-student-to-group-btn small primary" data-group="' + label + '" style="font-size:0.6rem;padding:2px 6px;">Add</button>';
+                    });
+                } else {
+                    html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
+                }
                 html += '</div>';
                 html += '</div>';
             }
@@ -243,221 +260,16 @@ function renderGroupList() {
     
     html += '</div>';
     container.innerHTML = html;
-    
-    // Event listeners for group management
-    container.querySelectorAll('.add-student-to-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var groupLabel = this.dataset.group;
-            var select = this.parentElement.querySelector('.add-student-to-group');
-            var studentId = select.value;
-            if (studentId) {
-                addStudentToGroup(groupLabel, studentId);
-            }
-        });
-    });
-    
-    container.querySelectorAll('.remove-from-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var groupLabel = this.dataset.group;
-            var studentId = this.dataset.student;
-            if (confirm('Remove this student from Group ' + groupLabel + '?')) {
-                removeStudentFromGroup(groupLabel, studentId);
-            }
-        });
-    });
-    
-    var addGroupBtn = document.getElementById('add-group-btn');
-    if (addGroupBtn) {
-        var newAddGroupBtn = addGroupBtn.cloneNode(true);
-        addGroupBtn.parentNode.replaceChild(newAddGroupBtn, addGroupBtn);
-        newAddGroupBtn.addEventListener('click', showAddGroupModal);
-    }
-}
-
-/**
- * Get groups for an instructor
- */
-function getInstructorGroups(instructorId) {
-    if (!data.curriculum.instructorGroups) {
-        data.curriculum.instructorGroups = {};
-    }
-    if (!data.curriculum.instructorGroups[instructorId]) {
-        data.curriculum.instructorGroups[instructorId] = {};
-    }
-    return data.curriculum.instructorGroups[instructorId];
-}
-
-/**
- * Show add group modal
- */
-function showAddGroupModal() {
-    if (!instructorCalendarState.selectedInstructorId) {
-        alert('Please select an instructor first.');
-        return;
-    }
-    
-    var instructorId = instructorCalendarState.selectedInstructorId;
-    var groups = getInstructorGroups(instructorId);
-    var existingLabels = Object.keys(groups);
-    
-    var modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-header">
-                <h3>Add Group</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Group Label *</label>
-                    <input type="text" id="new-group-label" placeholder="e.g., A, B, 1, 2..." style="width:100%;padding:8px;">
-                    ${existingLabels.length > 0 ? '<span style="font-size:0.6rem;color:var(--text-dim);">Existing groups: ' + existingLabels.join(', ') + '</span>' : ''}
-                </div>
-                <div class="form-actions" style="margin-top:16px;">
-                    <button type="button" id="cancel-add-group" class="secondary">Cancel</button>
-                    <button type="button" id="confirm-add-group" class="primary">Add Group</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-    modal.querySelector('#cancel-add-group').onclick = function() { modal.remove(); };
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.remove();
-    });
-    
-    modal.querySelector('#confirm-add-group').onclick = function() {
-        var label = document.getElementById('new-group-label').value.trim().toUpperCase();
-        if (!label) {
-            alert('Please enter a group label.');
-            return;
-        }
-        if (existingLabels.indexOf(label) !== -1) {
-            alert('Group "' + label + '" already exists.');
-            return;
-        }
-        
-        var groups = getInstructorGroups(instructorId);
-        groups[label] = { students: {} };
-        
-        saveData().then(function() {
-            if (typeof logActivity === 'function') {
-                logActivity('Created group ' + label + ' for instructor');
-            }
-            modal.remove();
-            renderGroupList();
-            populateGroupFilter();
-        }).catch(function(err) {
-            console.error('Failed to save:', err);
-            alert('Failed to create group.');
-        });
-    };
-}
-
-/**
- * Add student to group
- */
-function addStudentToGroup(groupLabel, studentId) {
-    if (!instructorCalendarState.selectedInstructorId) return;
-    
-    var instructorId = instructorCalendarState.selectedInstructorId;
-    var groups = getInstructorGroups(instructorId);
-    
-    if (!groups[groupLabel]) {
-        alert('Group not found.');
-        return;
-    }
-    
-    // Check if student is already in any group for this instructor
-    var currentGroup = null;
-    for (var label in groups) {
-        if (groups[label].students && groups[label].students[studentId]) {
-            currentGroup = label;
-            break;
-        }
-    }
-    
-    if (currentGroup === groupLabel) {
-        alert('Student is already in this group.');
-        return;
-    }
-    
-    if (currentGroup) {
-        if (!confirm('Student is already in Group ' + currentGroup + '. Move to Group ' + groupLabel + '?')) {
-            return;
-        }
-        delete groups[currentGroup].students[studentId];
-    }
-    
-    if (!groups[groupLabel].students) {
-        groups[groupLabel].students = {};
-    }
-    groups[groupLabel].students[studentId] = true;
-    
-    saveData().then(function() {
-        var student = data.characters.find(function(c) { return String(c.id) === String(studentId); });
-        var studentName = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-        if (typeof logActivity === 'function') {
-            logActivity('Added ' + studentName + ' to group ' + groupLabel);
-        }
-        renderGroupList();
-        populateGroupFilter();
-    }).catch(function(err) {
-        console.error('Failed to save:', err);
-        alert('Failed to add student to group.');
-    });
-}
-
-/**
- * Remove student from group
- */
-function removeStudentFromGroup(groupLabel, studentId) {
-    if (!instructorCalendarState.selectedInstructorId) return;
-    
-    var instructorId = instructorCalendarState.selectedInstructorId;
-    var groups = getInstructorGroups(instructorId);
-    
-    if (groups[groupLabel] && groups[groupLabel].students) {
-        delete groups[groupLabel].students[studentId];
-    }
-    
-    saveData().then(function() {
-        var student = data.characters.find(function(c) { return String(c.id) === String(studentId); });
-        var studentName = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-        if (typeof logActivity === 'function') {
-            logActivity('Removed ' + studentName + ' from group ' + groupLabel);
-        }
-        renderGroupList();
-        populateGroupFilter();
-    }).catch(function(err) {
-        console.error('Failed to save:', err);
-        alert('Failed to remove student from group.');
-    });
-}
-
-/**
- * Get students in a group
- */
-function getStudentsInGroup(instructorId, groupLabel) {
-    var groups = getInstructorGroups(instructorId);
-    if (!groups[groupLabel] || !groups[groupLabel].students) {
-        return [];
-    }
-    return Object.keys(groups[groupLabel].students);
 }
 
 /**
  * Toggle group expansion
  */
-function toggleGroup(label) {
-    if (instructorCalendarState.expandedGroups[label]) {
-        delete instructorCalendarState.expandedGroups[label];
+function toggleGroup(key) {
+    if (instructorCalendarState.expandedGroups[key]) {
+        delete instructorCalendarState.expandedGroups[key];
     } else {
-        instructorCalendarState.expandedGroups[label] = true;
+        instructorCalendarState.expandedGroups[key] = true;
     }
     renderGroupList();
 }
@@ -475,19 +287,21 @@ function populateGroupFilter() {
     }
     
     var instructorId = instructorCalendarState.selectedInstructorId;
-    var groups = getInstructorGroups(instructorId);
-    var groupLabels = Object.keys(groups).sort();
+    var week = instructorCalendarState.currentWeek;
+    var groups = getDisciplineGroupsForInstructor(instructorId, week);
+    var groupKeys = Object.keys(groups).sort();
     
     var currentValue = select.value;
     select.innerHTML = '<option value="all">All Groups</option>';
-    groupLabels.forEach(function(label) {
+    groupKeys.forEach(function(key) {
+        var group = groups[key];
         var option = document.createElement('option');
-        option.value = label;
-        option.textContent = 'Group ' + label;
+        option.value = key;
+        option.textContent = group.disciplineName + ' - Group ' + group.groupLabel + ' (' + group.students.length + ' students)';
         select.appendChild(option);
     });
     
-    if (currentValue && groupLabels.indexOf(currentValue) !== -1) {
+    if (currentValue && groupKeys.indexOf(currentValue) !== -1) {
         select.value = currentValue;
     } else {
         select.value = 'all';
@@ -541,7 +355,7 @@ function renderInstructorCalendarData() {
     
     var scheduleMap = {};
     var students = getStudents();
-    var groups = getInstructorGroups(instructorId);
+    var groups = getDisciplineGroupsForInstructor(instructorId, week);
     
     students.forEach(function(student) {
         var schedule = getStudentSchedule(student.id, week);
@@ -653,8 +467,12 @@ function renderInstructorCalendarData() {
     
     var filteredClassArray = classArray;
     if (activeFilter !== 'all') {
+        var filterParts = activeFilter.split('_');
+        var filterDisciplineId = filterParts[0];
+        var filterGroupLabel = filterParts[1];
         filteredClassArray = classArray.filter(function(c) {
-            return c.groupLabel === activeFilter || (c.isTemplate && !c.groupLabel);
+            return (c.groupLabel === filterGroupLabel && String(c.disciplineId) === String(filterDisciplineId)) || 
+                   (c.isTemplate && !c.groupLabel);
         });
     }
     
@@ -716,7 +534,7 @@ function renderInstructorCalendarData() {
                 labelEl.textContent = slotData.discipline.name + labelDisplay + groupDisplay + durationDisplay + templateDisplay + (studentCount > 0 ? ' - ' + studentCount + ' students' : '');
                 slot.appendChild(labelEl);
                 
-                if (activeFilter !== 'all' && slotData.groupLabel !== activeFilter && !slotData.isTemplate) {
+                if (activeFilter !== 'all' && slotData.groupLabel !== filterGroupLabel && !slotData.isTemplate) {
                     slot.style.opacity = '0.3';
                     slot.style.filter = 'grayscale(1)';
                 }
@@ -755,7 +573,7 @@ function renderInstructorCalendarData() {
                 labelEl.textContent = '▣ ' + blockLabel + blockGroup;
                 slot.appendChild(labelEl);
                 
-                if (activeFilter !== 'all' && isBlocked.groupLabel !== activeFilter) {
+                if (activeFilter !== 'all' && isBlocked.groupLabel !== filterGroupLabel) {
                     slot.style.opacity = '0.3';
                     slot.style.filter = 'grayscale(1)';
                 }
@@ -791,7 +609,7 @@ function renderInstructorCalendarData() {
 }
 
 /**
- * Show class management modal - with group dropdown to add all students from a group
+ * Show class management modal - with group dropdown from discipline groups
  */
 function showClassManagementModal(slotData, day, hour) {
     var discipline = slotData.discipline;
@@ -816,9 +634,12 @@ function showClassManagementModal(slotData, day, hour) {
     var label = slotData.label || '';
     var groupLabel = slotData.groupLabel || '';
     
-    // Get groups for this instructor
-    var groups = getInstructorGroups(instructorId);
-    var groupLabels = Object.keys(groups).sort();
+    // Get groups for this discipline from the discipline groups system
+    var disciplineGroups = {};
+    if (typeof getDisciplineGroups === 'function') {
+        disciplineGroups = getDisciplineGroups(discipline.id);
+    }
+    var groupLabels = Object.keys(disciplineGroups).sort();
     
     var studentInfo = [];
     assignedStudentIds.forEach(function(id) {
@@ -865,7 +686,7 @@ function showClassManagementModal(slotData, day, hour) {
                         <select id="add-from-group-select" style="flex:1;min-width:120px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
                             <option value="">Select a group...</option>
                             ${groupLabels.map(function(g) {
-                                var groupStudents = Object.keys(groups[g].students || {});
+                                var groupStudents = Object.keys(disciplineGroups[g].students || {});
                                 var alreadyAssigned = groupStudents.filter(function(id) { 
                                     return assignedStudentIds.some(function(aid) { return String(aid) === String(id); });
                                 });
@@ -879,7 +700,7 @@ function showClassManagementModal(slotData, day, hour) {
                     </div>
                     <span style="font-size:0.6rem;color:var(--text-dim);">Adds all students from the selected group to this class</span>
                 </div>
-                ` : '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);"><span style="font-size:0.75rem;color:var(--text-dim);">No groups created yet. Use "Manage Groups" to create groups.</span></div>'}
+                ` : '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);"><span style="font-size:0.75rem;color:var(--text-dim);">No groups created for this discipline. Create groups in the Groups tab.</span></div>'}
                 
                 <!-- Assign Individual Students -->
                 <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
@@ -970,7 +791,7 @@ function showClassManagementModal(slotData, day, hour) {
                 return;
             }
             
-            var groupStudents = getStudentsInGroup(instructorId, selectedGroup);
+            var groupStudents = Object.keys(disciplineGroups[selectedGroup].students || {});
             var toAdd = groupStudents.filter(function(id) { 
                 return !assignedStudentIds.some(function(aid) { return String(aid) === String(id); });
             });
@@ -1414,52 +1235,18 @@ function showAddBlockModal() {
         return d.instructorIds && d.instructorIds.some(function(id) { return String(id) === String(instructorId); });
     });
     
-    // Get existing groups for this instructor
+    // Get existing groups from the discipline groups system
     var existingGroups = new Set();
     var students = getStudents();
-    students.forEach(function(student) {
-        var schedule = getStudentSchedule(student.id, week);
-        for (var day in schedule) {
-            for (var hour in schedule[day]) {
-                var disciplineId = schedule[day][hour];
-                if (disciplineId) {
-                    var discipline = getDiscipline(disciplineId);
-                    if (discipline) {
-                        var classInstructorId = null;
-                        if (typeof getClassInstructor === 'function') {
-                            classInstructorId = getClassInstructor(student.id, week, parseInt(day), parseInt(hour));
-                        }
-                        var isTeaching = false;
-                        if (classInstructorId) {
-                            isTeaching = String(classInstructorId) === String(instructorId);
-                        } else if (discipline.instructorIds) {
-                            isTeaching = discipline.instructorIds.some(function(id) { 
-                                return String(id) === String(instructorId); 
-                            });
-                        }
-                        if (isTeaching) {
-                            if (typeof getClassGroupLabel === 'function') {
-                                var groupLabel = getClassGroupLabel(student.id, week, parseInt(day), parseInt(hour));
-                                if (groupLabel) existingGroups.add(groupLabel);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    });
     
-    // Get groups from templates
-    if (data.curriculum.instructorTemplates) {
-        var templateKey = instructorId + '_' + week;
-        if (data.curriculum.instructorTemplates[templateKey]) {
-            for (var key in data.curriculum.instructorTemplates[templateKey]) {
-                var templateData = data.curriculum.instructorTemplates[templateKey][key];
-                if (templateData.groupLabel) {
-                    existingGroups.add(templateData.groupLabel);
-                }
+    // Get groups from discipline groups
+    if (typeof getDisciplineGroups === 'function') {
+        availableDisciplines.forEach(function(discipline) {
+            var groups = getDisciplineGroups(discipline.id);
+            for (var label in groups) {
+                existingGroups.add(label);
             }
-        }
+        });
     }
     
     var modal = document.createElement('div');
@@ -1614,75 +1401,46 @@ function showAddBlockModal() {
             var discipline = getDiscipline(disciplineId);
             var students = getStudents();
             
-            students.forEach(function(student) {
-                // Check if student is in this group for this discipline
-                var isInGroup = false;
-                var schedule = getStudentSchedule(student.id, week);
-                
-                // Check existing classes for this student
-                for (var d in schedule) {
-                    for (var h in schedule[d]) {
-                        var existingDiscId = schedule[d][h];
-                        if (existingDiscId && String(existingDiscId) === String(disciplineId)) {
-                            var studentGroupLabel = null;
-                            if (typeof getClassGroupLabel === 'function') {
-                                studentGroupLabel = getClassGroupLabel(student.id, week, parseInt(d), parseInt(h));
-                            }
-                            if (studentGroupLabel === groupLabel) {
-                                isInGroup = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (isInGroup) break;
+            // Get students from this group for this discipline
+            var groupStudents = [];
+            if (typeof getDisciplineGroups === 'function') {
+                var groups = getDisciplineGroups(disciplineId);
+                if (groups[groupLabel] && groups[groupLabel].students) {
+                    groupStudents = Object.keys(groups[groupLabel].students);
                 }
-                
-                // Also check templates
-                if (!isInGroup && data.curriculum.instructorTemplates) {
-                    var templateKey = instructorId + '_' + week;
-                    if (data.curriculum.instructorTemplates[templateKey]) {
-                        for (var key in data.curriculum.instructorTemplates[templateKey]) {
-                            var templateData = data.curriculum.instructorTemplates[templateKey][key];
-                            if (templateData.disciplineId === disciplineId && templateData.groupLabel === groupLabel) {
-                                isInGroup = true;
-                                break;
-                            }
-                        }
+            }
+            
+            groupStudents.forEach(function(studentId) {
+                // Assign this student to the block
+                var schedule = getStudentSchedule(studentId, week);
+                // Check if student already has a class at this time
+                var hasConflict = false;
+                for (var h = hour; h < hour + duration && h <= 23; h++) {
+                    if (schedule[day] && schedule[day][h]) {
+                        hasConflict = true;
+                        break;
                     }
                 }
                 
-                if (isInGroup) {
-                    // Assign this student to the block
-                    var schedule = getStudentSchedule(student.id, week);
-                    // Check if student already has a class at this time
-                    var hasConflict = false;
+                if (!hasConflict) {
+                    // Add the class to the student
                     for (var h = hour; h < hour + duration && h <= 23; h++) {
-                        if (schedule[day] && schedule[day][h]) {
-                            hasConflict = true;
-                            break;
+                        if (!schedule[day]) schedule[day] = {};
+                        schedule[day][h] = disciplineId;
+                        if (typeof setClassInstructor === 'function') {
+                            setClassInstructor(studentId, week, day, h, instructorId);
+                        }
+                        if (label && typeof setClassLabel === 'function') {
+                            setClassLabel(studentId, week, day, h, label);
+                        }
+                        if (groupLabel && typeof setClassGroupLabel === 'function') {
+                            setClassGroupLabel(studentId, week, day, h, groupLabel);
+                        }
+                        if (h === hour && typeof setClassDuration === 'function') {
+                            setClassDuration(studentId, week, day, h, duration);
                         }
                     }
-                    
-                    if (!hasConflict) {
-                        // Add the class to the student
-                        for (var h = hour; h < hour + duration && h <= 23; h++) {
-                            if (!schedule[day]) schedule[day] = {};
-                            schedule[day][h] = disciplineId;
-                            if (typeof setClassInstructor === 'function') {
-                                setClassInstructor(student.id, week, day, h, instructorId);
-                            }
-                            if (label && typeof setClassLabel === 'function') {
-                                setClassLabel(student.id, week, day, h, label);
-                            }
-                            if (groupLabel && typeof setClassGroupLabel === 'function') {
-                                setClassGroupLabel(student.id, week, day, h, groupLabel);
-                            }
-                            if (h === hour && typeof setClassDuration === 'function') {
-                                setClassDuration(student.id, week, day, h, duration);
-                            }
-                        }
-                        autoAssignedCount++;
-                    }
+                    autoAssignedCount++;
                 }
             });
         }
@@ -1888,11 +1646,8 @@ window.populateInstructorCalendarSelector = populateInstructorCalendarSelector;
 window.populateGroupFilter = populateGroupFilter;
 window.renderGroupList = renderGroupList;
 window.toggleGroup = toggleGroup;
-window.getInstructorGroups = getInstructorGroups;
-window.getStudentsInGroup = getStudentsInGroup;
-window.showAddGroupModal = showAddGroupModal;
-window.addStudentToGroup = addStudentToGroup;
-window.removeStudentFromGroup = removeStudentFromGroup;
+window.getDisciplineGroupsForInstructor = getDisciplineGroupsForInstructor;
+window.getStudentsInDisciplineGroup = getStudentsInDisciplineGroup;
 window.initInstructorCalendarEvents = initInstructorCalendarEvents;
 window.showAddClassModal = showAddClassModal;
 window.showAddBlockModal = showAddBlockModal;
