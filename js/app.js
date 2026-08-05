@@ -140,7 +140,7 @@ function renderAll() {
 }
 
 // ============================================================
-// CHARACTER FUNCTIONS
+// CHARACTER FUNCTIONS - Complete with elimination support
 // ============================================================
 
 /**
@@ -172,8 +172,12 @@ function renderCharacters() {
         var deadClass = isDead ? ' deceased' : '';
         var deadBadge = isDead ? ' <span class="deceased-badge">Deceased</span>' : '';
         
+        // Check for eliminations
+        var hasEliminations = char.eliminations && char.eliminations.length > 0;
+        var elimBadge = hasEliminations ? ' <span class="eliminated-badge">Eliminated</span>' : '';
+        
         html += '<div class="list-item char-item' + deadClass + '" data-id="' + char.id + '">' +
-            '<span><strong>' + fullName + '</strong>' + deadBadge + '</span>' +
+            '<span><strong>' + fullName + '</strong>' + deadBadge + elimBadge + '</span>' +
             '<span>' + ageDisplay + '</span>' +
             '<span>' + status + '</span>' +
             '<span>' + teamCount + '</span>' +
@@ -234,6 +238,17 @@ function initCharacterEvents() {
         });
     }
     
+    // Elimination events
+    var addElimBtn = document.getElementById('add-elimination-btn');
+    if (addElimBtn) {
+        var newElimBtn = addElimBtn.cloneNode(true);
+        addElimBtn.parentNode.replaceChild(newElimBtn, addElimBtn);
+        newElimBtn.addEventListener('click', function() {
+            var container = document.getElementById('elimination-container');
+            addEliminationEntry(container);
+        });
+    }
+    
     var deceasedCheck = document.getElementById('char-deceased');
     if (deceasedCheck) {
         deceasedCheck.addEventListener('change', function() {
@@ -246,13 +261,76 @@ function initCharacterEvents() {
 }
 
 /**
- * Show character form for add or edit
+ * Add elimination entry to the form
+ */
+function addEliminationEntry(container, tournamentId, week, reason) {
+    var entry = document.createElement('div');
+    entry.className = 'elimination-entry-form';
+    entry.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;';
+    
+    // Tournament dropdown
+    var select = document.createElement('select');
+    select.className = 'elimination-tournament';
+    select.style.cssText = 'flex:1;min-width:120px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
+    select.innerHTML = '<option value="">Select tournament...</option>';
+    
+    if (data.tournaments) {
+        data.tournaments.forEach(function(t) {
+            var option = document.createElement('option');
+            option.value = t.id;
+            option.textContent = t.name;
+            if (tournamentId && String(t.id) === String(tournamentId)) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+    
+    var weekInput = document.createElement('input');
+    weekInput.type = 'number';
+    weekInput.className = 'elimination-week';
+    weekInput.placeholder = 'Week';
+    weekInput.style.cssText = 'width:70px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
+    if (week) weekInput.value = week;
+    
+    var reasonInput = document.createElement('input');
+    reasonInput.type = 'text';
+    reasonInput.className = 'elimination-reason';
+    reasonInput.placeholder = 'Reason (e.g., Defeated by...)';
+    reasonInput.style.cssText = 'flex:1;min-width:100px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
+    if (reason) reasonInput.value = reason;
+    
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'small danger remove-elimination';
+    removeBtn.textContent = '✕';
+    removeBtn.style.cssText = 'padding:4px 8px;font-size:0.65rem;';
+    removeBtn.onclick = function() {
+        if (container.children.length > 1) {
+            entry.remove();
+        } else {
+            alert('You need at least one elimination entry.');
+        }
+    };
+    
+    entry.appendChild(select);
+    entry.appendChild(weekInput);
+    entry.appendChild(reasonInput);
+    entry.appendChild(removeBtn);
+    container.appendChild(entry);
+}
+
+/**
+ * Show character form for add or edit - FIXED positioning
  */
 function showCharacterForm(editId) {
     var form = document.getElementById('character-form');
     var title = document.getElementById('form-title');
     var formElement = document.getElementById('char-form');
     form.classList.remove('hidden');
+    
+    // Scroll to the form smoothly
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     var deceasedCheck = document.getElementById('char-deceased');
     var deathFields = document.getElementById('death-fields');
@@ -289,6 +367,8 @@ function showCharacterForm(editId) {
             if (deathFields) {
                 deathFields.style.display = char.deceased ? 'block' : 'none';
             }
+            
+            // Career status
             var container = document.getElementById('career-status-container');
             container.innerHTML = '';
             if (char.careerStatus && char.careerStatus.length > 0) {
@@ -298,6 +378,18 @@ function showCharacterForm(editId) {
             } else {
                 addCareerStatusEntry(container);
             }
+            
+            // Eliminations
+            var elimContainer = document.getElementById('elimination-container');
+            elimContainer.innerHTML = '';
+            if (char.eliminations && char.eliminations.length > 0) {
+                char.eliminations.forEach(function(elim) {
+                    addEliminationEntry(elimContainer, elim.tournamentId, elim.week, elim.reason);
+                });
+            } else {
+                addEliminationEntry(elimContainer);
+            }
+            
             formElement.dataset.editId = editId;
         }
     } else {
@@ -305,14 +397,24 @@ function showCharacterForm(editId) {
         formElement.reset();
         delete formElement.dataset.editId;
         if (deathFields) deathFields.style.display = 'none';
+        
         var container = document.getElementById('career-status-container');
         container.innerHTML = '';
         addCareerStatusEntry(container);
+        
+        var elimContainer = document.getElementById('elimination-container');
+        elimContainer.innerHTML = '';
+        addEliminationEntry(elimContainer);
+        
         document.getElementById('char-specialty').value = '';
         var specialtyField = document.getElementById('specialty-field');
         if (specialtyField) specialtyField.style.display = 'none';
     }
-    form.scrollIntoView({ behavior: 'smooth' });
+    // Focus the first input
+    setTimeout(function() {
+        var firstName = document.getElementById('char-firstname');
+        if (firstName) firstName.focus();
+    }, 300);
 }
 
 /**
@@ -320,6 +422,11 @@ function showCharacterForm(editId) {
  */
 function hideCharacterForm() {
     document.getElementById('character-form').classList.add('hidden');
+    // Scroll back to the top of the character list
+    var list = document.getElementById('character-list');
+    if (list) {
+        list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 /**
@@ -361,7 +468,7 @@ function addCareerStatusEntry(container, status, startYear, endYear) {
 }
 
 /**
- * Save character from form - FIXED to properly save career status
+ * Save character from form - UPDATED with eliminations
  */
 function saveCharacter(e) {
     e.preventDefault();
@@ -372,7 +479,7 @@ function saveCharacter(e) {
     var deathCause = document.getElementById('char-death-cause').value.trim();
     var deathAge = document.getElementById('char-death-age').value.trim();
     
-    // Collect career status - FIXED to get all entries
+    // Collect career status
     var careerStatus = [];
     document.querySelectorAll('.career-status-entry').forEach(function(entry) {
         var select = entry.querySelector('.career-status-select');
@@ -383,6 +490,21 @@ function saveCharacter(e) {
                 status: select.value,
                 startYear: startInput ? startInput.value || '' : '',
                 endYear: endInput ? endInput.value || '' : ''
+            });
+        }
+    });
+    
+    // Collect eliminations
+    var eliminations = [];
+    document.querySelectorAll('.elimination-entry-form').forEach(function(entry) {
+        var select = entry.querySelector('.elimination-tournament');
+        var weekInput = entry.querySelector('.elimination-week');
+        var reasonInput = entry.querySelector('.elimination-reason');
+        if (select && select.value && weekInput && weekInput.value) {
+            eliminations.push({
+                tournamentId: select.value,
+                week: weekInput.value,
+                reason: reasonInput ? reasonInput.value.trim() || 'Eliminated from tournament' : 'Eliminated from tournament'
             });
         }
     });
@@ -406,7 +528,8 @@ function saveCharacter(e) {
         deathCause: deathCause,
         deathAge: deathAge,
         careerStatus: careerStatus,
-        specialty: document.getElementById('char-specialty').value.trim()
+        specialty: document.getElementById('char-specialty').value.trim(),
+        eliminations: eliminations
     };
     
     if (!charData.firstName) {
@@ -422,6 +545,9 @@ function saveCharacter(e) {
     if (editId) {
         var index = data.characters.findIndex(function(c) { return c.id === editId; });
         if (index !== -1) {
+            // Preserve the id and createdAt
+            charData.id = data.characters[index].id;
+            charData.createdAt = data.characters[index].createdAt;
             data.characters[index] = Object.assign({}, data.characters[index], charData);
             if (typeof logActivity === 'function') {
                 logActivity('Updated character: ' + charData.firstName);
@@ -449,6 +575,7 @@ function saveCharacter(e) {
             deathAge: charData.deathAge,
             careerStatus: charData.careerStatus,
             specialty: charData.specialty,
+            eliminations: charData.eliminations,
             eliminatedWeeks: [],
             createdAt: new Date().toISOString()
         };
@@ -466,7 +593,6 @@ function saveCharacter(e) {
 
 /**
  * Delete a character
- * @param {string} id - Character ID
  */
 function deleteCharacter(id) {
     if (!confirm('Delete this character permanently?')) return;
@@ -501,6 +627,7 @@ window.initCharacterEvents = initCharacterEvents;
 window.showCharacterForm = showCharacterForm;
 window.hideCharacterForm = hideCharacterForm;
 window.addCareerStatusEntry = addCareerStatusEntry;
+window.addEliminationEntry = addEliminationEntry;
 window.saveCharacter = saveCharacter;
 window.deleteCharacter = deleteCharacter;
 
