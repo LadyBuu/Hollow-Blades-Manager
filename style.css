@@ -827,16 +827,29 @@ main {
     color: var(--text);
     font-weight: 500;
 }
-/* Multi-hour slot stretching */
-.time-slot.occupied.duration-2 {
+.time-slot.blocked {
+    background: var(--warning-soft);
+    border-left: 3px solid var(--warning);
+    color: var(--text);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.time-slot.blocked .slot-label {
+    color: var(--text);
+    font-weight: 500;
+}
+.time-slot.occupied.duration-2,
+.time-slot.blocked.duration-2 {
     min-height: 60px !important;
     height: 60px !important;
 }
-.time-slot.occupied.duration-3 {
+.time-slot.occupied.duration-3,
+.time-slot.blocked.duration-3 {
     min-height: 90px !important;
     height: 90px !important;
 }
-.time-slot.occupied.duration-4 {
+.time-slot.occupied.duration-4,
+.time-slot.blocked.duration-4 {
     min-height: 120px !important;
     height: 120px !important;
 }
@@ -873,15 +886,18 @@ main {
     .time-slot .slot-label {
         font-size: 0.45rem;
     }
-    .time-slot.occupied.duration-2 {
+    .time-slot.occupied.duration-2,
+    .time-slot.blocked.duration-2 {
         min-height: 48px !important;
         height: 48px !important;
     }
-    .time-slot.occupied.duration-3 {
+    .time-slot.occupied.duration-3,
+    .time-slot.blocked.duration-3 {
         min-height: 72px !important;
         height: 72px !important;
     }
-    .time-slot.occupied.duration-4 {
+    .time-slot.occupied.duration-4,
+    .time-slot.blocked.duration-4 {
         min-height: 96px !important;
         height: 96px !important;
     }
@@ -918,15 +934,21 @@ main {
     .time-slot.occupied {
         border-left-width: 2px;
     }
-    .time-slot.occupied.duration-2 {
+    .time-slot.blocked {
+        border-left-width: 2px;
+    }
+    .time-slot.occupied.duration-2,
+    .time-slot.blocked.duration-2 {
         min-height: 36px !important;
         height: 36px !important;
     }
-    .time-slot.occupied.duration-3 {
+    .time-slot.occupied.duration-3,
+    .time-slot.blocked.duration-3 {
         min-height: 54px !important;
         height: 54px !important;
     }
-    .time-slot.occupied.duration-4 {
+    .time-slot.occupied.duration-4,
+    .time-slot.blocked.duration-4 {
         min-height: 72px !important;
         height: 72px !important;
     }
@@ -1166,6 +1188,31 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.instructor-calendar-grid .class-cell.empty-slot {
+    background: transparent;
+    border: 1px dashed var(--border-soft);
+    border-left: 1px dashed var(--border-soft);
+    cursor: pointer;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.instructor-calendar-grid .class-cell.empty-slot:hover {
+    background: var(--panel-alt);
+    border-color: var(--accent);
+}
+.instructor-calendar-grid .class-cell.empty-slot .add-indicator {
+    font-size: 1.2rem;
+    color: var(--text-dim);
+    opacity: 0.3;
+    transition: all 0.2s;
+}
+.instructor-calendar-grid .class-cell.empty-slot:hover .add-indicator {
+    opacity: 0.8;
+    color: var(--accent);
+}
 .instructor-calendar-grid .empty-cell {
     padding: 4px;
     opacity: 0.2;
@@ -1288,6 +1335,75 @@ main {
     font-size: 0.7rem;
     display: inline-block;
     margin: 2px;
+}
+
+/* ============================================================
+   CURRICULUM - Discipline Groups
+   ============================================================ */
+#discipline-groups-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.discipline-groups-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+}
+.discipline-groups-card .discipline-group-card {
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    flex: 1;
+    min-width: 120px;
+    max-width: 250px;
+    transition: border-color 0.2s;
+}
+.discipline-groups-card .discipline-group-card:hover {
+    border-color: var(--accent);
+}
+.discipline-groups-card .discipline-group-card .group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+.discipline-groups-card .discipline-group-card .group-header .group-name {
+    font-weight: 600;
+    color: var(--accent);
+}
+.discipline-groups-card .discipline-group-card .group-header .group-meta {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+.discipline-groups-card .discipline-group-card .group-students {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+}
+.discipline-groups-card .discipline-group-card .group-students .student-tag {
+    background: var(--panel-alt);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.discipline-groups-card .discipline-group-card .group-students .student-tag .remove-from-discipline-group-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.6rem;
+    padding: 0 2px;
+}
+.discipline-groups-card .discipline-group-card .group-students .student-tag .remove-from-discipline-group-btn:hover {
+    color: var(--danger);
+    opacity: 0.7;
 }
 
 /* ============================================================
