@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tournament Manager - Curriculum</title>
+    <title>Tournament Manager - Characters</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -13,9 +13,9 @@
         <h1>Tournament <span>Manager</span></h1>
         <nav id="main-nav">
             <a href="index.html">Dashboard</a>
-            <a href="characters.html">Characters</a>
+            <a href="characters.html" class="active">Characters</a>
             <a href="tournaments.html">Tournaments</a>
-            <a href="curriculum.html" class="active">Curriculum</a>
+            <a href="curriculum.html">Curriculum</a>
         </nav>
         <div class="header-actions">
             <button id="export-json-btn" class="small">Export JSON</button>
@@ -28,8 +28,159 @@
         </div>
     </header>
 
-    <main id="app-container">
-        <!-- Content rendered by curriculum-main.js -->
+    <main>
+        <div class="page-header">
+            <h2>Character Management</h2>
+            <button id="add-character-btn" class="primary">+ Add Character</button>
+        </div>
+
+        <!-- Character Form - Now positioned inline under the header -->
+        <div id="character-form" class="form-container hidden">
+            <h3 id="form-title">Add Character</h3>
+            <form id="char-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>First Name *</label>
+                        <input type="text" id="char-firstname" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Middle Name</label>
+                        <input type="text" id="char-middlename" />
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="char-lastname" />
+                    </div>
+                    <div class="form-group">
+                        <label>Year of Birth</label>
+                        <input type="number" id="char-birthyear" />
+                    </div>
+                    <div class="form-group">
+                        <label>Gender</label>
+                        <input type="text" id="char-gender" placeholder="Male/Female/Other" />
+                    </div>
+                    <div class="form-group">
+                        <label>Associated Names</label>
+                        <input type="text" id="char-associated-names" placeholder="e.g., The Shadow, Nightwalker" />
+                    </div>
+                    <div class="form-group">
+                        <label>Eye Color</label>
+                        <input type="text" id="char-eyes" placeholder="Blue, Green, Brown..." />
+                    </div>
+                    <div class="form-group">
+                        <label>Hair Color</label>
+                        <input type="text" id="char-hair" placeholder="Blonde, Black, Red..." />
+                    </div>
+                    <div class="form-group">
+                        <label>Skin Color/Tone</label>
+                        <input type="text" id="char-skin" placeholder="Fair, Olive, Dark..." />
+                    </div>
+                    <div class="form-group">
+                        <label>Height</label>
+                        <input type="text" id="char-height" placeholder="e.g., 5'10\", 178cm" />
+                    </div>
+                    <div class="form-group">
+                        <label>Build</label>
+                        <input type="text" id="char-build" placeholder="Slim, Athletic, Stocky..." />
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Appearance Notes</label>
+                        <textarea id="char-appearance-notes" rows="2" placeholder="Scars, tattoos, distinguishing features..."></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
+                        <label>Career Status History</label>
+                        <div id="career-status-container">
+                            <div class="career-status-entry">
+                                <select class="career-status-select">
+                                    <option value="">Select status...</option>
+                                    <option value="civilian">Civilian</option>
+                                    <option value="trainee">Trainee</option>
+                                    <option value="rookie">Rookie</option>
+                                    <option value="junior">Junior</option>
+                                    <option value="senior">Senior</option>
+                                    <option value="instructor">Instructor</option>
+                                    <option value="support">Support</option>
+                                </select>
+                                <input type="number" class="career-start-year" placeholder="Start Year" />
+                                <input type="number" class="career-end-year" placeholder="End Year (or leave blank)" />
+                                <button type="button" class="small danger remove-status">✕</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-status-btn" class="small" style="margin-top:8px;">+ Add Status</button>
+                        
+                        <div id="specialty-field" style="display:none;margin-top:8px;">
+                            <label>Specialty/Discipline</label>
+                            <input type="text" id="char-specialty" placeholder="e.g., Medical, Technical, Combat Training" />
+                        </div>
+                    </div>
+
+                    <!-- DECEASED SECTION -->
+                    <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                            <input type="checkbox" id="char-deceased" style="width:auto;" />
+                            <label for="char-deceased" style="margin:0;color:var(--danger);font-weight:600;">Mark as Deceased</label>
+                        </div>
+                        <div id="death-fields" style="display:none;padding-left:24px;border-left:2px solid var(--danger);">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Year of Death</label>
+                                    <input type="number" id="char-death-year" placeholder="e.g., 2023" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Death Age (fixed - won't change with years)</label>
+                                    <input type="number" id="char-death-age" min="0" max="150" placeholder="e.g., 45" />
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Cause of Death</label>
+                                    <input type="text" id="char-death-cause" placeholder="e.g., Battle wounds, Illness, Old age" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ELIMINATION SECTION - NEW -->
+                    <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
+                        <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">▣ Tournament Eliminations</label>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Eliminations are separate from death. A character can be eliminated from a tournament but still alive.</p>
+                        <div id="elimination-container">
+                            <div class="elimination-entry-form" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+                                <select class="elimination-tournament" style="flex:1;min-width:120px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;">
+                                    <option value="">Select tournament...</option>
+                                </select>
+                                <input type="number" class="elimination-week" placeholder="Week" style="width:70px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;">
+                                <input type="text" class="elimination-reason" placeholder="Reason (e.g., Defeated by...)" style="flex:1;min-width:100px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;">
+                                <button type="button" class="small danger remove-elimination">✕</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-elimination-btn" class="small" style="margin-top:8px;">+ Add Elimination</button>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label>Background / Notes</label>
+                        <textarea id="char-notes" rows="3" placeholder="Character background, motivations, etc."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-char-btn" class="secondary">Cancel</button>
+                    <button type="submit" id="save-char-btn" class="primary">Save Character</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Character List -->
+        <div id="character-list">
+            <div class="list-header char-header">
+                <span>Name</span>
+                <span>Age</span>
+                <span>Status</span>
+                <span>Teams</span>
+                <span>Actions</span>
+            </div>
+            <div id="characters-container">
+                <p class="empty-state">No characters created yet. Add your first character!</p>
+            </div>
+        </div>
     </main>
 
     <div id="modal-container" class="modal hidden">
@@ -45,23 +196,17 @@
     <script src="js/database.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/export.js"></script>
-    <script src="js/schedule.js"></script>
-    <script src="js/curriculum/curriculum-main.js"></script>
-    <script src="js/curriculum/disciplines.js"></script>
-    <script src="js/curriculum/groups.js"></script>
-    <script src="js/curriculum/class-view.js"></script>
-    <script src="js/curriculum/instructor-calendar.js"></script>
-    <script src="js/curriculum/grades.js"></script>
-    <script src="js/curriculum/ranking.js"></script>
     <script src="js/app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var checkData = setInterval(function() {
                 if (typeof data !== 'undefined' && data) {
                     clearInterval(checkData);
-                    var container = document.getElementById('app-container');
-                    if (container && typeof renderCurriculumView === 'function') {
-                        renderCurriculumView(container);
+                    if (typeof renderCharacters === 'function') {
+                        renderCharacters();
+                    }
+                    if (typeof initCharacterEvents === 'function') {
+                        initCharacterEvents();
                     }
                 }
             }, 200);
