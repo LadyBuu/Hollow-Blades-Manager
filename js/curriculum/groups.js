@@ -286,6 +286,15 @@ function autoDistributeStudents(disciplineId, week) {
         return { success: false, message: 'No groups created for this discipline. Create groups first.' };
     }
     
+    // Get class slots for this discipline in this week
+    var slots = getClassSlotsForDiscipline(disciplineId, weekNum);
+    if (slots.length === 0) {
+        return { 
+            success: false, 
+            message: 'No class slots found for this discipline in week ' + weekNum + '. Create class slots in the instructor calendar first.' 
+        };
+    }
+    
     // Get all students enrolled in this discipline
     var allStudents = getStudentsForDiscipline(disciplineId, weekNum);
     if (allStudents.length === 0) {
@@ -306,18 +315,30 @@ function autoDistributeStudents(disciplineId, week) {
         }
     });
     
-    // Calculate capacity per group
-    var maxStudents = discipline.maxStudents || 4;
-    var totalCapacity = groupLabels.length * maxStudents;
+    // Calculate capacity per group based on slots
+    var totalCapacity = 0;
+    var slotCapacities = {};
+    slots.forEach(function(slot) {
+        var key = slot.day + '_' + slot.hour;
+        if (!slotCapacities[key]) slotCapacities[key] = 0;
+        slotCapacities[key] += slot.capacity || discipline.maxStudents || 4;
+    });
+    
+    // Total capacity is the sum of all slot capacities
+    for (var key in slotCapacities) {
+        totalCapacity += slotCapacities[key];
+    }
+    
     var totalStudents = allStudents.length;
     
     if (totalCapacity < totalStudents) {
         return { 
             success: false, 
-            message: 'Not enough capacity. ' + totalStudents + ' students, ' + totalCapacity + ' spots available.',
+            message: 'Not enough capacity. ' + totalStudents + ' students, ' + totalCapacity + ' spots available across ' + slots.length + ' slots.',
             totalStudents: totalStudents,
             totalCapacity: totalCapacity,
-            shortfall: totalStudents - totalCapacity
+            shortfall: totalStudents - totalCapacity,
+            slots: slots
         };
     }
     
@@ -326,16 +347,21 @@ function autoDistributeStudents(disciplineId, week) {
         groups[label].students = {};
     }
     
+    // Calculate students per group based on capacity
+    var maxPerGroup = Math.ceil(totalStudents / groupLabels.length);
+    if (discipline.maxStudents && discipline.maxStudents < maxPerGroup) {
+        maxPerGroup = discipline.maxStudents;
+    }
+    
     // First pass: keep students already in groups (if they fit)
     for (var label in assignedStudents) {
         var students = assignedStudents[label];
         var group = groups[label];
         if (!group) continue;
         
-        var maxForGroup = maxStudents;
         var count = 0;
         students.forEach(function(student) {
-            if (count < maxForGroup) {
+            if (count < maxPerGroup) {
                 if (!group.students) group.students = {};
                 group.students[student.id] = true;
                 count++;
@@ -358,7 +384,7 @@ function autoDistributeStudents(disciplineId, week) {
             var label = groupLabels[i];
             var group = groups[label];
             var currentCount = Object.keys(group.students || {}).length;
-            var space = maxStudents - currentCount;
+            var space = maxPerGroup - currentCount;
             if (space > bestSpace) {
                 bestSpace = space;
                 bestGroup = label;
@@ -369,7 +395,11 @@ function autoDistributeStudents(disciplineId, week) {
             if (!groups[bestGroup].students) groups[bestGroup].students = {};
             groups[bestGroup].students[student.id] = true;
         } else {
-            // This shouldn't happen if capacity is sufficient
+            // If no group has space, try to add anyway (shouldn't happen if capacity is sufficient)
+            var anyGroup = groupLabels[groupIndex % groupLabels.length];
+            if (!groups[anyGroup].students) groups[anyGroup].students = {};
+            groups[anyGroup].students[student.id] = true;
+            groupIndex++;
         }
     });
     
@@ -388,12 +418,33 @@ function autoDistributeStudents(disciplineId, week) {
     
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     
+    // Also update class group labels for students who have classes
+    allStudents.forEach(function(student) {
+        var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
+        if (groupLabel) {
+            var schedule = getStudentSchedule(student.id, weekNum);
+            for (var day in schedule) {
+                for (var hour in schedule[day]) {
+                    if (String(schedule[day][hour]) === String(disciplineId)) {
+                        if (typeof setClassGroupLabel === 'function') {
+                            setClassGroupLabel(student.id, weekNum, parseInt(day), parseInt(hour), groupLabel);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    
     return {
         success: true,
         message: 'Successfully distributed ' + (totalStudents - finalUnassigned.length) + ' students across ' + groupLabels.length + ' groups.',
         assignments: finalAssignments,
         unassigned: finalUnassigned.length,
-        groupLabels: groupLabels
+        groupLabels: groupLabels,
+        slots: slots,
+        totalCapacity: totalCapacity,
+        totalStudents: totalStudents
     };
 }
 
@@ -460,7 +511,7 @@ function renderDisciplineGroups() {
             html += '<span style="font-size:0.65rem;color:var(--warning);padding:2px 8px;border:1px solid var(--warning);border-radius:10px;">Inactive (Wk ' + (discipline.startWeek || '?') + '-' + (discipline.endWeek || '?') + ')</span>';
         }
         html += '<button class="add-discipline-group-btn small primary" data-discipline="' + discipline.id + '">+ Add Group</button>';
-        html += '<button class="auto-distribute-btn small primary" data-discipline="' + discipline.id + '" style="background:var(--accent-soft);border-color:var(--accent);">🔄 Auto-Distribute</button>';
+        html += '<button class="auto-distribute-btn small" data-discipline="' + discipline.id + '">🔄 Auto-Distribute</button>';
         html += '</div>';
         html += '</div>';
         
@@ -619,11 +670,14 @@ function renderDisciplineGroups() {
     
     // Auto-Distribute buttons per discipline
     container.querySelectorAll('.auto-distribute-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        // Remove existing listeners by cloning
+        var newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', function() {
             var disciplineId = this.dataset.discipline;
             var week = instructorCalendarState ? instructorCalendarState.currentWeek || 1 : 1;
             
-            if (!confirm('Auto-distribute will reassign all students to groups for this discipline. Continue?')) {
+            if (!confirm('Auto-distribute will reassign all students to groups for this discipline.\n\nExisting group assignments will be overwritten.\n\nContinue?')) {
                 return;
             }
             
@@ -829,7 +883,10 @@ function initDisciplineGroupsEvents() {
     // Auto-Distribute global button
     var autoDistBtn = document.getElementById('auto-distribute-btn');
     if (autoDistBtn) {
-        autoDistBtn.addEventListener('click', function() {
+        // Remove existing listener by cloning
+        var newBtn = autoDistBtn.cloneNode(true);
+        autoDistBtn.parentNode.replaceChild(newBtn, autoDistBtn);
+        newBtn.addEventListener('click', function() {
             var disciplines = data.curriculum.disciplines || [];
             if (disciplines.length === 0) {
                 alert('No disciplines available.');
