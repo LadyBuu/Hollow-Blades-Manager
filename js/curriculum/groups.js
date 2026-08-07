@@ -1,437 +1,434 @@
 /**
- * groups.js - Discipline Group Management
- * Groups are connected to disciplines
- * Each group has a label (A, B, C) and a list of students
- * Groups enforce max students per discipline
- * Auto-Distribute helps fill groups but manual control is always available
+ * groups.js - Auto-Group Management
+ * Groups are auto-created from discipline + instructor + time slot
+ * Students in the same group share the same time slot
  */
 
 /**
- * Get groups for a specific discipline
+ * Generate a group key from discipline, instructor, day, hour
  */
-function getDisciplineGroups(disciplineId) {
-    if (!data.curriculum.disciplineGroups) {
-        data.curriculum.disciplineGroups = {};
-    }
-    if (!data.curriculum.disciplineGroups[disciplineId]) {
-        data.curriculum.disciplineGroups[disciplineId] = {};
-    }
-    return data.curriculum.disciplineGroups[disciplineId];
+function generateGroupKey(disciplineId, instructorId, day, hour) {
+    return disciplineId + '_' + instructorId + '_' + day + '_' + hour;
 }
 
 /**
- * Get all groups across all disciplines
+ * Generate a display name for a group
  */
-function getAllGroups() {
-    if (!data.curriculum.disciplineGroups) {
-        data.curriculum.disciplineGroups = {};
-    }
-    return data.curriculum.disciplineGroups;
+function generateGroupDisplayName(disciplineId, instructorId, day, hour) {
+    var discipline = getDiscipline(disciplineId);
+    var disciplineName = discipline ? discipline.name : 'Unknown';
+    
+    var instructor = data.characters.find(function(c) { return String(c.id) === String(instructorId); });
+    var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+    
+    var dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    var hourDisplay = hour > 12 ? hour - 12 : hour;
+    var ampm = hour >= 12 ? 'PM' : 'AM';
+    if (hour === 0) { hourDisplay = 12; ampm = 'AM'; }
+    if (hour === 12) { ampm = 'PM'; }
+    
+    // Shorten the name
+    var shortInstructor = instructorName.split(' ').map(function(n) { return n[0]; }).join('');
+    return disciplineName + ' (' + shortInstructor + ') - ' + dayNames[day] + ' ' + hourDisplay + ampm;
 }
 
 /**
- * Get students in a specific group
+ * Get or create an auto-group for a specific discipline + instructor + time slot
  */
-function getStudentsInDisciplineGroup(disciplineId, groupLabel) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (!groups[groupLabel] || !groups[groupLabel].students) {
-        return [];
+function getOrCreateAutoGroup(disciplineId, instructorId, day, hour) {
+    if (!data.curriculum.autoGroups) {
+        data.curriculum.autoGroups = {};
     }
-    return Object.keys(groups[groupLabel].students);
+    
+    var key = generateGroupKey(disciplineId, instructorId, day, hour);
+    
+    if (!data.curriculum.autoGroups[key]) {
+        data.curriculum.autoGroups[key] = {
+            id: key,
+            disciplineId: disciplineId,
+            instructorId: instructorId,
+            day: day,
+            hour: hour,
+            students: [],
+            displayName: generateGroupDisplayName(disciplineId, instructorId, day, hour),
+            createdAt: new Date().toISOString()
+        };
+    }
+    
+    return data.curriculum.autoGroups[key];
 }
 
 /**
- * Check if a student is in a specific group
+ * Get all auto-groups
  */
-function isStudentInGroup(disciplineId, groupLabel, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (!groups[groupLabel] || !groups[groupLabel].students) {
-        return false;
+function getAllAutoGroups() {
+    if (!data.curriculum.autoGroups) {
+        data.curriculum.autoGroups = {};
     }
-    return !!groups[groupLabel].students[studentId];
+    return data.curriculum.autoGroups;
 }
 
 /**
- * Get the group a student is in for a specific discipline
+ * Get auto-groups for a specific discipline
  */
-function getStudentDisciplineGroup(disciplineId, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    for (var label in groups) {
-        if (groups[label].students && groups[label].students[studentId]) {
-            return label;
+function getAutoGroupsForDiscipline(disciplineId) {
+    var allGroups = getAllAutoGroups();
+    var result = {};
+    for (var key in allGroups) {
+        if (allGroups[key].disciplineId === disciplineId) {
+            result[key] = allGroups[key];
+        }
+    }
+    return result;
+}
+
+/**
+ * Get auto-groups for a specific instructor
+ */
+function getAutoGroupsForInstructor(instructorId) {
+    var allGroups = getAllAutoGroups();
+    var result = {};
+    for (var key in allGroups) {
+        if (allGroups[key].instructorId === instructorId) {
+            result[key] = allGroups[key];
+        }
+    }
+    return result;
+}
+
+/**
+ * Get the auto-group a student belongs to for a specific discipline
+ */
+function getStudentAutoGroup(studentId, disciplineId) {
+    var allGroups = getAllAutoGroups();
+    for (var key in allGroups) {
+        var group = allGroups[key];
+        if (group.disciplineId === disciplineId && group.students && group.students.indexOf(studentId) !== -1) {
+            return group;
         }
     }
     return null;
 }
 
 /**
- * Check if a character is eliminated in a specific week
+ * Check if a student is in any auto-group for a discipline
  */
-function isCharacterEliminatedInWeek(charId, week) {
-    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
-    if (!char) return false;
-    if (char.deceased) return true;
-    
-    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
-        var weekNum = parseInt(week) || 1;
-        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
-            var elimWeek = parseInt(char.eliminatedWeeks[i]);
-            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
-                return true;
-            }
-        }
-    }
-    return false;
+function isStudentInAutoGroup(studentId, disciplineId) {
+    return getStudentAutoGroup(studentId, disciplineId) !== null;
 }
 
 /**
- * Check if a discipline is active in a specific week
+ * Add a student to an auto-group
  */
-function isDisciplineActiveInWeek(disciplineId, week) {
-    var discipline = getDiscipline(disciplineId);
-    if (!discipline) return false;
-    var weekNum = parseInt(week) || 1;
-    var start = parseInt(discipline.startWeek);
-    var end = parseInt(discipline.endWeek);
-    if (isNaN(start)) return true;
-    return start <= weekNum && (isNaN(end) || end >= weekNum);
-}
-
-/**
- * Get all students for a discipline (from group assignments)
- */
-function getAllStudentsForDiscipline(disciplineId) {
-    var allStudents = getStudents();
-    var result = [];
+function addStudentToAutoGroup(disciplineId, instructorId, day, hour, studentId) {
+    var group = getOrCreateAutoGroup(disciplineId, instructorId, day, hour);
     
-    allStudents.forEach(function(student) {
-        var group = getStudentDisciplineGroup(disciplineId, student.id);
-        if (group) {
-            result.push(student);
-        }
-    });
-    
-    return result;
-}
-
-/**
- * Get all students with their group info for a discipline
- */
-function getStudentsWithGroupsForDiscipline(disciplineId) {
-    var groups = getDisciplineGroups(disciplineId);
-    var allStudents = getStudents();
-    var result = {
-        groups: {},
-        unassigned: []
-    };
-    
-    for (var label in groups) {
-        result.groups[label] = [];
+    // Check if student is already in this group
+    if (group.students.indexOf(studentId) !== -1) {
+        return { success: false, message: 'Student already in this group.', group: group };
     }
     
-    allStudents.forEach(function(student) {
-        var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
-        if (groupLabel && result.groups[groupLabel] !== undefined) {
-            result.groups[groupLabel].push(student);
-        } else {
-            result.unassigned.push(student);
-        }
-    });
-    
-    return result;
-}
-
-/**
- * Add a student to a group
- */
-function addStudentToDisciplineGroup(disciplineId, groupLabel, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    
-    if (!groups[groupLabel]) {
-        groups[groupLabel] = { students: {} };
-    }
-    
-    if (groups[groupLabel].students && groups[groupLabel].students[studentId]) {
-        return { success: false, message: 'Student is already in this group.' };
-    }
-    
-    var currentGroup = getStudentDisciplineGroup(disciplineId, studentId);
-    if (currentGroup) {
-        delete groups[currentGroup].students[studentId];
-    }
-    
-    var discipline = getDiscipline(disciplineId);
-    if (discipline && discipline.maxStudents) {
-        var currentCount = Object.keys(groups[groupLabel].students || {}).length;
-        if (currentCount >= discipline.maxStudents) {
-            return { 
-                success: false, 
-                message: 'Group ' + groupLabel + ' already has ' + currentCount + ' students (max ' + discipline.maxStudents + ').' 
-            };
+    // Check if student is already in another group for this discipline
+    var existingGroup = getStudentAutoGroup(studentId, disciplineId);
+    if (existingGroup) {
+        // Remove from old group first
+        var index = existingGroup.students.indexOf(studentId);
+        if (index !== -1) {
+            existingGroup.students.splice(index, 1);
         }
     }
     
-    if (!groups[groupLabel].students) {
-        groups[groupLabel].students = {};
-    }
-    groups[groupLabel].students[studentId] = true;
+    group.students.push(studentId);
     
-    return { success: true, message: 'Student added to group.' };
+    return { success: true, message: 'Student added to group.', group: group };
 }
 
 /**
- * Remove a student from a group
+ * Remove a student from an auto-group
  */
-function removeStudentFromDisciplineGroup(disciplineId, groupLabel, studentId) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (groups[groupLabel] && groups[groupLabel].students) {
-        delete groups[groupLabel].students[studentId];
-        return { success: true };
+function removeStudentFromAutoGroup(disciplineId, instructorId, day, hour, studentId) {
+    var key = generateGroupKey(disciplineId, instructorId, day, hour);
+    if (!data.curriculum.autoGroups || !data.curriculum.autoGroups[key]) {
+        return { success: false, message: 'Group not found.' };
     }
-    return { success: false, message: 'Student not found in group.' };
-}
-
-/**
- * Remove a group entirely
- */
-function removeDisciplineGroup(disciplineId, groupLabel) {
-    var groups = getDisciplineGroups(disciplineId);
-    if (groups[groupLabel]) {
-        delete groups[groupLabel];
-        return { success: true };
+    
+    var group = data.curriculum.autoGroups[key];
+    var index = group.students.indexOf(studentId);
+    if (index === -1) {
+        return { success: false, message: 'Student not in this group.' };
     }
-    return { success: false, message: 'Group not found.' };
+    
+    group.students.splice(index, 1);
+    
+    // If group is empty, keep it (don't delete - it might be used again)
+    
+    return { success: true, message: 'Student removed from group.' };
 }
 
 /**
- * Get class slots for a discipline in a week
+ * Get all students in an auto-group
  */
-function getClassSlotsForDiscipline(disciplineId, week) {
-    var slots = [];
+function getStudentsInAutoGroup(disciplineId, instructorId, day, hour) {
+    var key = generateGroupKey(disciplineId, instructorId, day, hour);
+    if (!data.curriculum.autoGroups || !data.curriculum.autoGroups[key]) {
+        return [];
+    }
+    return data.curriculum.autoGroups[key].students || [];
+}
+
+/**
+ * Get the group for a specific class slot (discipline + instructor + time)
+ */
+function getAutoGroupForSlot(disciplineId, instructorId, day, hour) {
+    var key = generateGroupKey(disciplineId, instructorId, day, hour);
+    if (!data.curriculum.autoGroups || !data.curriculum.autoGroups[key]) {
+        return null;
+    }
+    return data.curriculum.autoGroups[key];
+}
+
+/**
+ * Check if adding a student to a group would cause conflicts
+ * Returns list of students who would be affected
+ */
+function checkAutoGroupConflicts(disciplineId, instructorId, day, hour, studentId, week) {
+    var group = getOrCreateAutoGroup(disciplineId, instructorId, day, hour);
+    var conflicts = [];
     var weekNum = parseInt(week) || 1;
     
-    if (data.curriculum.instructorTemplates) {
-        for (var instructorId in data.curriculum.instructorTemplates) {
-            var template = data.curriculum.instructorTemplates[instructorId];
-            var templateKey = instructorId + '_' + weekNum;
-            if (template[templateKey]) {
-                for (var key in template[templateKey]) {
-                    var parts = key.split('_');
-                    var day = parseInt(parts[0]);
-                    var hour = parseInt(parts[1]);
-                    var classData = template[templateKey][key];
-                    if (String(classData.disciplineId) === String(disciplineId)) {
-                        slots.push({
-                            instructorId: instructorId,
-                            week: weekNum,
-                            day: day,
-                            hour: hour,
-                            capacity: classData.capacity || 4,
-                            duration: classData.duration || 1,
-                            label: classData.label || ''
-                        });
-                    }
-                }
-            }
-        }
-    }
-    
-    return slots;
-}
-
-/**
- * Get students enrolled in a discipline (from schedules)
- */
-function getStudentsForDiscipline(disciplineId, week) {
-    var students = getStudents();
-    var result = [];
-    var weekNum = parseInt(week) || 1;
-    
-    students.forEach(function(student) {
-        var schedule = getStudentSchedule(student.id, weekNum);
-        for (var day in schedule) {
-            for (var hour in schedule[day]) {
-                if (String(schedule[day][hour]) === String(disciplineId)) {
-                    result.push(student);
-                    return;
-                }
+    // Check each student in the group
+    group.students.forEach(function(id) {
+        if (String(id) === String(studentId)) return;
+        
+        var schedule = getStudentSchedule(id, weekNum);
+        // Check if this student has a class at this time (they shouldn't, since they're in this group)
+        // But check anyway
+        for (var h = hour; h < hour + 1 && h <= 23; h++) {
+            if (schedule[day] && schedule[day][h]) {
+                var discId = schedule[day][h];
+                var disc = getDiscipline(discId);
+                conflicts.push({
+                    studentId: id,
+                    studentName: getStudentName(id),
+                    conflictDiscipline: disc ? disc.name : 'Unknown'
+                });
+                break;
             }
         }
     });
     
-    return result;
+    return conflicts;
 }
 
 /**
- * Auto-distribute students to groups for a discipline
+ * Get student name helper
  */
-function autoDistributeStudents(disciplineId, week) {
+function getStudentName(studentId) {
+    var student = data.characters.find(function(c) { return String(c.id) === String(studentId); });
+    if (student) {
+        return [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
+    }
+    return 'Unknown';
+}
+
+/**
+ * Auto-assign a student to a discipline, creating/using auto-groups
+ * This is the main function called when adding a student to a class
+ */
+function autoAssignStudentToGroupAndClass(studentId, disciplineId, instructorId, week, day, hour, duration) {
+    var weekNum = parseInt(week) || 1;
+    var dur = duration || 1;
     var discipline = getDiscipline(disciplineId);
+    
     if (!discipline) {
         return { success: false, message: 'Discipline not found.' };
     }
     
-    var weekNum = parseInt(week) || 1;
-    var groups = getDisciplineGroups(disciplineId);
-    var groupLabels = Object.keys(groups).sort();
+    // Get or create the auto-group
+    var group = getOrCreateAutoGroup(disciplineId, instructorId, day, hour);
     
-    if (groupLabels.length === 0) {
-        return { success: false, message: 'No groups created for this discipline. Create groups first.' };
+    // Check if student is already in this group
+    if (group.students.indexOf(studentId) !== -1) {
+        // Student is already in the group, just add the class
+        var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, dur, instructorId);
+        if (result.success) {
+            return { 
+                success: true, 
+                message: 'Student already in group. Class added.',
+                group: group,
+                addedToGroup: false
+            };
+        }
+        return result;
     }
     
-    var slots = getClassSlotsForDiscipline(disciplineId, weekNum);
-    if (slots.length === 0) {
-        return { 
-            success: false, 
-            message: 'No class slots found for this discipline in week ' + weekNum + '. Create class slots in the instructor calendar first.' 
+    // Check if student is in another group for this discipline
+    var existingGroup = getStudentAutoGroup(studentId, disciplineId);
+    if (existingGroup) {
+        // Student is in another group - warn and ask to move
+        return {
+            success: false,
+            message: 'Student is already in group "' + existingGroup.displayName + '" for this discipline. Move to new group?',
+            existingGroup: existingGroup,
+            needsMoveConfirmation: true
         };
     }
     
-    var allStudents = getStudentsForDiscipline(disciplineId, weekNum);
-    if (allStudents.length === 0) {
-        return { success: false, message: 'No students enrolled in this discipline for week ' + weekNum + '.' };
-    }
+    // Check for conflicts with existing students in the group
+    var conflicts = checkAutoGroupConflicts(disciplineId, instructorId, day, hour, studentId, weekNum);
     
-    var assignedStudents = {};
-    var unassignedStudents = [];
-    
-    allStudents.forEach(function(student) {
-        var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
-        if (groupLabel) {
-            if (!assignedStudents[groupLabel]) assignedStudents[groupLabel] = [];
-            assignedStudents[groupLabel].push(student);
-        } else {
-            unassignedStudents.push(student);
+    // Check if the student has a conflict at this time
+    var schedule = getStudentSchedule(studentId, weekNum);
+    var studentHasConflict = false;
+    var conflictDiscipline = null;
+    for (var h = hour; h < hour + dur && h <= 23; h++) {
+        if (schedule[day] && schedule[day][h]) {
+            studentHasConflict = true;
+            var conflictId = schedule[day][h];
+            var conflictDisc = getDiscipline(conflictId);
+            if (conflictDisc) {
+                conflictDiscipline = conflictDisc.name;
+            }
+            break;
         }
-    });
-    
-    var totalCapacity = 0;
-    var slotCapacities = {};
-    slots.forEach(function(slot) {
-        var key = slot.day + '_' + slot.hour;
-        if (!slotCapacities[key]) slotCapacities[key] = 0;
-        slotCapacities[key] += slot.capacity || discipline.maxStudents || 4;
-    });
-    
-    for (var key in slotCapacities) {
-        totalCapacity += slotCapacities[key];
     }
     
-    var totalStudents = allStudents.length;
-    
-    if (totalCapacity < totalStudents) {
-        return { 
-            success: false, 
-            message: 'Not enough capacity. ' + totalStudents + ' students, ' + totalCapacity + ' spots available across ' + slots.length + ' slots.',
-            totalStudents: totalStudents,
-            totalCapacity: totalCapacity,
-            shortfall: totalStudents - totalCapacity,
-            slots: slots
+    if (studentHasConflict) {
+        return {
+            success: false,
+            message: 'Student has a conflict at this time: ' + conflictDiscipline,
+            hasConflict: true,
+            conflictDiscipline: conflictDiscipline
         };
     }
     
-    for (var label in groups) {
-        groups[label].students = {};
+    if (conflicts.length > 0) {
+        // Students in the group have conflicts - need to resolve
+        var conflictNames = conflicts.map(function(c) { return c.studentName + ' (' + c.conflictDiscipline + ')'; }).join(', ');
+        return {
+            success: false,
+            message: 'Students in this group have conflicts: ' + conflictNames,
+            hasConflicts: true,
+            conflicts: conflicts,
+            group: group
+        };
     }
     
-    var maxPerGroup = Math.ceil(totalStudents / groupLabels.length);
-    if (discipline.maxStudents && discipline.maxStudents < maxPerGroup) {
-        maxPerGroup = discipline.maxStudents;
+    // All checks passed - add student to group
+    group.students.push(studentId);
+    
+    // Add the class to the student
+    var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, dur, instructorId);
+    
+    if (result.success) {
+        return {
+            success: true,
+            message: 'Student added to group and class assigned.',
+            group: group,
+            addedToGroup: true
+        };
     }
     
-    for (var label in assignedStudents) {
-        var students = assignedStudents[label];
-        var group = groups[label];
-        if (!group) continue;
-        
-        var count = 0;
-        students.forEach(function(student) {
-            if (count < maxPerGroup) {
-                if (!group.students) group.students = {};
-                group.students[student.id] = true;
-                count++;
-            } else {
-                unassignedStudents.push(student);
-            }
-        });
-    }
-    
-    var remainingStudents = unassignedStudents.slice();
-    var groupIndex = 0;
-    
-    remainingStudents.forEach(function(student) {
-        var bestGroup = null;
-        var bestSpace = -1;
-        
-        for (var i = 0; i < groupLabels.length; i++) {
-            var label = groupLabels[i];
-            var group = groups[label];
-            var currentCount = Object.keys(group.students || {}).length;
-            var space = maxPerGroup - currentCount;
-            if (space > bestSpace) {
-                bestSpace = space;
-                bestGroup = label;
-            }
-        }
-        
-        if (bestGroup && bestSpace > 0) {
-            if (!groups[bestGroup].students) groups[bestGroup].students = {};
-            groups[bestGroup].students[student.id] = true;
-        } else {
-            var anyGroup = groupLabels[groupIndex % groupLabels.length];
-            if (!groups[anyGroup].students) groups[anyGroup].students = {};
-            groups[anyGroup].students[student.id] = true;
-            groupIndex++;
-        }
-    });
-    
-    var finalAssignments = {};
-    var finalUnassigned = [];
-    allStudents.forEach(function(student) {
-        var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
-        if (groupLabel) {
-            if (!finalAssignments[groupLabel]) finalAssignments[groupLabel] = 0;
-            finalAssignments[groupLabel]++;
-        } else {
-            finalUnassigned.push(student);
-        }
-    });
-    
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    
-    allStudents.forEach(function(student) {
-        var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
-        if (groupLabel) {
-            var schedule = getStudentSchedule(student.id, weekNum);
-            for (var day in schedule) {
-                for (var hour in schedule[day]) {
-                    if (String(schedule[day][hour]) === String(disciplineId)) {
-                        if (typeof setClassGroupLabel === 'function') {
-                            setClassGroupLabel(student.id, weekNum, parseInt(day), parseInt(hour), groupLabel);
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    });
-    
-    return {
-        success: true,
-        message: 'Successfully distributed ' + (totalStudents - finalUnassigned.length) + ' students across ' + groupLabels.length + ' groups.',
-        assignments: finalAssignments,
-        unassigned: finalUnassigned.length,
-        groupLabels: groupLabels,
-        slots: slots,
-        totalCapacity: totalCapacity,
-        totalStudents: totalStudents
-    };
+    return result;
 }
 
 /**
- * Render the discipline groups view
+ * Add a class to a student's schedule
  */
-function renderDisciplineGroupsView(container) {
+function addClassToStudent(studentId, disciplineId, week, day, hour, duration, instructorId) {
+    var schedule = getStudentSchedule(studentId, week);
+    var dur = duration || 1;
+    
+    // Check for conflicts
+    for (var h = hour; h < hour + dur && h <= 23; h++) {
+        if (schedule[day] && schedule[day][h]) {
+            var conflictId = schedule[day][h];
+            var conflictDisc = getDiscipline(conflictId);
+            return {
+                success: false,
+                message: 'Student has a conflict at ' + h + ':00' + (conflictDisc ? ' (' + conflictDisc.name + ')' : '')
+            };
+        }
+    }
+    
+    // Add the class
+    for (var h = hour; h < hour + dur && h <= 23; h++) {
+        if (!schedule[day]) schedule[day] = {};
+        schedule[day][h] = disciplineId;
+        if (instructorId) {
+            setClassInstructor(studentId, week, day, h, instructorId);
+        }
+        if (h === hour) {
+            setClassDuration(studentId, week, day, h, dur);
+        }
+        // Set group label on the class
+        setClassGroupLabel(studentId, week, day, h, 'G-' + instructorId + '-' + day + '-' + hour);
+    }
+    
+    return { success: true, message: 'Class added successfully.' };
+}
+
+/**
+ * Resolve conflicts by removing conflicting students from the group
+ * Or by removing their conflicting classes
+ */
+function resolveAutoGroupConflicts(disciplineId, instructorId, day, hour, week, resolveAction) {
+    var group = getAutoGroupForSlot(disciplineId, instructorId, day, hour);
+    if (!group) {
+        return { success: false, message: 'Group not found.' };
+    }
+    
+    var weekNum = parseInt(week) || 1;
+    var results = [];
+    var conflicts = checkAutoGroupConflicts(disciplineId, instructorId, day, hour, null, weekNum);
+    
+    if (conflicts.length === 0) {
+        return { success: true, message: 'No conflicts to resolve.', conflicts: [] };
+    }
+    
+    if (resolveAction === 'remove_conflicting') {
+        // Remove students with conflicts from the group
+        conflicts.forEach(function(c) {
+            var index = group.students.indexOf(c.studentId);
+            if (index !== -1) {
+                group.students.splice(index, 1);
+                results.push({
+                    studentId: c.studentId,
+                    studentName: c.studentName,
+                    action: 'removed from group'
+                });
+            }
+        });
+        return { success: true, message: 'Conflicting students removed from group.', results: results };
+    } else if (resolveAction === 'clear_conflicting_classes') {
+        // Remove conflicting classes from students
+        conflicts.forEach(function(c) {
+            var schedule = getStudentSchedule(c.studentId, weekNum);
+            for (var h = hour; h < hour + 1 && h <= 23; h++) {
+                if (schedule[day] && schedule[day][h]) {
+                    delete schedule[day][h];
+                    setClassInstructor(c.studentId, weekNum, day, h, null);
+                    setClassLabel(c.studentId, weekNum, day, h, null);
+                    setClassGroupLabel(c.studentId, weekNum, day, h, null);
+                    setClassDuration(c.studentId, weekNum, day, h, null);
+                }
+            }
+            results.push({
+                studentId: c.studentId,
+                studentName: c.studentName,
+                action: 'conflicting class removed'
+            });
+        });
+        return { success: true, message: 'Conflicting classes removed.', results: results };
+    }
+    
+    return { success: false, message: 'Invalid resolve action.' };
+}
+
+/**
+ * Render the auto-groups view
+ */
+function renderAutoGroupsView(container) {
     if (!container) {
         container = document.getElementById('groups-content');
     }
@@ -439,144 +436,125 @@ function renderDisciplineGroupsView(container) {
     
     container.innerHTML = `
         <div class="page-header">
-            <h2>▣ Discipline Groups</h2>
+            <h2>▣ Auto-Groups</h2>
             <div class="header-actions">
-                <button id="auto-distribute-btn" class="primary small">🔄 Auto-Distribute</button>
+                <span style="font-size:0.7rem;color:var(--text-dim);">Groups auto-created from classes</span>
+                <button id="refresh-auto-groups-btn" class="small secondary">⟳ Refresh</button>
             </div>
         </div>
-        <div id="discipline-groups-container">
-            <p class="empty-state">No disciplines available. Create a discipline first.</p>
+        <div id="auto-groups-container">
+            <p class="empty-state">No groups created yet. Groups are auto-created when classes are scheduled.</p>
         </div>
     `;
     
-    renderDisciplineGroups();
-    initDisciplineGroupsEvents();
+    renderAutoGroups();
+    initAutoGroupsEvents();
 }
 
 /**
- * Render the discipline groups
+ * Render the auto-groups
  */
-function renderDisciplineGroups() {
-    var container = document.getElementById('discipline-groups-container');
+function renderAutoGroups() {
+    var container = document.getElementById('auto-groups-container');
     if (!container) return;
     
-    var disciplines = data.curriculum.disciplines || [];
-    if (disciplines.length === 0) {
-        container.innerHTML = '<p class="empty-state">No disciplines created yet. Create a discipline first.</p>';
+    var allGroups = getAllAutoGroups();
+    var groupKeys = Object.keys(allGroups);
+    
+    if (groupKeys.length === 0) {
+        container.innerHTML = '<p class="empty-state">No groups created yet. Groups are auto-created when classes are scheduled.</p>';
         return;
     }
     
-    var week = instructorCalendarState ? instructorCalendarState.currentWeek || 1 : 1;
+    var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
-    var html = '<div style="display:flex;flex-direction:column;gap:16px;">';
+    var html = '<div style="display:flex;flex-direction:column;gap:12px;">';
     
-    disciplines.sort(function(a, b) { return a.name.localeCompare(b.name); });
-    
-    disciplines.forEach(function(discipline) {
-        var isActive = isDisciplineActiveInWeek(discipline.id, week);
-        var groups = getDisciplineGroups(discipline.id);
-        var groupLabels = Object.keys(groups).sort();
-        var maxStudents = discipline.maxStudents || 'Unlimited';
-        
-        var studentData = getStudentsWithGroupsForDiscipline(discipline.id);
-        var totalStudents = Object.values(studentData.groups).reduce(function(sum, arr) { return sum + arr.length; }, 0) + studentData.unassigned.length;
-        
-        html += '<div class="discipline-groups-card" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);' + (!isActive ? 'opacity:0.6;' : '') + '">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
-        html += '<h3 style="color:var(--accent);">' + discipline.name + '</h3>';
-        html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-        html += '<span style="font-size:0.7rem;color:var(--text-dim);">Max: ' + maxStudents + ' | Total: ' + totalStudents + '</span>';
-        if (!isActive) {
-            html += '<span style="font-size:0.65rem;color:var(--warning);padding:2px 8px;border:1px solid var(--warning);border-radius:10px;">Inactive (Wk ' + (discipline.startWeek || '?') + '-' + (discipline.endWeek || '?') + ')</span>';
+    // Sort groups by discipline, then day, then hour
+    groupKeys.sort(function(a, b) {
+        var gA = allGroups[a];
+        var gB = allGroups[b];
+        if (gA.disciplineId !== gB.disciplineId) {
+            var dA = getDiscipline(gA.disciplineId);
+            var dB = getDiscipline(gB.disciplineId);
+            return (dA ? dA.name : '') > (dB ? dB.name : '') ? 1 : -1;
         }
-        html += '<button class="add-discipline-group-btn small primary" data-discipline="' + discipline.id + '">+ Add Group</button>';
-        html += '<button class="auto-distribute-btn small" data-discipline="' + discipline.id + '">🔄 Auto-Distribute</button>';
+        if (gA.day !== gB.day) return gA.day - gB.day;
+        return gA.hour - gB.hour;
+    });
+    
+    groupKeys.forEach(function(key) {
+        var group = allGroups[key];
+        var discipline = getDiscipline(group.disciplineId);
+        var instructor = data.characters.find(function(c) { return String(c.id) === String(group.instructorId); });
+        var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+        
+        var hourDisplay = group.hour > 12 ? group.hour - 12 : group.hour;
+        var ampm = group.hour >= 12 ? 'PM' : 'AM';
+        if (group.hour === 0) { hourDisplay = 12; ampm = 'AM'; }
+        if (group.hour === 12) { ampm = 'PM'; }
+        
+        var studentCount = group.students ? group.students.length : 0;
+        var isExpanded = window.autoGroupsExpanded && window.autoGroupsExpanded[key] || false;
+        
+        html += '<div class="auto-group-card" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
+        html += '<div style="cursor:pointer;" onclick="window.toggleAutoGroup(\'' + key + '\')">';
+        html += '<strong style="color:var(--accent);">' + (discipline ? discipline.name : 'Unknown') + '</strong>';
+        html += ' <span style="color:var(--text-dim);font-size:0.8rem;">' + dayNames[group.day] + ' ' + hourDisplay + ':00 ' + ampm + '</span>';
+        html += ' <span style="color:var(--text-dim);font-size:0.7rem;">(' + instructorName + ')</span>';
+        html += '</div>';
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:0.75rem;color:var(--text-dim);">' + studentCount + ' student' + (studentCount !== 1 ? 's' : '') + '</span>';
+        html += '<span style="font-size:0.7rem;color:var(--text-dim);cursor:pointer;" onclick="window.toggleAutoGroup(\'' + key + '\')">' + (isExpanded ? '▼' : '▶') + '</span>';
         html += '</div>';
         html += '</div>';
         
-        if (groupLabels.length === 0) {
-            html += '<p style="color:var(--text-dim);font-size:0.8rem;margin-bottom:8px;">No groups created for this discipline. Click "Add Group" to create one.</p>';
-        } else {
-            html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
-            groupLabels.forEach(function(label) {
-                var group = groups[label];
-                var studentCount = group.students ? Object.keys(group.students).length : 0;
-                var isFull = discipline.maxStudents && studentCount >= discipline.maxStudents;
-                var isExpanded = instructorCalendarState && instructorCalendarState.expandedGroups ? 
-                    instructorCalendarState.expandedGroups[discipline.id + '_' + label] || false : false;
-                
-                var studentsInGroup = studentData.groups[label] || [];
-                
-                html += '<div class="discipline-group-card" style="background:var(--bg);border:1px solid ' + (isFull ? 'var(--danger)' : 'var(--border-soft)') + ';border-radius:var(--radius);padding:8px 12px;flex:1;min-width:120px;max-width:250px;">';
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="window.toggleDisciplineGroup(\'' + discipline.id + '\', \'' + label + '\')">';
-                html += '<span style="font-weight:600;color:var(--accent);">Group ' + label + '</span>';
-                html += '<span style="font-size:0.7rem;color:var(--text-dim);">' + studentCount + '/' + (discipline.maxStudents || '∞') + (isExpanded ? ' ▼' : ' ▶') + '</span>';
-                html += '</div>';
-                
-                if (isExpanded) {
-                    html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
-                    
-                    if (studentsInGroup.length > 0) {
-                        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
-                        studentsInGroup.forEach(function(student) {
-                            var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                            var isEliminated = isCharacterEliminatedInWeek(student.id, week);
-                            html += '<span class="student-tag" style="background:var(--panel-alt);padding:2px 8px;border-radius:12px;font-size:0.7rem;display:inline-flex;align-items:center;gap:4px;' + (isEliminated ? 'opacity:0.4;text-decoration:line-through;' : '') + '">' + name;
-                            html += '<button class="remove-from-discipline-group-btn" data-discipline="' + discipline.id + '" data-group="' + label + '" data-student="' + student.id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
-                            html += '</span>';
-                        });
-                        html += '</div>';
-                    } else {
-                        html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
-                    }
-                    
-                    html += '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">';
-                    html += '<select class="add-student-to-discipline-group" data-discipline="' + discipline.id + '" data-group="' + label + '" style="flex:1;min-width:100px;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
-                    html += '<option value="">Add student...</option>';
-                    
-                    studentData.unassigned.forEach(function(student) {
-                        var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                        var inGroup = isStudentInGroup(discipline.id, label, student.id);
-                        if (!inGroup) {
-                            var isEliminated = isCharacterEliminatedInWeek(student.id, week);
-                            html += '<option value="' + student.id + '" ' + (isEliminated ? 'style="opacity:0.4;"' : '') + '>' + name + (isEliminated ? ' (eliminated)' : '') + '</option>';
-                        }
-                    });
-                    
-                    for (var otherLabel in groups) {
-                        if (otherLabel === label) continue;
-                        if (groups[otherLabel].students) {
-                            Object.keys(groups[otherLabel].students).forEach(function(id) {
-                                var student = data.characters.find(function(c) { return String(c.id) === String(id); });
-                                if (student) {
-                                    var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                                    var isEliminated = isCharacterEliminatedInWeek(id, week);
-                                    html += '<option value="' + id + '" style="color:var(--warning);' + (isEliminated ? 'opacity:0.4;' : '') + '">' + name + ' (in Group ' + otherLabel + ')' + (isEliminated ? ' (eliminated)' : '') + '</option>';
-                                }
-                            });
-                        }
-                    }
-                    html += '</select>';
-                    html += '<button class="add-student-to-discipline-group-btn small primary" data-discipline="' + discipline.id + '" data-group="' + label + '" style="font-size:0.6rem;padding:2px 6px;">Add</button>';
-                    html += '</div>';
-                    
-                    html += '</div>';
-                }
-                
-                html += '</div>';
-            });
-            html += '</div>';
+        if (isExpanded) {
+            html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);">';
             
-            if (studentData.unassigned.length > 0) {
-                html += '<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:var(--radius);border:1px dashed var(--border);">';
-                html += '<span style="font-size:0.7rem;color:var(--text-dim);">Unassigned (' + studentData.unassigned.length + '): </span>';
-                studentData.unassigned.forEach(function(student) {
-                    var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
-                    var isEliminated = isCharacterEliminatedInWeek(student.id, week);
-                    html += '<span style="background:var(--panel-alt);padding:2px 6px;border-radius:10px;font-size:0.65rem;margin:2px;display:inline-block;' + (isEliminated ? 'opacity:0.4;text-decoration:line-through;' : '') + '">' + name + '</span>';
+            // List students in this group
+            if (group.students && group.students.length > 0) {
+                html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+                group.students.forEach(function(id) {
+                    var name = getStudentName(id);
+                    html += '<span class="student-tag" style="background:var(--bg);padding:2px 10px;border-radius:12px;font-size:0.75rem;border:1px solid var(--border-soft);">' + name;
+                    html += ' <button class="remove-from-auto-group-btn small" data-key="' + key + '" data-student="' + id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">✕</button>';
+                    html += '</span>';
                 });
                 html += '</div>';
+            } else {
+                html += '<div style="color:var(--text-dim);font-size:0.75rem;margin-bottom:8px;">No students in this group</div>';
             }
+            
+            // Add student dropdown
+            var allStudents = getStudents();
+            var availableStudents = allStudents.filter(function(s) {
+                return !group.students || group.students.indexOf(s.id) === -1;
+            });
+            
+            if (availableStudents.length > 0) {
+                html += '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+                html += '<select class="add-to-auto-group-select" data-key="' + key + '" style="flex:1;min-width:120px;padding:4px 8px;font-size:0.75rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
+                html += '<option value="">Add student...</option>';
+                availableStudents.forEach(function(s) {
+                    var name = [s.firstName, s.lastName].filter(function(n) { return n; }).join(' ');
+                    html += '<option value="' + s.id + '">' + name + '</option>';
+                });
+                html += '</select>';
+                html += '<button class="add-to-auto-group-btn small primary" data-key="' + key + '" style="font-size:0.65rem;padding:2px 8px;">Add</button>';
+                html += '</div>';
+            } else {
+                html += '<div style="color:var(--text-dim);font-size:0.75rem;">All students are in this group</div>';
+            }
+            
+            // Show class slot info
+            html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);font-size:0.7rem;color:var(--text-dim);">';
+            html += 'Class: ' + (discipline ? discipline.name : 'Unknown') + ' | Instructor: ' + instructorName;
+            html += ' | Time: ' + dayNames[group.day] + ' ' + hourDisplay + ':00 ' + ampm;
+            html += '</div>';
+            
+            html += '</div>';
         }
         
         html += '</div>';
@@ -585,363 +563,166 @@ function renderDisciplineGroups() {
     html += '</div>';
     container.innerHTML = html;
     
-    container.querySelectorAll('.add-student-to-discipline-group-btn').forEach(function(btn) {
+    // Event listeners for add/remove
+    container.querySelectorAll('.add-to-auto-group-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            var groupLabel = this.dataset.group;
-            var select = this.parentElement.querySelector('.add-student-to-discipline-group');
+            var key = this.dataset.key;
+            var select = this.parentElement.querySelector('.add-to-auto-group-select');
             var studentId = select.value;
-            if (studentId) {
-                var result = addStudentToDisciplineGroup(disciplineId, groupLabel, studentId);
-                if (result.success) {
-                    saveData().then(function() {
-                        if (typeof logActivity === 'function') {
-                            logActivity('Added student to group ' + groupLabel);
-                        }
-                        renderDisciplineGroups();
-                    }).catch(function(err) {
-                        console.error('Failed to save:', err);
-                        alert('Failed to add student to group.');
-                    });
-                } else {
-                    alert(result.message);
-                }
-            }
-        });
-    });
-    
-    container.querySelectorAll('.remove-from-discipline-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            var groupLabel = this.dataset.group;
-            var studentId = this.dataset.student;
-            if (confirm('Remove this student from the group?')) {
-                var result = removeStudentFromDisciplineGroup(disciplineId, groupLabel, studentId);
-                if (result.success) {
-                    saveData().then(function() {
-                        if (typeof logActivity === 'function') {
-                            logActivity('Removed student from group');
-                        }
-                        renderDisciplineGroups();
-                    }).catch(function(err) {
-                        console.error('Failed to save:', err);
-                        alert('Failed to remove student from group.');
-                    });
-                }
-            }
-        });
-    });
-    
-    container.querySelectorAll('.add-discipline-group-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            showAddDisciplineGroupModal(disciplineId);
-        });
-    });
-    
-    container.querySelectorAll('.auto-distribute-btn').forEach(function(btn) {
-        var newBtn = btn.cloneNode(true);
-        btn.parentNode.replaceChild(newBtn, btn);
-        newBtn.addEventListener('click', function() {
-            var disciplineId = this.dataset.discipline;
-            var week = instructorCalendarState ? instructorCalendarState.currentWeek || 1 : 1;
-            
-            if (!confirm('Auto-distribute will reassign all students to groups for this discipline.\n\nExisting group assignments will be overwritten.\n\nContinue?')) {
+            if (!studentId) {
+                alert('Please select a student.');
                 return;
             }
             
-            var result = autoDistributeStudents(disciplineId, week);
+            var allGroups = getAllAutoGroups();
+            var group = allGroups[key];
+            if (!group) {
+                alert('Group not found.');
+                return;
+            }
+            
+            // Check if student already in group
+            if (group.students.indexOf(studentId) !== -1) {
+                alert('Student already in this group.');
+                return;
+            }
+            
+            // Check if student is in another group for this discipline
+            var existingGroup = getStudentAutoGroup(studentId, group.disciplineId);
+            if (existingGroup && existingGroup.id !== key) {
+                if (!confirm('Student is in group "' + existingGroup.displayName + '" for this discipline. Move to "' + group.displayName + '"?')) {
+                    return;
+                }
+                // Remove from old group
+                var idx = existingGroup.students.indexOf(studentId);
+                if (idx !== -1) {
+                    existingGroup.students.splice(idx, 1);
+                }
+            }
+            
+            // Add student to group
+            group.students.push(studentId);
+            
+            // Add the class to the student
+            var weekNum = 1; // Default to week 1
+            var result = addClassToStudent(
+                studentId,
+                group.disciplineId,
+                weekNum,
+                group.day,
+                group.hour,
+                1,
+                group.instructorId
+            );
+            
             if (result.success) {
                 saveData().then(function() {
                     if (typeof logActivity === 'function') {
-                        logActivity('Auto-distributed students for discipline');
+                        logActivity('Added student to auto-group: ' + group.displayName);
                     }
-                    renderDisciplineGroups();
-                    alert('✅ ' + result.message + '\n\n' + 
-                        Object.keys(result.assignments).map(function(label) {
-                            return 'Group ' + label + ': ' + result.assignments[label] + ' students';
-                        }).join('\n') +
-                        (result.unassigned > 0 ? '\n\n⚠ ' + result.unassigned + ' students could not be assigned.' : ''));
+                    renderAutoGroups();
+                    if (typeof renderSchedule === 'function') {
+                        renderSchedule();
+                    }
+                    alert('Student added to group and class assigned!');
                 }).catch(function(err) {
                     console.error('Failed to save:', err);
-                    alert('Failed to save distribution.');
+                    alert('Failed to save changes.');
                 });
             } else {
-                alert('❌ ' + result.message);
+                // If class assignment failed, remove from group
+                var idx = group.students.indexOf(studentId);
+                if (idx !== -1) group.students.splice(idx, 1);
+                alert('Failed to add class: ' + result.message);
             }
         });
     });
-}
-
-/**
- * Toggle discipline group expansion
- */
-function toggleDisciplineGroup(disciplineId, groupLabel) {
-    if (!instructorCalendarState) {
-        instructorCalendarState = { expandedGroups: {} };
-    }
-    var key = disciplineId + '_' + groupLabel;
-    if (instructorCalendarState.expandedGroups[key]) {
-        delete instructorCalendarState.expandedGroups[key];
-    } else {
-        instructorCalendarState.expandedGroups[key] = true;
-    }
-    renderDisciplineGroups();
-}
-
-/**
- * Show add group modal for a specific discipline
- */
-function showAddDisciplineGroupModal(disciplineId) {
-    var disciplines = data.curriculum.disciplines || [];
-    if (disciplines.length === 0) {
-        alert('No disciplines available. Create a discipline first.');
-        return;
-    }
     
-    if (!disciplineId) {
-        var modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width:400px;">
-                <div class="modal-header">
-                    <h3>Add Group to Discipline</h3>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Discipline *</label>
-                        <select id="add-group-discipline-select" style="width:100%;padding:8px;">
-                            ${disciplines.map(function(d) {
-                                return '<option value="' + d.id + '">' + d.name + '</option>';
-                            }).join('')}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Group Label *</label>
-                        <input type="text" id="add-group-label" placeholder="e.g., A, B, 1, 2..." style="width:100%;padding:8px;">
-                    </div>
-                    <div class="form-actions" style="margin-top:16px;">
-                        <button type="button" id="cancel-add-group" class="secondary">Cancel</button>
-                        <button type="button" id="confirm-add-group" class="primary">Add Group</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-        modal.querySelector('#cancel-add-group').onclick = function() { modal.remove(); };
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) modal.remove();
-        });
-        
-        modal.querySelector('#confirm-add-group').onclick = function() {
-            var selectedDisciplineId = document.getElementById('add-group-discipline-select').value;
-            var label = document.getElementById('add-group-label').value.trim().toUpperCase();
+    container.querySelectorAll('.remove-from-auto-group-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var key = this.dataset.key;
+            var studentId = this.dataset.student;
             
-            if (!selectedDisciplineId) {
-                alert('Please select a discipline.');
-                return;
-            }
-            if (!label) {
-                alert('Please enter a group label.');
-                return;
+            if (!confirm('Remove this student from the group? This will remove their class from this time slot.')) return;
+            
+            var allGroups = getAllAutoGroups();
+            var group = allGroups[key];
+            if (!group) return;
+            
+            var idx = group.students.indexOf(studentId);
+            if (idx !== -1) {
+                group.students.splice(idx, 1);
             }
             
-            var groups = getDisciplineGroups(selectedDisciplineId);
-            if (groups[label]) {
-                alert('Group "' + label + '" already exists for this discipline.');
-                return;
+            // Remove the class from the student's schedule
+            var weekNum = 1;
+            var schedule = getStudentSchedule(studentId, weekNum);
+            for (var h = group.hour; h < group.hour + 1 && h <= 23; h++) {
+                if (schedule[group.day] && schedule[group.day][h]) {
+                    delete schedule[group.day][h];
+                }
             }
-            
-            groups[label] = { students: {} };
             
             saveData().then(function() {
                 if (typeof logActivity === 'function') {
-                    var discipline = getDiscipline(selectedDisciplineId);
-                    logActivity('Created group ' + label + ' for discipline ' + (discipline ? discipline.name : ''));
+                    logActivity('Removed student from auto-group: ' + group.displayName);
                 }
-                modal.remove();
-                renderDisciplineGroups();
+                renderAutoGroups();
+                if (typeof renderSchedule === 'function') {
+                    renderSchedule();
+                }
+                alert('Student removed from group and class removed.');
             }).catch(function(err) {
                 console.error('Failed to save:', err);
-                alert('Failed to create group.');
+                alert('Failed to save changes.');
             });
-        };
-        return;
-    }
-    
-    var discipline = getDiscipline(disciplineId);
-    if (!discipline) {
-        alert('Discipline not found.');
-        return;
-    }
-    
-    var groups = getDisciplineGroups(disciplineId);
-    var existingLabels = Object.keys(groups);
-    
-    var modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:400px;">
-            <div class="modal-header">
-                <h3>Add Group to ${discipline.name}</h3>
-                <button class="close-modal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Discipline:</label>
-                    <span style="padding:6px 0;display:block;">${discipline.name}</span>
-                </div>
-                <div class="form-group">
-                    <label>Group Label *</label>
-                    <input type="text" id="add-group-label" placeholder="e.g., A, B, 1, 2..." style="width:100%;padding:8px;">
-                    ${existingLabels.length > 0 ? '<span style="font-size:0.6rem;color:var(--text-dim);">Existing groups: ' + existingLabels.join(', ') + '</span>' : ''}
-                </div>
-                <div class="form-actions" style="margin-top:16px;">
-                    <button type="button" id="cancel-add-group" class="secondary">Cancel</button>
-                    <button type="button" id="confirm-add-group" class="primary">Add Group</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-    modal.querySelector('#cancel-add-group').onclick = function() { modal.remove(); };
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) modal.remove();
-    });
-    
-    modal.querySelector('#confirm-add-group').onclick = function() {
-        var label = document.getElementById('add-group-label').value.trim().toUpperCase();
-        
-        if (!label) {
-            alert('Please enter a group label.');
-            return;
-        }
-        if (existingLabels.indexOf(label) !== -1) {
-            alert('Group "' + label + '" already exists for this discipline.');
-            return;
-        }
-        
-        var groups = getDisciplineGroups(disciplineId);
-        groups[label] = { students: {} };
-        
-        saveData().then(function() {
-            if (typeof logActivity === 'function') {
-                logActivity('Created group ' + label + ' for discipline ' + discipline.name);
-            }
-            modal.remove();
-            renderDisciplineGroups();
-        }).catch(function(err) {
-            console.error('Failed to save:', err);
-            alert('Failed to create group.');
         });
-    };
+    });
 }
 
 /**
- * Initialize discipline groups events
+ * Toggle auto-group expansion
  */
-function initDisciplineGroupsEvents() {
-    var autoDistBtn = document.getElementById('auto-distribute-btn');
-    if (autoDistBtn) {
-        var newBtn = autoDistBtn.cloneNode(true);
-        autoDistBtn.parentNode.replaceChild(newBtn, autoDistBtn);
-        newBtn.addEventListener('click', function() {
-            var disciplines = data.curriculum.disciplines || [];
-            if (disciplines.length === 0) {
-                alert('No disciplines available.');
-                return;
-            }
-            
-            var modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width:400px;">
-                    <div class="modal-header">
-                        <h3>Auto-Distribute Students</h3>
-                        <button class="close-modal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>Select Discipline:</label>
-                            <select id="auto-dist-discipline" style="width:100%;padding:8px;">
-                                ${disciplines.map(function(d) {
-                                    return '<option value="' + d.id + '">' + d.name + '</option>';
-                                }).join('')}
-                            </select>
-                        </div>
-                        <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border-soft);">
-                            <p style="font-size:0.75rem;color:var(--text-dim);">
-                                ⚡ This will reassign all students to groups for the selected discipline.
-                                Existing group assignments will be overwritten.
-                            </p>
-                        </div>
-                        <div class="form-actions" style="margin-top:16px;">
-                            <button type="button" id="cancel-auto-dist" class="secondary">Cancel</button>
-                            <button type="button" id="confirm-auto-dist" class="primary">Auto-Distribute</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
-            modal.querySelector('#cancel-auto-dist').onclick = function() { modal.remove(); };
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) modal.remove();
-            });
-            
-            modal.querySelector('#confirm-auto-dist').onclick = function() {
-                var disciplineId = document.getElementById('auto-dist-discipline').value;
-                var week = instructorCalendarState ? instructorCalendarState.currentWeek || 1 : 1;
-                modal.remove();
-                
-                var result = autoDistributeStudents(disciplineId, week);
-                if (result.success) {
-                    saveData().then(function() {
-                        if (typeof logActivity === 'function') {
-                            logActivity('Auto-distributed students for discipline');
-                        }
-                        renderDisciplineGroups();
-                        alert('✅ ' + result.message + '\n\n' + 
-                            Object.keys(result.assignments).map(function(label) {
-                                return 'Group ' + label + ': ' + result.assignments[label] + ' students';
-                            }).join('\n') +
-                            (result.unassigned > 0 ? '\n\n⚠ ' + result.unassigned + ' students could not be assigned.' : ''));
-                    }).catch(function(err) {
-                        console.error('Failed to save:', err);
-                        alert('Failed to save distribution.');
-                    });
-                } else {
-                    alert('❌ ' + result.message);
-                }
-            };
+function toggleAutoGroup(key) {
+    if (!window.autoGroupsExpanded) {
+        window.autoGroupsExpanded = {};
+    }
+    window.autoGroupsExpanded[key] = !window.autoGroupsExpanded[key];
+    renderAutoGroups();
+}
+
+/**
+ * Initialize auto-groups events
+ */
+function initAutoGroupsEvents() {
+    var refreshBtn = document.getElementById('refresh-auto-groups-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            renderAutoGroups();
         });
     }
 }
 
 // Make functions globally available
-window.renderDisciplineGroupsView = renderDisciplineGroupsView;
-window.renderDisciplineGroups = renderDisciplineGroups;
-window.getDisciplineGroups = getDisciplineGroups;
-window.getStudentsInDisciplineGroup = getStudentsInDisciplineGroup;
-window.isStudentInGroup = isStudentInGroup;
-window.getStudentDisciplineGroup = getStudentDisciplineGroup;
-window.addStudentToDisciplineGroup = addStudentToDisciplineGroup;
-window.removeStudentFromDisciplineGroup = removeStudentFromDisciplineGroup;
-window.removeDisciplineGroup = removeDisciplineGroup;
-window.toggleDisciplineGroup = toggleDisciplineGroup;
-window.getAllStudentsForDiscipline = getAllStudentsForDiscipline;
-window.getStudentsWithGroupsForDiscipline = getStudentsWithGroupsForDiscipline;
-window.isCharacterEliminatedInWeek = isCharacterEliminatedInWeek;
-window.isDisciplineActiveInWeek = isDisciplineActiveInWeek;
-window.showAddDisciplineGroupModal = showAddDisciplineGroupModal;
-window.initDisciplineGroupsEvents = initDisciplineGroupsEvents;
-window.autoDistributeStudents = autoDistributeStudents;
-window.getClassSlotsForDiscipline = getClassSlotsForDiscipline;
-window.getStudentsForDiscipline = getStudentsForDiscipline;
+window.renderAutoGroupsView = renderAutoGroupsView;
+window.renderAutoGroups = renderAutoGroups;
+window.getAllAutoGroups = getAllAutoGroups;
+window.getAutoGroupsForDiscipline = getAutoGroupsForDiscipline;
+window.getAutoGroupsForInstructor = getAutoGroupsForInstructor;
+window.getStudentAutoGroup = getStudentAutoGroup;
+window.isStudentInAutoGroup = isStudentInAutoGroup;
+window.addStudentToAutoGroup = addStudentToAutoGroup;
+window.removeStudentFromAutoGroup = removeStudentFromAutoGroup;
+window.getStudentsInAutoGroup = getStudentsInAutoGroup;
+window.getAutoGroupForSlot = getAutoGroupForSlot;
+window.getOrCreateAutoGroup = getOrCreateAutoGroup;
+window.autoAssignStudentToGroupAndClass = autoAssignStudentToGroupAndClass;
+window.addClassToStudent = addClassToStudent;
+window.checkAutoGroupConflicts = checkAutoGroupConflicts;
+window.resolveAutoGroupConflicts = resolveAutoGroupConflicts;
+window.toggleAutoGroup = toggleAutoGroup;
+window.generateGroupKey = generateGroupKey;
+window.generateGroupDisplayName = generateGroupDisplayName;
+window.getStudentName = getStudentName;
+window.initAutoGroupsEvents = initAutoGroupsEvents;
+window.autoGroupsExpanded = {};
