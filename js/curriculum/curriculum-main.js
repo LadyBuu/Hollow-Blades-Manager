@@ -1,6 +1,7 @@
 /**
  * curriculum-main.js - Main Curriculum Module
  * Entry point for all curriculum features
+ * Loads all sub-modules: disciplines, auto-groups, class-view, instructor-calendar, schedule, grades, ranking
  */
 
 // Global state
@@ -59,27 +60,68 @@ function renderCurriculumView(container) {
     // Initialize tabs
     initCurriculumTabs();
     
-    // Render each section
-    if (typeof renderDisciplinesView === 'function') {
-        renderDisciplinesView(document.getElementById('disciplines-content'));
+    // Render each section - check if functions exist
+    var disciplinesContent = document.getElementById('disciplines-content');
+    if (disciplinesContent) {
+        if (typeof renderDisciplinesView === 'function') {
+            renderDisciplinesView(disciplinesContent);
+        } else {
+            disciplinesContent.innerHTML = '<p class="empty-state">Disciplines module not loaded. Check that disciplines.js is included.</p>';
+        }
     }
-    if (typeof renderAutoGroupsView === 'function') {
-        renderAutoGroupsView(document.getElementById('groups-content'));
+    
+    var groupsContent = document.getElementById('groups-content');
+    if (groupsContent) {
+        if (typeof renderAutoGroupsView === 'function') {
+            renderAutoGroupsView(groupsContent);
+        } else {
+            groupsContent.innerHTML = '<p class="empty-state">Auto-Groups module not loaded. Check that groups.js is included.</p>';
+        }
     }
-    if (typeof renderClassView === 'function') {
-        renderClassView(document.getElementById('class-view-content'));
+    
+    var classViewContent = document.getElementById('class-view-content');
+    if (classViewContent) {
+        if (typeof renderClassView === 'function') {
+            renderClassView(classViewContent);
+        } else {
+            classViewContent.innerHTML = '<p class="empty-state">Class View module not loaded. Check that class-view.js is included.</p>';
+        }
     }
-    if (typeof renderInstructorCalendar === 'function') {
-        renderInstructorCalendar(document.getElementById('instructor-calendar-content'));
+    
+    var instructorCalendarContent = document.getElementById('instructor-calendar-content');
+    if (instructorCalendarContent) {
+        if (typeof renderInstructorCalendar === 'function') {
+            renderInstructorCalendar(instructorCalendarContent);
+        } else {
+            instructorCalendarContent.innerHTML = '<p class="empty-state">Instructor Calendar module not loaded. Check that instructor-calendar.js is included.</p>';
+        }
     }
-    if (typeof renderScheduleView === 'function') {
-        renderScheduleView(document.getElementById('schedule-content'));
+    
+    var scheduleContent = document.getElementById('schedule-content');
+    if (scheduleContent) {
+        if (typeof renderScheduleView === 'function') {
+            renderScheduleView(scheduleContent);
+        } else {
+            scheduleContent.innerHTML = '<p class="empty-state">Schedule module not loaded. Check that schedule.js is included.</p>';
+        }
     }
-    if (typeof renderGradesView === 'function') {
-        renderGradesView(document.getElementById('grades-content'));
+    
+    var gradesContent = document.getElementById('grades-content');
+    if (gradesContent) {
+        if (typeof renderGradesView === 'function') {
+            renderGradesView(gradesContent);
+        } else {
+            gradesContent.innerHTML = '<p class="empty-state">Grades module not loaded. Check that grades.js is included.</p>';
+        }
     }
-    if (typeof renderRankingView === 'function') {
-        renderRankingView(document.getElementById('ranking-content'));
+    
+    var rankingContent = document.getElementById('ranking-content');
+    if (rankingContent) {
+        if (typeof renderRankingView === 'function') {
+            renderRankingView(rankingContent);
+        } else {
+            rankingContent.innerHTML = '<p class="empty-state">Ranking module not loaded. Check that ranking.js is included.</p>';
+        }
     }
     
     // Initialize events
@@ -147,35 +189,79 @@ function initCurriculumTabs() {
             }
             
             // Refresh content when switching tabs
-            if (tabName === 'disciplines' && typeof renderDisciplinesView === 'function') {
-                renderDisciplinesView(document.getElementById('disciplines-content'));
-            } else if (tabName === 'groups' && typeof renderAutoGroupsView === 'function') {
-                renderAutoGroupsView(document.getElementById('groups-content'));
-            } else if (tabName === 'class-view' && typeof renderClassView === 'function') {
-                renderClassView(document.getElementById('class-view-content'));
-            } else if (tabName === 'instructor-calendar' && typeof renderInstructorCalendar === 'function') {
-                renderInstructorCalendar(document.getElementById('instructor-calendar-content'));
-            } else if (tabName === 'schedule' && typeof renderScheduleView === 'function') {
-                renderScheduleView(document.getElementById('schedule-content'));
-            } else if (tabName === 'grades' && typeof renderGradesView === 'function') {
-                renderGradesView(document.getElementById('grades-content'));
-            } else if (tabName === 'ranking' && typeof renderRankingView === 'function') {
-                renderRankingView(document.getElementById('ranking-content'));
+            if (tabName === 'disciplines') {
+                var content = document.getElementById('disciplines-content');
+                if (content && typeof renderDisciplinesView === 'function') {
+                    renderDisciplinesView(content);
+                }
+            } else if (tabName === 'groups') {
+                var content = document.getElementById('groups-content');
+                if (content && typeof renderAutoGroupsView === 'function') {
+                    renderAutoGroupsView(content);
+                }
+            } else if (tabName === 'class-view') {
+                var content = document.getElementById('class-view-content');
+                if (content && typeof renderClassView === 'function') {
+                    renderClassView(content);
+                }
+            } else if (tabName === 'instructor-calendar') {
+                var content = document.getElementById('instructor-calendar-content');
+                if (content && typeof renderInstructorCalendar === 'function') {
+                    renderInstructorCalendar(content);
+                }
+            } else if (tabName === 'schedule') {
+                var content = document.getElementById('schedule-content');
+                if (content && typeof renderScheduleView === 'function') {
+                    renderScheduleView(content);
+                }
+            } else if (tabName === 'grades') {
+                var content = document.getElementById('grades-content');
+                if (content && typeof renderGradesView === 'function') {
+                    renderGradesView(content);
+                }
+            } else if (tabName === 'ranking') {
+                var content = document.getElementById('ranking-content');
+                if (content && typeof renderRankingView === 'function') {
+                    renderRankingView(content);
+                }
             }
         });
     });
 }
 
 /**
- * Initialize curriculum events
+ * Initialize curriculum events - calls init functions from all sub-modules
  */
 function initCurriculumEvents() {
-    if (typeof initDisciplineEvents === 'function') initDisciplineEvents();
-    if (typeof initAutoGroupsEvents === 'function') initAutoGroupsEvents();
-    if (typeof initClassViewEvents === 'function') initClassViewEvents();
-    if (typeof initInstructorCalendarEvents === 'function') initInstructorCalendarEvents();
-    if (typeof initGradesEvents === 'function') initGradesEvents();
-    if (typeof initRankingEvents === 'function') initRankingEvents();
+    // Disciplines
+    if (typeof initDisciplineEvents === 'function') {
+        initDisciplineEvents();
+    }
+    
+    // Auto-Groups
+    if (typeof initAutoGroupsEvents === 'function') {
+        initAutoGroupsEvents();
+    }
+    
+    // Class View
+    if (typeof initClassViewEvents === 'function') {
+        initClassViewEvents();
+    }
+    
+    // Instructor Calendar
+    if (typeof initInstructorCalendarEvents === 'function') {
+        initInstructorCalendarEvents();
+    }
+    
+    // Grades
+    if (typeof initGradesEvents === 'function') {
+        initGradesEvents();
+    }
+    
+    // Ranking
+    if (typeof initRankingEvents === 'function') {
+        initRankingEvents();
+    }
 }
 
 /**
