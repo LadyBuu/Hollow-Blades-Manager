@@ -10,6 +10,11 @@ var selectedGradeStudentId = null;
 var classViewState = { currentWeek: 1, filterDiscipline: 'all' };
 var instructorCalendarState = { currentWeek: 1, selectedInstructorId: null, expandedGroups: {} };
 
+// Also expose scheduleState from schedule.js
+if (typeof scheduleState === 'undefined') {
+    var scheduleState = { currentWeek: 1, selectedStudentId: null };
+}
+
 /**
  * Render the full curriculum view
  */
@@ -165,7 +170,6 @@ function initCurriculumTabs() {
  * Initialize curriculum events
  */
 function initCurriculumEvents() {
-    // Delegate to individual modules
     if (typeof initDisciplineEvents === 'function') initDisciplineEvents();
     if (typeof initDisciplineGroupsEvents === 'function') initDisciplineGroupsEvents();
     if (typeof initClassViewEvents === 'function') initClassViewEvents();
@@ -219,3 +223,4 @@ window.currentRankWeek = currentRankWeek;
 window.selectedGradeStudentId = selectedGradeStudentId;
 window.classViewState = classViewState;
 window.instructorCalendarState = instructorCalendarState;
+window.scheduleState = scheduleState;
