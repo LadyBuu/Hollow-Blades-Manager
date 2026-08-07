@@ -105,7 +105,6 @@ function getAllStudentsForDiscipline(disciplineId) {
     var result = [];
     
     allStudents.forEach(function(student) {
-        // Check if student is in any group for this discipline
         var group = getStudentDisciplineGroup(disciplineId, student.id);
         if (group) {
             result.push(student);
@@ -126,7 +125,6 @@ function getStudentsWithGroupsForDiscipline(disciplineId) {
         unassigned: []
     };
     
-    // Initialize group structure
     for (var label in groups) {
         result.groups[label] = [];
     }
@@ -153,19 +151,15 @@ function addStudentToDisciplineGroup(disciplineId, groupLabel, studentId) {
         groups[groupLabel] = { students: {} };
     }
     
-    // Check if student is already in this group
     if (groups[groupLabel].students && groups[groupLabel].students[studentId]) {
         return { success: false, message: 'Student is already in this group.' };
     }
     
-    // Check if student is in another group for this discipline
     var currentGroup = getStudentDisciplineGroup(disciplineId, studentId);
     if (currentGroup) {
-        // Remove from old group
         delete groups[currentGroup].students[studentId];
     }
     
-    // Check discipline max students limit
     var discipline = getDiscipline(disciplineId);
     if (discipline && discipline.maxStudents) {
         var currentCount = Object.keys(groups[groupLabel].students || {}).length;
@@ -216,7 +210,6 @@ function getClassSlotsForDiscipline(disciplineId, week) {
     var slots = [];
     var weekNum = parseInt(week) || 1;
     
-    // Check instructor templates
     if (data.curriculum.instructorTemplates) {
         for (var instructorId in data.curriculum.instructorTemplates) {
             var template = data.curriculum.instructorTemplates[instructorId];
@@ -286,7 +279,6 @@ function autoDistributeStudents(disciplineId, week) {
         return { success: false, message: 'No groups created for this discipline. Create groups first.' };
     }
     
-    // Get class slots for this discipline in this week
     var slots = getClassSlotsForDiscipline(disciplineId, weekNum);
     if (slots.length === 0) {
         return { 
@@ -295,13 +287,11 @@ function autoDistributeStudents(disciplineId, week) {
         };
     }
     
-    // Get all students enrolled in this discipline
     var allStudents = getStudentsForDiscipline(disciplineId, weekNum);
     if (allStudents.length === 0) {
         return { success: false, message: 'No students enrolled in this discipline for week ' + weekNum + '.' };
     }
     
-    // Get current assignments
     var assignedStudents = {};
     var unassignedStudents = [];
     
@@ -315,7 +305,6 @@ function autoDistributeStudents(disciplineId, week) {
         }
     });
     
-    // Calculate capacity per group based on slots
     var totalCapacity = 0;
     var slotCapacities = {};
     slots.forEach(function(slot) {
@@ -324,7 +313,6 @@ function autoDistributeStudents(disciplineId, week) {
         slotCapacities[key] += slot.capacity || discipline.maxStudents || 4;
     });
     
-    // Total capacity is the sum of all slot capacities
     for (var key in slotCapacities) {
         totalCapacity += slotCapacities[key];
     }
@@ -342,18 +330,15 @@ function autoDistributeStudents(disciplineId, week) {
         };
     }
     
-    // Clear all existing assignments
     for (var label in groups) {
         groups[label].students = {};
     }
     
-    // Calculate students per group based on capacity
     var maxPerGroup = Math.ceil(totalStudents / groupLabels.length);
     if (discipline.maxStudents && discipline.maxStudents < maxPerGroup) {
         maxPerGroup = discipline.maxStudents;
     }
     
-    // First pass: keep students already in groups (if they fit)
     for (var label in assignedStudents) {
         var students = assignedStudents[label];
         var group = groups[label];
@@ -371,12 +356,10 @@ function autoDistributeStudents(disciplineId, week) {
         });
     }
     
-    // Second pass: distribute remaining students evenly
     var remainingStudents = unassignedStudents.slice();
     var groupIndex = 0;
     
     remainingStudents.forEach(function(student) {
-        // Find the group with the most space
         var bestGroup = null;
         var bestSpace = -1;
         
@@ -395,7 +378,6 @@ function autoDistributeStudents(disciplineId, week) {
             if (!groups[bestGroup].students) groups[bestGroup].students = {};
             groups[bestGroup].students[student.id] = true;
         } else {
-            // If no group has space, try to add anyway (shouldn't happen if capacity is sufficient)
             var anyGroup = groupLabels[groupIndex % groupLabels.length];
             if (!groups[anyGroup].students) groups[anyGroup].students = {};
             groups[anyGroup].students[student.id] = true;
@@ -403,7 +385,6 @@ function autoDistributeStudents(disciplineId, week) {
         }
     });
     
-    // Count final assignments
     var finalAssignments = {};
     var finalUnassigned = [];
     allStudents.forEach(function(student) {
@@ -418,7 +399,6 @@ function autoDistributeStudents(disciplineId, week) {
     
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     
-    // Also update class group labels for students who have classes
     allStudents.forEach(function(student) {
         var groupLabel = getStudentDisciplineGroup(disciplineId, student.id);
         if (groupLabel) {
@@ -498,7 +478,6 @@ function renderDisciplineGroups() {
         var groupLabels = Object.keys(groups).sort();
         var maxStudents = discipline.maxStudents || 'Unlimited';
         
-        // Get all students with their group info
         var studentData = getStudentsWithGroupsForDiscipline(discipline.id);
         var totalStudents = Object.values(studentData.groups).reduce(function(sum, arr) { return sum + arr.length; }, 0) + studentData.unassigned.length;
         
@@ -526,7 +505,6 @@ function renderDisciplineGroups() {
                 var isExpanded = instructorCalendarState && instructorCalendarState.expandedGroups ? 
                     instructorCalendarState.expandedGroups[discipline.id + '_' + label] || false : false;
                 
-                // Get students in this group
                 var studentsInGroup = studentData.groups[label] || [];
                 
                 html += '<div class="discipline-group-card" style="background:var(--bg);border:1px solid ' + (isFull ? 'var(--danger)' : 'var(--border-soft)') + ';border-radius:var(--radius);padding:8px 12px;flex:1;min-width:120px;max-width:250px;">';
@@ -538,7 +516,6 @@ function renderDisciplineGroups() {
                 if (isExpanded) {
                     html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-soft);">';
                     
-                    // Show students in this group
                     if (studentsInGroup.length > 0) {
                         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
                         studentsInGroup.forEach(function(student) {
@@ -553,12 +530,10 @@ function renderDisciplineGroups() {
                         html += '<span style="font-size:0.7rem;color:var(--text-dim);">No students assigned</span>';
                     }
                     
-                    // Add student dropdown
                     html += '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">';
                     html += '<select class="add-student-to-discipline-group" data-discipline="' + discipline.id + '" data-group="' + label + '" style="flex:1;min-width:100px;padding:2px 4px;font-size:0.7rem;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">';
                     html += '<option value="">Add student...</option>';
                     
-                    // Show unassigned students
                     studentData.unassigned.forEach(function(student) {
                         var name = [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ');
                         var inGroup = isStudentInGroup(discipline.id, label, student.id);
@@ -568,7 +543,6 @@ function renderDisciplineGroups() {
                         }
                     });
                     
-                    // Also show students in other groups with a warning
                     for (var otherLabel in groups) {
                         if (otherLabel === label) continue;
                         if (groups[otherLabel].students) {
@@ -593,7 +567,6 @@ function renderDisciplineGroups() {
             });
             html += '</div>';
             
-            // Show unassigned students
             if (studentData.unassigned.length > 0) {
                 html += '<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:var(--radius);border:1px dashed var(--border);">';
                 html += '<span style="font-size:0.7rem;color:var(--text-dim);">Unassigned (' + studentData.unassigned.length + '): </span>';
@@ -612,7 +585,6 @@ function renderDisciplineGroups() {
     html += '</div>';
     container.innerHTML = html;
     
-    // Event listeners for group management
     container.querySelectorAll('.add-student-to-discipline-group-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var disciplineId = this.dataset.discipline;
@@ -660,7 +632,6 @@ function renderDisciplineGroups() {
         });
     });
     
-    // Add group buttons per discipline
     container.querySelectorAll('.add-discipline-group-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var disciplineId = this.dataset.discipline;
@@ -668,9 +639,7 @@ function renderDisciplineGroups() {
         });
     });
     
-    // Auto-Distribute buttons per discipline
     container.querySelectorAll('.auto-distribute-btn').forEach(function(btn) {
-        // Remove existing listeners by cloning
         var newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         newBtn.addEventListener('click', function() {
@@ -730,7 +699,6 @@ function showAddDisciplineGroupModal(disciplineId) {
         return;
     }
     
-    // If no disciplineId provided, show a dropdown
     if (!disciplineId) {
         var modal = document.createElement('div');
         modal.className = 'modal';
@@ -804,7 +772,6 @@ function showAddDisciplineGroupModal(disciplineId) {
         return;
     }
     
-    // If disciplineId provided, use it directly
     var discipline = getDiscipline(disciplineId);
     if (!discipline) {
         alert('Discipline not found.');
@@ -880,10 +847,8 @@ function showAddDisciplineGroupModal(disciplineId) {
  * Initialize discipline groups events
  */
 function initDisciplineGroupsEvents() {
-    // Auto-Distribute global button
     var autoDistBtn = document.getElementById('auto-distribute-btn');
     if (autoDistBtn) {
-        // Remove existing listener by cloning
         var newBtn = autoDistBtn.cloneNode(true);
         autoDistBtn.parentNode.replaceChild(newBtn, autoDistBtn);
         newBtn.addEventListener('click', function() {
@@ -893,7 +858,6 @@ function initDisciplineGroupsEvents() {
                 return;
             }
             
-            // Show a discipline selector
             var modal = document.createElement('div');
             modal.className = 'modal';
             modal.innerHTML = `
