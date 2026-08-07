@@ -133,8 +133,12 @@ function renderRanking() {
             }
         }
         
+        // FIX: Only show rank input if rank is a valid number
+        var rankDisplay = rank !== '-' && !isNaN(rank) ? rank : '';
+        var rankMax = rankings.length > 0 ? rankings.length : 1;
+        
         html += '<tr>';
-        html += '<td class="rank-number"><input type="number" class="rank-input" data-student="' + r.studentId + '" value="' + rank + '" min="1" max="' + rankings.length + '"></td>';
+        html += '<td class="rank-number"><input type="number" class="rank-input" data-student="' + r.studentId + '" value="' + rankDisplay + '" min="1" max="' + rankMax + '"></td>';
         html += '<td>' + r.firstName + (r.lastName ? ' ' + r.lastName : '') + '</td>';
         html += '<td style="font-weight:700;color:var(--accent);">' + (r.average > 0 ? r.average.toFixed(1) : '—') + '</td>';
         html += '<td>' + r.mandatoryCount + '</td>';
@@ -285,7 +289,9 @@ function initRankingEvents() {
     }
 }
 
+// Make functions globally available
 window.renderRankingView = renderRankingView;
 window.renderRanking = renderRanking;
 window.autoRank = autoRank;
 window.initRankingEvents = initRankingEvents;
+window.currentRankWeek = currentRankWeek;
