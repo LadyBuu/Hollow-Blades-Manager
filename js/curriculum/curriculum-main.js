@@ -23,7 +23,7 @@ function renderCurriculumView(container) {
         <div class="tab-container">
             <div class="tab-nav">
                 <button class="tab-btn active" data-tab="disciplines">Disciplines</button>
-                <button class="tab-btn" data-tab="groups">▣ Groups</button>
+                <button class="tab-btn" data-tab="groups">▣ Auto-Groups</button>
                 <button class="tab-btn" data-tab="class-view">▤ Class View</button>
                 <button class="tab-btn" data-tab="instructor-calendar">◷ Instructor Calendar</button>
                 <button class="tab-btn" data-tab="schedule">◷ Schedule</button>
@@ -63,8 +63,8 @@ function renderCurriculumView(container) {
     if (typeof renderDisciplinesView === 'function') {
         renderDisciplinesView(document.getElementById('disciplines-content'));
     }
-    if (typeof renderDisciplineGroupsView === 'function') {
-        renderDisciplineGroupsView(document.getElementById('groups-content'));
+    if (typeof renderAutoGroupsView === 'function') {
+        renderAutoGroupsView(document.getElementById('groups-content'));
     }
     if (typeof renderClassView === 'function') {
         renderClassView(document.getElementById('class-view-content'));
@@ -149,8 +149,8 @@ function initCurriculumTabs() {
             // Refresh content when switching tabs
             if (tabName === 'disciplines' && typeof renderDisciplinesView === 'function') {
                 renderDisciplinesView(document.getElementById('disciplines-content'));
-            } else if (tabName === 'groups' && typeof renderDisciplineGroupsView === 'function') {
-                renderDisciplineGroupsView(document.getElementById('groups-content'));
+            } else if (tabName === 'groups' && typeof renderAutoGroupsView === 'function') {
+                renderAutoGroupsView(document.getElementById('groups-content'));
             } else if (tabName === 'class-view' && typeof renderClassView === 'function') {
                 renderClassView(document.getElementById('class-view-content'));
             } else if (tabName === 'instructor-calendar' && typeof renderInstructorCalendar === 'function') {
@@ -171,7 +171,7 @@ function initCurriculumTabs() {
  */
 function initCurriculumEvents() {
     if (typeof initDisciplineEvents === 'function') initDisciplineEvents();
-    if (typeof initDisciplineGroupsEvents === 'function') initDisciplineGroupsEvents();
+    if (typeof initAutoGroupsEvents === 'function') initAutoGroupsEvents();
     if (typeof initClassViewEvents === 'function') initClassViewEvents();
     if (typeof initInstructorCalendarEvents === 'function') initInstructorCalendarEvents();
     if (typeof initGradesEvents === 'function') initGradesEvents();
