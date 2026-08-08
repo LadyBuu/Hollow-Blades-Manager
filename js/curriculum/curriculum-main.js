@@ -1,7 +1,7 @@
 /**
  * curriculum-main.js - Main Curriculum Module
  * Entry point for all curriculum features
- * Loads all sub-modules: disciplines, auto-groups, class-view, instructor-calendar, schedule, grades, ranking
+ * Loads all sub-modules: disciplines, auto-groups, class-view, instructor-calendar, student-schedule, grades, ranking
  */
 
 // Global state
@@ -11,9 +11,9 @@ var selectedGradeStudentId = null;
 var classViewState = { currentWeek: 1, filterDiscipline: 'all' };
 var instructorCalendarState = { currentWeek: 1, selectedInstructorId: null, expandedGroups: {} };
 
-// Also expose scheduleState from schedule.js
-if (typeof scheduleState === 'undefined') {
-    var scheduleState = { currentWeek: 1, selectedStudentId: null };
+// Student schedule state (from student-schedule.js)
+if (typeof studentScheduleState === 'undefined') {
+    var studentScheduleState = { currentWeek: 1, selectedStudentId: null };
 }
 
 /**
@@ -99,10 +99,12 @@ function renderCurriculumView(container) {
     
     var scheduleContent = document.getElementById('schedule-content');
     if (scheduleContent) {
-        if (typeof renderScheduleView === 'function') {
+        if (typeof renderStudentScheduleView === 'function') {
+            renderStudentScheduleView(scheduleContent);
+        } else if (typeof renderScheduleView === 'function') {
             renderScheduleView(scheduleContent);
         } else {
-            scheduleContent.innerHTML = '<p class="empty-state">Schedule module not loaded. Check that schedule.js is included.</p>';
+            scheduleContent.innerHTML = '<p class="empty-state">Schedule module not loaded. Check that student-schedule.js is included.</p>';
         }
     }
     
@@ -211,7 +213,9 @@ function initCurriculumTabs() {
                 }
             } else if (tabName === 'schedule') {
                 var content = document.getElementById('schedule-content');
-                if (content && typeof renderScheduleView === 'function') {
+                if (content && typeof renderStudentScheduleView === 'function') {
+                    renderStudentScheduleView(content);
+                } else if (content && typeof renderScheduleView === 'function') {
                     renderScheduleView(content);
                 }
             } else if (tabName === 'grades') {
@@ -298,15 +302,47 @@ function getInstructorNames(discipline) {
     return names;
 }
 
+/**
+ * Get all instructor templates for a week - SHARED UTILITY
+ */
+function getAllInstructorTemplatesForWeek(week) {
+    var results = {};
+    var weekNum = parseInt(week) || 1;
+    if (data.curriculum.instructorTemplates) {
+        for (var templateKey in data.curriculum.instructorTemplates) {
+            var parts = templateKey.split('_');
+            var instructorId = parts[0];
+            var templateWeek = parseInt(parts[1]);
+            if (templateWeek === weekNum) {
+                results[instructorId] = data.curriculum.instructorTemplates[templateKey];
+            }
+        }
+    }
+    return results;
+}
+
+/**
+ * Get instructor templates for a specific instructor and week - SHARED UTILITY
+ */
+function getInstructorTemplatesForWeek(instructorId, week) {
+    var templateKey = instructorId + '_' + week;
+    if (data.curriculum.instructorTemplates && data.curriculum.instructorTemplates[templateKey]) {
+        return data.curriculum.instructorTemplates[templateKey];
+    }
+    return {};
+}
+
 // Make functions globally available
 window.renderCurriculumView = renderCurriculumView;
 window.initCurriculumTabs = initCurriculumTabs;
 window.initCurriculumEvents = initCurriculumEvents;
 window.populateStudentSelector = populateStudentSelector;
 window.getInstructorNames = getInstructorNames;
+window.getAllInstructorTemplatesForWeek = getAllInstructorTemplatesForWeek;
+window.getInstructorTemplatesForWeek = getInstructorTemplatesForWeek;
 window.currentGradeWeek = currentGradeWeek;
 window.currentRankWeek = currentRankWeek;
 window.selectedGradeStudentId = selectedGradeStudentId;
 window.classViewState = classViewState;
 window.instructorCalendarState = instructorCalendarState;
-window.scheduleState = scheduleState;
+window.studentScheduleState = studentScheduleState;
