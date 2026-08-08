@@ -1,7 +1,7 @@
 /**
  * schedule.js - Per-Student Schedule Calendar
  * Handles individual student schedules, week by week
- * Updated with auto-group assignment
+ * Updated with duration selection, instructor selection, and auto-group sync
  */
 
 // Schedule state
@@ -244,7 +244,8 @@ function getAvailableDisciplinesForStudent(studentId, week) {
                 remaining: maxHours - usedCount,
                 instructorIds: d.instructorIds || [],
                 instructorNames: instructors,
-                groupInfo: groupInfo
+                groupInfo: groupInfo,
+                hasSlots: false
             });
         }
     });
@@ -276,7 +277,7 @@ function getOtherStudents(currentStudentId) {
 }
 
 /**
- * Add a class to a student's schedule (used by auto-groups)
+ * Add a class to a student's schedule
  */
 function addClassToStudent(studentId, disciplineId, week, day, hour, duration, instructorId) {
     var schedule = getStudentSchedule(studentId, week);
@@ -308,6 +309,163 @@ function addClassToStudent(studentId, disciplineId, week, day, hour, duration, i
     }
     
     return { success: true, message: 'Class added successfully.' };
+}
+
+/**
+ * Check if an instructor has a template at a specific time
+ */
+function getInstructorTemplate(instructorId, week, day, hour) {
+    var templateKey = instructorId + '_' + week;
+    if (data.curriculum.instructorTemplates && data.curriculum.instructorTemplates[templateKey]) {
+        var slotKey = day + '_' + hour;
+        if (data.curriculum.instructorTemplates[templateKey][slotKey]) {
+            return data.curriculum.instructorTemplates[templateKey][slotKey];
+        }
+    }
+    return null;
+}
+
+/**
+ * Check if an instructor is available at a specific time
+ */
+function isInstructorAvailable(instructorId, week, day, hour, duration) {
+    var dur = duration || 1;
+    
+    // Check if instructor has a template at this time
+    var template = getInstructorTemplate(instructorId, week, day, hour);
+    if (template) {
+        // Check if the template has a discipline assigned
+        if (template.disciplineId) {
+            // Check if there are any students assigned to this slot
+            var students = getStudents();
+            var hasStudents = false;
+            for (var i = 0; i < students.length; i++) {
+                var schedule = getStudentSchedule(students[i].id, week);
+                for (var h = day; h < day + dur && h <= 23; h++) {
+                    if (schedule[day] && schedule[day][h]) {
+                        var classInstructor = getClassInstructor(students[i].id, week, day, h);
+                        if (classInstructor === instructorId) {
+                            hasStudents = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasStudents) break;
+            }
+            return {
+                available: true,
+                template: template,
+                hasStudents: hasStudents
+            };
+        }
+    }
+    
+    return { available: false, template: null, hasStudents: false };
+}
+
+/**
+ * Get all available slots for a discipline from instructor templates
+ */
+function getAvailableSlotsForDiscipline(disciplineId, week, studentId) {
+    var weekNum = parseInt(week) || 1;
+    var slots = [];
+    var existingSlots = {};
+    var discipline = getDiscipline(disciplineId);
+    var maxStudents = discipline ? discipline.maxStudents : 10;
+    
+    // Check instructor templates for this discipline
+    if (data.curriculum.instructorTemplates) {
+        for (var instructorId in data.curriculum.instructorTemplates) {
+            var templateKey = instructorId + '_' + weekNum;
+            if (data.curriculum.instructorTemplates[templateKey]) {
+                for (var slotKey in data.curriculum.instructorTemplates[templateKey]) {
+                    var slotData = data.curriculum.instructorTemplates[templateKey][slotKey];
+                    if (String(slotData.disciplineId) === String(disciplineId)) {
+                        var parts = slotKey.split('_');
+                        var day = parseInt(parts[0]);
+                        var hour = parseInt(parts[1]);
+                        var key = day + '_' + hour;
+                        
+                        // Count assigned students
+                        var currentCount = 0;
+                        var assignedStudents = slotData.assignedStudents || [];
+                        if (assignedStudents.length > 0) {
+                            currentCount = assignedStudents.length;
+                        } else {
+                            var students = getStudents();
+                            students.forEach(function(s) {
+                                var schedule = getStudentSchedule(s.id, weekNum);
+                                if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
+                                    currentCount++;
+                                }
+                            });
+                        }
+                        
+                        var isFull = currentCount >= maxStudents;
+                        var studentAssigned = false;
+                        var hasConflict = false;
+                        var duration = slotData.duration || 1;
+                        
+                        if (studentId) {
+                            var schedule = getStudentSchedule(studentId, weekNum);
+                            for (var h = hour; h < hour + duration && h <= 23; h++) {
+                                if (schedule[day] && schedule[day][h]) {
+                                    hasConflict = true;
+                                    break;
+                                }
+                            }
+                            if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
+                                studentAssigned = true;
+                            }
+                        }
+                        
+                        // Check if instructor has a block at this time
+                        var isBlocked = false;
+                        if (data.curriculum.instructorBlocks) {
+                            var blockKey = instructorId + '_' + weekNum;
+                            if (data.curriculum.instructorBlocks[blockKey]) {
+                                if (data.curriculum.instructorBlocks[blockKey][day] && 
+                                    data.curriculum.instructorBlocks[blockKey][day][hour]) {
+                                    isBlocked = true;
+                                }
+                            }
+                        }
+                        
+                        var instructor = data.characters.find(function(c) { return String(c.id) === String(instructorId); });
+                        var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+                        
+                        if (!existingSlots[key]) {
+                            existingSlots[key] = {
+                                day: day,
+                                hour: hour,
+                                duration: duration,
+                                instructorId: instructorId,
+                                instructorName: instructorName,
+                                label: slotData.label || '',
+                                groupLabel: slotData.groupLabel || '',
+                                assignedStudents: assignedStudents,
+                                currentCount: currentCount,
+                                maxStudents: maxStudents,
+                                isFull: isFull,
+                                studentAssigned: studentAssigned,
+                                hasConflict: hasConflict,
+                                isBlocked: isBlocked,
+                                isTemplate: true
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    var slotArray = Object.values(existingSlots);
+    slotArray.sort(function(a, b) {
+        if (a.day !== b.day) return a.day - b.day;
+        return a.hour - b.hour;
+    });
+    
+    return slotArray;
 }
 
 /**
@@ -679,6 +837,13 @@ function renderSchedule() {
         scheduleState.currentWeek
     );
     
+    // Check which disciplines have available slots
+    availableDisciplines.forEach(function(item) {
+        var slots = getAvailableSlotsForDiscipline(item.discipline.id, scheduleState.currentWeek, scheduleState.selectedStudentId);
+        item.hasSlots = slots.length > 0;
+        item.slotCount = slots.length;
+    });
+    
     var hours = [];
     for (var h = 5; h <= 23; h++) {
         hours.push(h);
@@ -854,6 +1019,13 @@ function updateScheduleSidebar() {
     );
     var restDays = data.curriculum.restDays[scheduleState.currentWeek] || [];
     
+    // Check which disciplines have available slots
+    available.forEach(function(item) {
+        var slots = getAvailableSlotsForDiscipline(item.discipline.id, scheduleState.currentWeek, scheduleState.selectedStudentId);
+        item.hasSlots = slots.length > 0;
+        item.slotCount = slots.length;
+    });
+    
     var overview = document.getElementById('schedule-overview');
     if (overview) {
         var classList = [];
@@ -946,10 +1118,13 @@ function updateScheduleSidebar() {
                     item.instructorNames.join(', ') : 'No instructors assigned';
                 var isFull = item.remaining === 0;
                 var groupInfo = item.groupInfo || '';
+                var slotsInfo = item.hasSlots ? 
+                    ' <span style="color:var(--info);font-size:0.6rem;">✓ ' + item.slotCount + ' slots</span>' : 
+                    ' <span style="color:var(--warning);font-size:0.6rem;">no slots</span>';
                 
                 html += '<div class="available-discipline' + (isFull ? ' full' : '') + '" style="cursor:pointer;" data-discipline="' + disc.id + '">' +
                     '<span>' + disc.name + ' <span style="font-size:0.6rem;color:var(--text-dim);">(' + instructorDisplay + ')</span>' + groupInfo + '</span>' +
-                    '<span class="hours">' + item.used + '/' + item.maxHours + 'h</span>' +
+                    '<span class="hours">' + item.used + '/' + item.maxHours + 'h ' + slotsInfo + '</span>' +
                 '</div>';
             });
             availContainer.innerHTML = html;
@@ -1025,21 +1200,23 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
     }
     
     var weekNum = parseInt(week) || scheduleState.currentWeek || 1;
-    var slots = getAvailableTimeSlotsForDiscipline(disciplineId, weekNum, studentId);
+    var slots = getAvailableSlotsForDiscipline(disciplineId, weekNum, studentId);
     
-    // Filter out blocked slots and slots that are full
+    // Filter slots
     var availableSlots = slots.filter(function(s) {
         return !s.isBlocked && !s.isFull && !s.studentAssigned && !s.hasConflict;
     });
     
-    // Also show slots where student is already assigned (as info)
     var assignedSlots = slots.filter(function(s) {
         return s.studentAssigned;
     });
     
-    // Also show slots with conflicts (as warning)
     var conflictSlots = slots.filter(function(s) {
         return !s.isBlocked && s.hasConflict && !s.studentAssigned;
+    });
+    
+    var fullSlots = slots.filter(function(s) {
+        return !s.isBlocked && s.isFull && !s.studentAssigned;
     });
     
     var dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -1047,7 +1224,7 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
     var modal = document.createElement('div');
     modal.className = 'modal';
     modal.innerHTML = `
-        <div class="modal-content" style="max-width:550px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h3>${discipline.name} - Available Time Slots</h3>
                 <button class="close-modal">&times;</button>
@@ -1055,12 +1232,22 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
             <div class="modal-body">
                 <div style="margin-bottom:12px;">
                     <span style="color:var(--text-dim);font-size:0.85rem;">Week ${weekNum}</span>
-                    ${getStudentAutoGroup && getStudentAutoGroup(studentId, disciplineId) ? 
-                        '<span style="margin-left:12px;color:var(--accent);font-size:0.8rem;">Your Group: ' + getStudentAutoGroup(studentId, disciplineId).displayName + '</span>' : 
+                    ${typeof getStudentAutoGroup === 'function' && getStudentAutoGroup(studentId, disciplineId) ? 
+                        '<span style="margin-left:12px;color:var(--accent);font-size:0.8rem;">Group: ' + getStudentAutoGroup(studentId, disciplineId).displayName + '</span>' : 
                         '<span style="margin-left:12px;color:var(--warning);font-size:0.8rem;">Not in any group</span>'}
+                    <span style="margin-left:12px;font-size:0.7rem;color:var(--text-dim);">Instructors: ${getInstructorNames(discipline).join(', ') || 'None'}</span>
                 </div>
                 
-                ${availableSlots.length === 0 && assignedSlots.length === 0 && conflictSlots.length === 0 ? 
+                <div style="margin-bottom:12px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border-soft);">
+                    <p style="font-size:0.75rem;color:var(--text-dim);">
+                        💡 Click "Join" on any available slot. The system will:
+                        <br>• Add the student to the class
+                        <br>• Add ALL students in the group to the same slot
+                        <br>• Handle conflicts automatically
+                    </p>
+                </div>
+                
+                ${availableSlots.length === 0 && assignedSlots.length === 0 && conflictSlots.length === 0 && fullSlots.length === 0 ? 
                     '<p class="empty-state">No time slots available for this discipline in week ' + weekNum + '</p>' : ''}
                 
                 ${availableSlots.length > 0 ? `
@@ -1076,12 +1263,9 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
                         var groupDisplay = slot.groupLabel ? ' (G' + slot.groupLabel + ')' : '';
                         var capacityDisplay = slot.currentCount + '/' + slot.maxStudents + ' students';
                         
-                        var instructor = data.characters.find(function(c) { return String(c.id) === String(slot.instructorId); });
-                        var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                        
                         return '<div class="available-slot" style="background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">' +
                             '<div><strong>' + dayNames[slot.day] + ' ' + hourDisplay + ':00 ' + ampm + '</strong>' + durationDisplay + labelDisplay + groupDisplay + 
-                            '<br><span style="font-size:0.7rem;color:var(--text-dim);">Instructor: ' + instructorName + ' | ' + capacityDisplay + '</span></div>' +
+                            '<br><span style="font-size:0.7rem;color:var(--text-dim);">Instructor: ' + slot.instructorName + ' | ' + capacityDisplay + '</span></div>' +
                             '<button class="join-slot-btn primary small" data-day="' + slot.day + '" data-hour="' + slot.hour + '" data-duration="' + slot.duration + '" data-instructor="' + slot.instructorId + '">Join</button>' +
                         '</div>';
                     }).join('')}
@@ -1110,7 +1294,7 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
                 
                 ${conflictSlots.length > 0 ? `
                 <div style="margin-bottom:12px;">
-                    <h4 style="color:var(--danger);font-size:0.85rem;">⚠ Conflict (${conflictSlots.length})</h4>
+                    <h4 style="color:var(--danger);font-size:0.85rem;">⚠ Conflicts (${conflictSlots.length})</h4>
                     ${conflictSlots.map(function(slot) {
                         var hourDisplay = slot.hour > 12 ? slot.hour - 12 : slot.hour;
                         var ampm = slot.hour >= 12 ? 'PM' : 'AM';
@@ -1120,27 +1304,36 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
                         var labelDisplay = slot.label ? ' [' + slot.label + ']' : '';
                         var groupDisplay = slot.groupLabel ? ' (G' + slot.groupLabel + ')' : '';
                         
-                        var instructor = data.characters.find(function(c) { return String(c.id) === String(slot.instructorId); });
-                        var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                        
                         return '<div style="background:var(--danger-soft);border:1px solid var(--danger);border-radius:6px;padding:8px 12px;margin-bottom:6px;">' +
                             '<strong>' + dayNames[slot.day] + ' ' + hourDisplay + ':00 ' + ampm + '</strong>' + durationDisplay + labelDisplay + groupDisplay +
-                            '<br><span style="font-size:0.7rem;color:var(--text-dim);">Instructor: ' + instructorName + '</span>' +
-                            ' <span style="color:var(--danger);font-size:0.7rem;">(conflict - click to resolve)</span>' +
-                            '<br><button class="resolve-conflict-btn small warning-btn" data-day="' + slot.day + '" data-hour="' + slot.hour + '" data-duration="' + slot.duration + '" data-instructor="' + slot.instructorId + '">Resolve Conflict</button>' +
+                            '<br><span style="font-size:0.7rem;color:var(--text-dim);">Instructor: ' + slot.instructorName + '</span>' +
+                            ' <span style="color:var(--danger);font-size:0.7rem;">(conflict)</span>' +
+                            '<br><button class="resolve-conflict-btn small warning-btn" data-day="' + slot.day + '" data-hour="' + slot.hour + '" data-duration="' + slot.duration + '" data-instructor="' + slot.instructorId + '">Resolve & Join</button>' +
                         '</div>';
                     }).join('')}
                 </div>
                 ` : ''}
                 
-                <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;font-size:0.75rem;color:var(--text-dim);">
-                    <p>💡 <strong>How it works:</strong> Click "Join" on any available slot. The system will:</p>
-                    <ul style="margin:4px 0;padding-left:20px;">
-                        <li>Automatically use your group for this discipline</li>
-                        <li>Check for conflicts with existing classes</li>
-                        <li>Add you to the class and group</li>
-                    </ul>
+                ${fullSlots.length > 0 ? `
+                <div style="margin-bottom:12px;">
+                    <h4 style="color:var(--warning);font-size:0.85rem;">⚠ Full Slots (${fullSlots.length})</h4>
+                    ${fullSlots.map(function(slot) {
+                        var hourDisplay = slot.hour > 12 ? slot.hour - 12 : slot.hour;
+                        var ampm = slot.hour >= 12 ? 'PM' : 'AM';
+                        if (slot.hour === 0) { hourDisplay = 12; ampm = 'AM'; }
+                        if (slot.hour === 12) { ampm = 'PM'; }
+                        var durationDisplay = slot.duration > 1 ? ' (' + slot.duration + 'h)' : '';
+                        var labelDisplay = slot.label ? ' [' + slot.label + ']' : '';
+                        var groupDisplay = slot.groupLabel ? ' (G' + slot.groupLabel + ')' : '';
+                        
+                        return '<div style="background:var(--warning-soft);border:1px solid var(--warning);border-radius:6px;padding:8px 12px;margin-bottom:6px;color:var(--text-dim);">' +
+                            dayNames[slot.day] + ' ' + hourDisplay + ':00 ' + ampm + durationDisplay + labelDisplay + groupDisplay +
+                            ' <span style="color:var(--warning);font-size:0.7rem;">(FULL - ' + slot.currentCount + '/' + slot.maxStudents + ')</span>' +
+                            '<br><span style="font-size:0.7rem;color:var(--text-dim);">Instructor: ' + slot.instructorName + '</span>' +
+                        '</div>';
+                    }).join('')}
                 </div>
+                ` : ''}
                 
                 <div class="form-actions" style="margin-top:12px;">
                     <button type="button" id="close-slots-modal" class="secondary">Close</button>
@@ -1165,61 +1358,7 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
             var duration = parseInt(this.dataset.duration) || 1;
             var instructorId = this.dataset.instructor || null;
             
-            // Add the class to the student
-            var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, duration, instructorId);
-            
-            if (result.success) {
-                // Create or update the group for this student
-                if (typeof getOrCreateGroupForStudent === 'function') {
-                    var group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, day, hour, instructorId);
-                    
-                    // Also add the class to all other students in the group
-                    var addedCount = 0;
-                    if (group && group.students) {
-                        group.students.forEach(function(otherStudentId) {
-                            if (String(otherStudentId) === String(studentId)) return;
-                            
-                            var otherSchedule = getStudentSchedule(otherStudentId, weekNum);
-                            var hasConflict = false;
-                            for (var h = hour; h < hour + duration && h <= 23; h++) {
-                                if (otherSchedule[day] && otherSchedule[day][h]) {
-                                    hasConflict = true;
-                                    break;
-                                }
-                            }
-                            
-                            if (!hasConflict) {
-                                var addResult = addClassToStudent(otherStudentId, disciplineId, weekNum, day, hour, duration, instructorId);
-                                if (addResult.success) {
-                                    addedCount++;
-                                }
-                            }
-                        });
-                    }
-                    
-                    if (addedCount > 0) {
-                        alert('✅ Added ' + discipline.name + ' to ' + addedCount + ' other student(s) in the group!');
-                    }
-                }
-                
-                modal.remove();
-                saveData().then(function() {
-                    if (typeof logActivity === 'function') {
-                        logActivity('Student joined ' + discipline.name + ' at Week ' + weekNum + ', Day ' + day + ', Hour ' + hour);
-                    }
-                    renderSchedule();
-                    if (typeof renderAutoGroups === 'function') {
-                        renderAutoGroups();
-                    }
-                    alert('✅ Successfully joined ' + discipline.name + '!\nGroup: ' + (group ? group.displayName : 'N/A'));
-                }).catch(function(err) {
-                    console.error('Failed to save:', err);
-                    renderSchedule();
-                    alert('Class added but failed to save data.');
-                });
-            } else {
-                alert('❌ ' + result.message);
-            }
+            joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, modal);
         });
     });
     
@@ -1266,181 +1405,105 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
                 }
             }
             
-            // Now join the new class
-            var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, duration, instructorId);
-            
-            if (result.success) {
-                // Create or update the group
-                if (typeof getOrCreateGroupForStudent === 'function') {
-                    var group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, day, hour, instructorId);
-                }
-                
-                modal.remove();
-                saveData().then(function() {
-                    if (typeof logActivity === 'function') {
-                        logActivity('Resolved conflict and joined ' + discipline.name);
-                    }
-                    renderSchedule();
-                    if (typeof renderAutoGroups === 'function') {
-                        renderAutoGroups();
-                    }
-                    alert('✅ Conflict resolved! Joined ' + discipline.name);
-                }).catch(function(err) {
-                    console.error('Failed to save:', err);
-                    renderSchedule();
-                });
-            } else {
-                alert('❌ ' + result.message);
-            }
+            joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, modal);
         });
     });
 }
 
 /**
- * Get available time slots for a discipline
+ * Join a student to a slot (with group sync)
  */
-function getAvailableTimeSlotsForDiscipline(disciplineId, week, studentId) {
-    var weekNum = parseInt(week) || 1;
-    var slots = [];
-    var students = getStudents();
-    var existingSlots = {};
-    var discipline = getDiscipline(disciplineId);
-    var maxStudents = discipline ? discipline.maxStudents : 10;
+function joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, modal) {
+    // Add the class to the student
+    var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, duration, instructorId);
     
-    // Check instructor templates
-    if (data.curriculum.instructorTemplates) {
-        for (var instructorId in data.curriculum.instructorTemplates) {
-            var templateKey = instructorId + '_' + weekNum;
-            if (data.curriculum.instructorTemplates[templateKey]) {
-                for (var slotKey in data.curriculum.instructorTemplates[templateKey]) {
-                    var slotData = data.curriculum.instructorTemplates[templateKey][slotKey];
-                    if (String(slotData.disciplineId) === String(disciplineId)) {
-                        var parts = slotKey.split('_');
-                        var day = parseInt(parts[0]);
-                        var hour = parseInt(parts[1]);
-                        var key = day + '_' + hour;
-                        
-                        // Count assigned students
-                        var currentCount = 0;
-                        var assignedStudents = slotData.assignedStudents || [];
-                        if (assignedStudents.length > 0) {
-                            currentCount = assignedStudents.length;
-                        } else {
-                            students.forEach(function(s) {
-                                var schedule = getStudentSchedule(s.id, weekNum);
-                                if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
-                                    currentCount++;
-                                }
-                            });
-                        }
-                        
-                        var isFull = currentCount >= maxStudents;
-                        var studentAssigned = false;
-                        var hasConflict = false;
-                        var duration = slotData.duration || 1;
-                        
-                        if (studentId) {
-                            var schedule = getStudentSchedule(studentId, weekNum);
-                            if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
-                                studentAssigned = true;
-                            }
-                            hasConflict = hasStudentConflict(studentId, weekNum, day, hour, duration);
-                        }
-                        
-                        if (!existingSlots[key]) {
-                            existingSlots[key] = {
-                                day: day,
-                                hour: hour,
-                                duration: duration,
-                                instructorId: instructorId,
-                                label: slotData.label || '',
-                                groupLabel: slotData.groupLabel || '',
-                                assignedStudents: assignedStudents,
-                                currentCount: currentCount,
-                                maxStudents: maxStudents,
-                                isFull: isFull,
-                                studentAssigned: studentAssigned,
-                                hasConflict: hasConflict,
-                                isTemplate: true,
-                                isBlocked: false
-                            };
-                        }
+    if (!result.success) {
+        alert('❌ ' + result.message);
+        return;
+    }
+    
+    var addedCount = 0;
+    var group = null;
+    
+    // Create or update the group for this student
+    if (typeof getOrCreateGroupForStudent === 'function') {
+        group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, day, hour, instructorId);
+        
+        // Also add the class to all other students in the group
+        if (group && group.students) {
+            group.students.forEach(function(otherStudentId) {
+                if (String(otherStudentId) === String(studentId)) return;
+                
+                var otherSchedule = getStudentSchedule(otherStudentId, weekNum);
+                var hasConflict = false;
+                for (var h = hour; h < hour + duration && h <= 23; h++) {
+                    if (otherSchedule[day] && otherSchedule[day][h]) {
+                        hasConflict = true;
+                        break;
                     }
                 }
-            }
+                
+                if (!hasConflict) {
+                    var addResult = addClassToStudent(otherStudentId, disciplineId, weekNum, day, hour, duration, instructorId);
+                    if (addResult.success) {
+                        addedCount++;
+                    }
+                }
+            });
         }
     }
     
-    // Also check instructor blocks
-    if (data.curriculum.instructorBlocks) {
-        for (var instructorId in data.curriculum.instructorBlocks) {
-            var blockKey = instructorId + '_' + weekNum;
-            if (data.curriculum.instructorBlocks[blockKey]) {
-                for (var day in data.curriculum.instructorBlocks[blockKey]) {
-                    for (var hour in data.curriculum.instructorBlocks[blockKey][day]) {
-                        var blockData = data.curriculum.instructorBlocks[blockKey][day][hour];
-                        var key = day + '_' + hour;
-                        if (!existingSlots[key]) {
-                            var hasConflict = false;
-                            if (studentId) {
-                                var duration = blockData.duration || 1;
-                                hasConflict = hasStudentConflict(studentId, weekNum, parseInt(day), parseInt(hour), duration);
-                            }
-                            existingSlots[key] = {
-                                day: parseInt(day),
-                                hour: parseInt(hour),
-                                duration: blockData.duration || 1,
-                                instructorId: instructorId,
-                                label: blockData.label || 'Blocked Time',
-                                groupLabel: blockData.groupLabel || '',
-                                assignedStudents: [],
-                                currentCount: 0,
-                                maxStudents: 0,
-                                isFull: false,
-                                studentAssigned: false,
-                                hasConflict: hasConflict,
-                                isBlocked: true,
-                                isTemplate: false
-                            };
-                        }
-                    }
-                }
-            }
-        }
+    if (modal) {
+        modal.remove();
     }
     
-    var slotArray = Object.values(existingSlots);
-    slotArray.sort(function(a, b) {
-        if (a.day !== b.day) return a.day - b.day;
-        return a.hour - b.hour;
+    saveData().then(function() {
+        if (typeof logActivity === 'function') {
+            logActivity('Student joined ' + getDiscipline(disciplineId).name + ' at Week ' + weekNum + ', Day ' + day + ', Hour ' + hour + ' (auto-group)');
+        }
+        renderSchedule();
+        if (typeof renderAutoGroups === 'function') {
+            renderAutoGroups();
+        }
+        var msg = '✅ Successfully joined ' + getDiscipline(disciplineId).name + '!';
+        if (group) {
+            msg += '\nGroup: ' + group.displayName;
+        }
+        if (addedCount > 0) {
+            msg += '\n\nAlso added to ' + addedCount + ' other student(s) in the group.';
+        }
+        alert(msg);
+    }).catch(function(err) {
+        console.error('Failed to save:', err);
+        renderSchedule();
+        alert('Class added but failed to save data.');
     });
-    
-    return slotArray;
 }
 
 /**
- * Check if a student has a conflict at a given time slot
- */
-function hasStudentConflict(studentId, week, day, hour, duration) {
-    var schedule = getStudentSchedule(studentId, week);
-    var dur = duration || 1;
-    
-    for (var h = hour; h < hour + dur && h <= 23; h++) {
-        if (schedule[day] && schedule[day][h]) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * Show add class modal (updated with auto-group)
+ * Show add class modal (updated with duration and instructor selection)
  */
 function showAddScheduleClassModal(studentId, week, day, hour) {
     var available = getAvailableDisciplinesForStudent(studentId, week);
     
+    // Check which disciplines have available slots
+    available.forEach(function(item) {
+        var slots = getAvailableSlotsForDiscipline(item.discipline.id, week, studentId);
+        item.hasSlots = slots.length > 0;
+        item.slotCount = slots.length;
+        item.slots = slots;
+    });
+    
+    // Filter to disciplines that have slots
+    var hasSlots = available.filter(function(item) { return item.hasSlots; });
+    
     if (available.length === 0) {
         alert('All disciplines are full for this week.');
+        return;
+    }
+    
+    if (hasSlots.length === 0) {
+        alert('No disciplines have available time slots this week. Check instructor schedules first.');
         return;
     }
     
@@ -1462,29 +1525,47 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
                 <div class="form-group">
                     <label>Select Discipline:</label>
                     <select id="add-class-select" style="width:100%;padding:8px;margin-bottom:8px;">
-                        ${available.map(function(item) {
+                        ${hasSlots.map(function(item) {
                             var d = item.discipline;
                             var instructorDisplay = item.instructorNames.length > 0 ? 
                                 item.instructorNames.join(', ') : 'No instructors assigned';
                             var groupInfo = item.groupInfo || '';
-                            return '<option value="' + d.id + '">' + 
-                                d.name + ' (' + instructorDisplay + ') - ' + 
-                                item.used + '/' + item.maxHours + 'h' + groupInfo +
+                            var slotsInfo = ' (' + item.slotCount + ' slots available)';
+                            return '<option value="' + d.id + '" data-instructors="' + d.instructorIds.join(',') + '">' + 
+                                d.name + ' (' + instructorDisplay + ')' + groupInfo + slotsInfo +
                             '</option>';
                         }).join('')}
                     </select>
                 </div>
                 
+                <div class="form-group" id="instructor-select-group" style="display:none;">
+                    <label>Select Instructor:</label>
+                    <select id="add-class-instructor" style="width:100%;padding:8px;">
+                        <option value="">Select instructor...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Duration (hours):</label>
+                    <select id="add-class-duration" style="width:100%;padding:8px;">
+                        <option value="1">1 hour</option>
+                        <option value="2">2 hours</option>
+                        <option value="3">3 hours</option>
+                        <option value="4">4 hours</option>
+                    </select>
+                </div>
+                
                 <div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border-soft);">
                     <p style="font-size:0.75rem;color:var(--text-dim);">
-                        💡 <strong>Auto-Group:</strong> Students in the same group share all class slots.
-                        When you add a student to a class, all students in their group will be added to the same slot.
+                        💡 <strong>Auto-Group:</strong> When you add a student to a class, ALL students in their group will be added to the same slot.
+                        <br>If the student is not in a group yet, a new group will be created.
                     </p>
                 </div>
                 
                 <div class="form-actions" style="margin-top:16px;">
+                    <button type="button" id="view-all-slots-btn" class="info-btn small">📋 View All Slots</button>
                     <button type="button" id="cancel-add-class" class="secondary">Cancel</button>
-                    <button type="button" id="confirm-add-class" class="primary">Add Class (Auto-Group)</button>
+                    <button type="button" id="confirm-add-class" class="primary">Add Class</button>
                 </div>
             </div>
         </div>
@@ -1492,11 +1573,56 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
     
     document.body.appendChild(modal);
     
+    // Populate instructor dropdown based on selected discipline
+    var disciplineSelect = document.getElementById('add-class-select');
+    var instructorGroup = document.getElementById('instructor-select-group');
+    var instructorSelect = document.getElementById('add-class-instructor');
+    
+    function updateInstructors() {
+        var selectedOption = disciplineSelect.options[disciplineSelect.selectedIndex];
+        var instructorIds = selectedOption ? selectedOption.dataset.instructors : '';
+        
+        if (instructorIds) {
+            var ids = instructorIds.split(',');
+            if (ids.length > 1) {
+                instructorGroup.style.display = 'block';
+                instructorSelect.innerHTML = '<option value="">Select instructor...</option>';
+                ids.forEach(function(id) {
+                    if (!id) return;
+                    var instructor = data.characters.find(function(c) { return String(c.id) === String(id); });
+                    if (instructor) {
+                        var name = [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ');
+                        var option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = name;
+                        instructorSelect.appendChild(option);
+                    }
+                });
+                return;
+            }
+        }
+        instructorGroup.style.display = 'none';
+    }
+    
+    disciplineSelect.addEventListener('change', updateInstructors);
+    setTimeout(updateInstructors, 100);
+    
     modal.querySelector('.close-modal').onclick = function() { modal.remove(); };
     modal.querySelector('#cancel-add-class').onclick = function() { modal.remove(); };
     modal.addEventListener('click', function(e) {
         if (e.target === modal) modal.remove();
     });
+    
+    // View all slots button
+    modal.querySelector('#view-all-slots-btn').onclick = function() {
+        var disciplineId = document.getElementById('add-class-select').value;
+        if (!disciplineId) {
+            alert('Please select a discipline.');
+            return;
+        }
+        modal.remove();
+        showAvailableTimeSlotsModal(disciplineId, studentId, week);
+    };
     
     modal.querySelector('#confirm-add-class').onclick = function() {
         var disciplineId = document.getElementById('add-class-select').value;
@@ -1505,24 +1631,27 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
             return;
         }
         
-        var discipline = getDiscipline(disciplineId);
-        if (!discipline) {
-            alert('Discipline not found.');
-            return;
-        }
-        
-        // Find an instructor for this discipline
-        var instructorId = null;
-        if (discipline.instructorIds && discipline.instructorIds.length > 0) {
-            instructorId = discipline.instructorIds[0];
-        }
-        
+        // Get selected instructor
+        var instructorId = document.getElementById('add-class-instructor').value;
         if (!instructorId) {
-            alert('No instructor assigned to this discipline.');
-            return;
+            // If only one instructor, use it
+            var selectedOption = disciplineSelect.options[disciplineSelect.selectedIndex];
+            var instructorIds = selectedOption ? selectedOption.dataset.instructors : '';
+            if (instructorIds) {
+                var ids = instructorIds.split(',');
+                if (ids.length === 1 && ids[0]) {
+                    instructorId = ids[0];
+                } else {
+                    alert('Please select an instructor for this class.');
+                    return;
+                }
+            } else {
+                alert('No instructor available for this discipline.');
+                return;
+            }
         }
         
-        var duration = 1;
+        var duration = parseInt(document.getElementById('add-class-duration').value) || 1;
         var weekNum = parseInt(week) || 1;
         
         // Check if student already has a class at this time
@@ -1540,14 +1669,29 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
             return;
         }
         
+        // Check if instructor has a template at this time
+        var template = getInstructorTemplate(instructorId, weekNum, day, hour);
+        if (!template) {
+            alert('This instructor does not have a class scheduled at this time. Please check the instructor calendar first.');
+            return;
+        }
+        
+        // Check if the template has the right discipline
+        if (String(template.disciplineId) !== String(disciplineId)) {
+            alert('The instructor has a different discipline scheduled at this time: ' + getDiscipline(template.disciplineId).name);
+            return;
+        }
+        
         // Add the class to the student
         var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, duration, instructorId);
         
         if (result.success) {
-            // Create or update the group for this student
             var addedCount = 0;
+            var group = null;
+            
+            // Create or update the group for this student
             if (typeof getOrCreateGroupForStudent === 'function') {
-                var group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, day, hour, instructorId);
+                group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, day, hour, instructorId);
                 
                 // Also add the class to all other students in the group
                 if (group && group.students) {
@@ -1576,13 +1720,16 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
             modal.remove();
             saveData().then(function() {
                 if (typeof logActivity === 'function') {
-                    logActivity('Added ' + discipline.name + ' to schedule (auto-group)');
+                    logActivity('Added ' + getDiscipline(disciplineId).name + ' to schedule (auto-group)');
                 }
                 renderSchedule();
                 if (typeof renderAutoGroups === 'function') {
                     renderAutoGroups();
                 }
-                var msg = '✅ Added ' + discipline.name + '!\nStudent added to group automatically.';
+                var msg = '✅ Added ' + getDiscipline(disciplineId).name + '!';
+                if (group) {
+                    msg += '\nGroup: ' + group.displayName;
+                }
                 if (addedCount > 0) {
                     msg += '\n\nAlso added to ' + addedCount + ' other student(s) in the group.';
                 }
@@ -1674,8 +1821,8 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
     modal.querySelector('#remove-class-detail').onclick = function() {
         if (confirm('Remove this class from the schedule?')) {
             // Also remove from auto-group if applicable
-            if (instructorId && typeof removeStudentFromAutoGroup === 'function') {
-                var group = getAutoGroupForSlot(disciplineId, instructorId, day, hour);
+            if (instructorId && typeof getOrCreateGroupForStudent === 'function') {
+                var group = getStudentAutoGroup(studentId, disciplineId);
                 if (group && group.students && group.students.indexOf(studentId) !== -1) {
                     if (confirm('This student is in an auto-group. Remove from group as well?')) {
                         var idx = group.students.indexOf(studentId);
@@ -1765,9 +1912,6 @@ function clearSchedule() {
         }
     }
     
-    // Also clear auto-groups for this week (optional - might want to keep)
-    // For now, we'll keep auto-groups
-    
     saveData().then(function() {
         if (typeof logActivity === 'function') {
             logActivity('Cleared schedule for week ' + scheduleState.currentWeek);
@@ -1816,24 +1960,6 @@ function saveRestDays() {
     });
 }
 
-/**
- * Get the auto group for a specific slot
- */
-function getAutoGroupForSlot(disciplineId, instructorId, day, hour) {
-    var key = generateGroupKey(disciplineId, instructorId, day, hour);
-    if (!data.curriculum.autoGroups || !data.curriculum.autoGroups[key]) {
-        return null;
-    }
-    return data.curriculum.autoGroups[key];
-}
-
-/**
- * Generate a group key
- */
-function generateGroupKey(disciplineId, instructorId, day, hour) {
-    return disciplineId + '_' + instructorId + '_' + day + '_' + hour;
-}
-
 // Make functions globally available
 window.renderScheduleView = renderScheduleView;
 window.renderSchedule = renderSchedule;
@@ -1858,9 +1984,9 @@ window.showScheduleClassDetails = showScheduleClassDetails;
 window.removeScheduleClass = removeScheduleClass;
 window.getOtherStudents = getOtherStudents;
 window.addClassToStudent = addClassToStudent;
-window.getAvailableTimeSlotsForDiscipline = getAvailableTimeSlotsForDiscipline;
+window.getAvailableSlotsForDiscipline = getAvailableSlotsForDiscipline;
 window.showAvailableTimeSlotsModal = showAvailableTimeSlotsModal;
-window.hasStudentConflict = hasStudentConflict;
-window.getAutoGroupForSlot = getAutoGroupForSlot;
-window.generateGroupKey = generateGroupKey;
+window.joinStudentToSlot = joinStudentToSlot;
+window.getInstructorTemplate = getInstructorTemplate;
+window.isInstructorAvailable = isInstructorAvailable;
 window.scheduleState = scheduleState;
