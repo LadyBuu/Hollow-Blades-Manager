@@ -13,6 +13,19 @@ var instructorCalendarState = {
 };
 
 /**
+ * Get all students in a specific group for a discipline
+ */
+function getStudentsInDisciplineGroup(disciplineId, groupLabel) {
+    if (typeof getDisciplineGroups === 'function') {
+        var groups = getDisciplineGroups(disciplineId);
+        if (groups[groupLabel] && groups[groupLabel].students) {
+            return Object.keys(groups[groupLabel].students);
+        }
+    }
+    return [];
+}
+
+/**
  * Render the instructor calendar view
  */
 function renderInstructorCalendar(container) {
@@ -144,7 +157,7 @@ function populateInstructorCalendarSelector() {
 }
 
 /**
- * Get discipline groups for a specific instructor - PULLS FROM GROUPS.JS
+ * Get discipline groups for a specific instructor
  */
 function getDisciplineGroupsForInstructor(instructorId, week) {
     var weekNum = parseInt(week) || 1;
@@ -161,7 +174,6 @@ function getDisciplineGroupsForInstructor(instructorId, week) {
         if (typeof getDisciplineGroups === 'function') {
             var groups = getDisciplineGroups(discipline.id);
             for (var label in groups) {
-                // Key format: disciplineId_groupLabel
                 var key = discipline.id + '_' + label;
                 result[key] = {
                     disciplineId: discipline.id,
@@ -174,19 +186,6 @@ function getDisciplineGroupsForInstructor(instructorId, week) {
     });
     
     return result;
-}
-
-/**
- * Get students in a specific group for a discipline
- */
-function getStudentsInDisciplineGroup(disciplineId, groupLabel) {
-    if (typeof getDisciplineGroups === 'function') {
-        var groups = getDisciplineGroups(disciplineId);
-        if (groups[groupLabel] && groups[groupLabel].students) {
-            return Object.keys(groups[groupLabel].students);
-        }
-    }
-    return [];
 }
 
 /**
@@ -423,31 +422,28 @@ function renderInstructorCalendarData() {
         }
     });
     
-    if (data.curriculum.instructorTemplates) {
-        var templateKey = instructorId + '_' + week;
-        if (data.curriculum.instructorTemplates[templateKey]) {
-            for (var key in data.curriculum.instructorTemplates[templateKey]) {
-                var parts = key.split('_');
-                var day = parseInt(parts[0]);
-                var hour = parseInt(parts[1]);
-                var templateData = data.curriculum.instructorTemplates[templateKey][key];
-                var mapKey = day + '_' + hour;
-                if (!scheduleMap[mapKey]) {
-                    var discipline = getDiscipline(templateData.disciplineId);
-                    if (discipline) {
-                        scheduleMap[mapKey] = {
-                            day: day,
-                            hour: hour,
-                            disciplineId: templateData.disciplineId,
-                            discipline: discipline,
-                            students: [],
-                            label: templateData.label || null,
-                            duration: templateData.duration || 1,
-                            groupLabel: templateData.groupLabel || null,
-                            isTemplate: true
-                        };
-                    }
-                }
+    // Check instructor templates for this week
+    var templates = getInstructorTemplatesForWeek(instructorId, week);
+    for (var slotKey in templates) {
+        var slotData = templates[slotKey];
+        var parts = slotKey.split('_');
+        var day = parseInt(parts[0]);
+        var hour = parseInt(parts[1]);
+        var mapKey = day + '_' + hour;
+        if (!scheduleMap[mapKey]) {
+            var discipline = getDiscipline(slotData.disciplineId);
+            if (discipline) {
+                scheduleMap[mapKey] = {
+                    day: day,
+                    hour: hour,
+                    disciplineId: slotData.disciplineId,
+                    discipline: discipline,
+                    students: [],
+                    label: slotData.label || null,
+                    duration: slotData.duration || 1,
+                    groupLabel: slotData.groupLabel || null,
+                    isTemplate: true
+                };
             }
         }
     }
@@ -609,6 +605,17 @@ function renderInstructorCalendarData() {
 }
 
 /**
+ * Get instructor templates for a specific week
+ */
+function getInstructorTemplatesForWeek(instructorId, week) {
+    var templateKey = instructorId + '_' + week;
+    if (data.curriculum.instructorTemplates && data.curriculum.instructorTemplates[templateKey]) {
+        return data.curriculum.instructorTemplates[templateKey];
+    }
+    return {};
+}
+
+/**
  * Show class management modal - with group dropdown from discipline groups
  */
 function showClassManagementModal(slotData, day, hour) {
@@ -645,7 +652,6 @@ function showClassManagementModal(slotData, day, hour) {
     assignedStudentIds.forEach(function(id) {
         var student = data.characters.find(function(c) { return String(c.id) === String(id); });
         if (student) {
-            // Get the group label for this student for this specific class slot
             var studentGroupLabel = null;
             if (typeof getClassGroupLabel === 'function') {
                 studentGroupLabel = getClassGroupLabel(id, week, day, hour);
@@ -892,8 +898,8 @@ function showClassManagementModal(slotData, day, hour) {
                 modal.remove();
                 renderInstructorCalendarData();
                 populateGroupFilter();
-                if (typeof renderSchedule === 'function') {
-                    renderSchedule();
+                if (typeof renderStudentSchedule === 'function') {
+                    renderStudentSchedule();
                 }
                 alert('Added ' + toAdd.length + ' students from Group ' + selectedGroup + '!');
             }).catch(function(err) {
@@ -995,8 +1001,8 @@ function showClassManagementModal(slotData, day, hour) {
             modal.remove();
             renderInstructorCalendarData();
             populateGroupFilter();
-            if (typeof renderSchedule === 'function') {
-                renderSchedule();
+            if (typeof renderStudentSchedule === 'function') {
+                renderStudentSchedule();
             }
             alert('Student assignments updated!');
         }).catch(function(err) {
@@ -1062,8 +1068,8 @@ function removeInstructorClass(slotData, day, hour) {
         }
         renderInstructorCalendarData();
         populateGroupFilter();
-        if (typeof renderSchedule === 'function') {
-            renderSchedule();
+        if (typeof renderStudentSchedule === 'function') {
+            renderStudentSchedule();
         }
         alert('Class removed!');
     }).catch(function(err) {
@@ -1456,8 +1462,8 @@ function showAddBlockModal() {
             }
             renderInstructorCalendarData();
             populateGroupFilter();
-            if (typeof renderSchedule === 'function') {
-                renderSchedule();
+            if (typeof renderStudentSchedule === 'function') {
+                renderStudentSchedule();
             }
             var msg = 'Time blocked successfully!';
             if (autoAssignedCount > 0) {
@@ -1655,4 +1661,5 @@ window.showClassManagementModal = showClassManagementModal;
 window.showBlockManagementModal = showBlockManagementModal;
 window.removeBlockedTime = removeBlockedTime;
 window.removeInstructorClass = removeInstructorClass;
+window.getInstructorTemplatesForWeek = getInstructorTemplatesForWeek;
 window.instructorCalendarState = instructorCalendarState;
