@@ -372,87 +372,95 @@ function getAvailableSlotsForDiscipline(disciplineId, week, studentId) {
     var existingSlots = {};
     var discipline = getDiscipline(disciplineId);
     var maxStudents = discipline ? discipline.maxStudents : 10;
+    var students = getStudents();
     
     // Check instructor templates for this discipline
     if (data.curriculum.instructorTemplates) {
-        for (var instructorId in data.curriculum.instructorTemplates) {
-            var templateKey = instructorId + '_' + weekNum;
-            if (data.curriculum.instructorTemplates[templateKey]) {
-                for (var slotKey in data.curriculum.instructorTemplates[templateKey]) {
-                    var slotData = data.curriculum.instructorTemplates[templateKey][slotKey];
-                    if (String(slotData.disciplineId) === String(disciplineId)) {
-                        var parts = slotKey.split('_');
-                        var day = parseInt(parts[0]);
-                        var hour = parseInt(parts[1]);
-                        var key = day + '_' + hour;
-                        
-                        // Count assigned students
-                        var currentCount = 0;
-                        var assignedStudents = slotData.assignedStudents || [];
-                        if (assignedStudents.length > 0) {
-                            currentCount = assignedStudents.length;
-                        } else {
-                            var students = getStudents();
-                            students.forEach(function(s) {
-                                var schedule = getStudentSchedule(s.id, weekNum);
-                                if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
-                                    currentCount++;
-                                }
-                            });
-                        }
-                        
-                        var isFull = currentCount >= maxStudents;
-                        var studentAssigned = false;
-                        var hasConflict = false;
-                        var duration = slotData.duration || 1;
-                        
-                        if (studentId) {
-                            var schedule = getStudentSchedule(studentId, weekNum);
-                            for (var h = hour; h < hour + duration && h <= 23; h++) {
-                                if (schedule[day] && schedule[day][h]) {
-                                    hasConflict = true;
-                                    break;
-                                }
-                            }
+        for (var templateKey in data.curriculum.instructorTemplates) {
+            // templateKey format: instructorId_week
+            var parts = templateKey.split('_');
+            var instructorId = parts[0];
+            var templateWeek = parseInt(parts[1]);
+            
+            // Only check the requested week
+            if (templateWeek !== weekNum) continue;
+            
+            var template = data.curriculum.instructorTemplates[templateKey];
+            for (var slotKey in template) {
+                var slotData = template[slotKey];
+                // Check if this slot is for the requested discipline
+                if (String(slotData.disciplineId) === String(disciplineId)) {
+                    var slotParts = slotKey.split('_');
+                    var day = parseInt(slotParts[0]);
+                    var hour = parseInt(slotParts[1]);
+                    var key = day + '_' + hour;
+                    
+                    // Count assigned students
+                    var currentCount = 0;
+                    var assignedStudents = slotData.assignedStudents || [];
+                    if (assignedStudents.length > 0) {
+                        currentCount = assignedStudents.length;
+                    } else {
+                        students.forEach(function(s) {
+                            var schedule = getStudentSchedule(s.id, weekNum);
                             if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
-                                studentAssigned = true;
+                                currentCount++;
+                            }
+                        });
+                    }
+                    
+                    var isFull = currentCount >= maxStudents;
+                    var studentAssigned = false;
+                    var hasConflict = false;
+                    var duration = slotData.duration || 1;
+                    
+                    if (studentId) {
+                        var schedule = getStudentSchedule(studentId, weekNum);
+                        for (var h = hour; h < hour + duration && h <= 23; h++) {
+                            if (schedule[day] && schedule[day][h]) {
+                                hasConflict = true;
+                                break;
                             }
                         }
-                        
-                        // Check if instructor has a block at this time
-                        var isBlocked = false;
-                        if (data.curriculum.instructorBlocks) {
-                            var blockKey = instructorId + '_' + weekNum;
-                            if (data.curriculum.instructorBlocks[blockKey]) {
-                                if (data.curriculum.instructorBlocks[blockKey][day] && 
-                                    data.curriculum.instructorBlocks[blockKey][day][hour]) {
-                                    isBlocked = true;
-                                }
+                        if (schedule[day] && schedule[day][hour] && String(schedule[day][hour]) === String(disciplineId)) {
+                            studentAssigned = true;
+                        }
+                    }
+                    
+                    // Check if instructor has a block at this time
+                    var isBlocked = false;
+                    if (data.curriculum.instructorBlocks) {
+                        var blockKey = instructorId + '_' + weekNum;
+                        if (data.curriculum.instructorBlocks[blockKey]) {
+                            if (data.curriculum.instructorBlocks[blockKey][day] && 
+                                data.curriculum.instructorBlocks[blockKey][day][hour]) {
+                                isBlocked = true;
                             }
                         }
-                        
-                        var instructor = data.characters.find(function(c) { return String(c.id) === String(instructorId); });
-                        var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-                        
-                        if (!existingSlots[key]) {
-                            existingSlots[key] = {
-                                day: day,
-                                hour: hour,
-                                duration: duration,
-                                instructorId: instructorId,
-                                instructorName: instructorName,
-                                label: slotData.label || '',
-                                groupLabel: slotData.groupLabel || '',
-                                assignedStudents: assignedStudents,
-                                currentCount: currentCount,
-                                maxStudents: maxStudents,
-                                isFull: isFull,
-                                studentAssigned: studentAssigned,
-                                hasConflict: hasConflict,
-                                isBlocked: isBlocked,
-                                isTemplate: true
-                            };
-                        }
+                    }
+                    
+                    var instructor = data.characters.find(function(c) { return String(c.id) === String(instructorId); });
+                    var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+                    
+                    if (!existingSlots[key]) {
+                        existingSlots[key] = {
+                            day: day,
+                            hour: hour,
+                            duration: duration,
+                            instructorId: instructorId,
+                            instructorName: instructorName,
+                            label: slotData.label || '',
+                            groupLabel: slotData.groupLabel || '',
+                            assignedStudents: assignedStudents,
+                            currentCount: currentCount,
+                            maxStudents: maxStudents,
+                            isFull: isFull,
+                            studentAssigned: studentAssigned,
+                            hasConflict: hasConflict,
+                            isBlocked: isBlocked,
+                            isTemplate: true,
+                            slotKey: slotKey
+                        };
                     }
                 }
             }
@@ -1358,7 +1366,11 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
             var duration = parseInt(this.dataset.duration) || 1;
             var instructorId = this.dataset.instructor || null;
             
-            joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, modal);
+            // Close the modal
+            modal.remove();
+            
+            // Call joinStudentToSlot
+            joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, null);
         });
     });
     
@@ -1405,7 +1417,9 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
                 }
             }
             
-            joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, modal);
+            // Close the modal and join
+            modal.remove();
+            joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, null);
         });
     });
 }
@@ -1414,44 +1428,70 @@ function showAvailableTimeSlotsModal(disciplineId, studentId, week) {
  * Join a student to a slot (with group sync)
  */
 function joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration, instructorId, modal) {
-    // Add the class to the student
-    var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, duration, instructorId);
+    // Check if the student already has a class at this time
+    var schedule = getStudentSchedule(studentId, weekNum);
+    var hasConflict = false;
+    for (var h = hour; h < hour + duration && h <= 23; h++) {
+        if (schedule[day] && schedule[day][h]) {
+            hasConflict = true;
+            break;
+        }
+    }
     
-    if (!result.success) {
-        alert('❌ ' + result.message);
+    if (hasConflict) {
+        alert('Student already has a class at this time.');
         return;
     }
     
-    var addedCount = 0;
+    // First, get or create the group for this student
     var group = null;
-    
-    // Create or update the group for this student
     if (typeof getOrCreateGroupForStudent === 'function') {
         group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, day, hour, instructorId);
-        
-        // Also add the class to all other students in the group
-        if (group && group.students) {
-            group.students.forEach(function(otherStudentId) {
-                if (String(otherStudentId) === String(studentId)) return;
-                
-                var otherSchedule = getStudentSchedule(otherStudentId, weekNum);
-                var hasConflict = false;
-                for (var h = hour; h < hour + duration && h <= 23; h++) {
-                    if (otherSchedule[day] && otherSchedule[day][h]) {
-                        hasConflict = true;
-                        break;
-                    }
-                }
-                
-                if (!hasConflict) {
-                    var addResult = addClassToStudent(otherStudentId, disciplineId, weekNum, day, hour, duration, instructorId);
-                    if (addResult.success) {
-                        addedCount++;
-                    }
-                }
-            });
-        }
     }
+    
+    if (!group) {
+        // Fallback: just add the student
+        var result = addClassToStudent(studentId, disciplineId, weekNum, day, hour, duration, instructorId);
+        if (result.success) {
+            if (modal) modal.remove();
+            saveData().then(function() {
+                renderSchedule();
+                if (typeof renderAutoGroups === 'function') renderAutoGroups();
+                alert('✅ Added ' + getDiscipline(disciplineId).name + '!');
+            });
+        } else {
+            alert('❌ ' + result.message);
+        }
+        return;
+    }
+    
+    // Add the class to ALL students in the group
+    var addedCount = 0;
+    var conflictStudents = [];
+    
+    group.students.forEach(function(otherStudentId) {
+        if (String(otherStudentId) === String(studentId)) return;
+        
+        var otherSchedule = getStudentSchedule(otherStudentId, weekNum);
+        var hasConflict = false;
+        for (var h = hour; h < hour + duration && h <= 23; h++) {
+            if (otherSchedule[day] && otherSchedule[day][h]) {
+                hasConflict = true;
+                break;
+            }
+        }
+        
+        if (hasConflict) {
+            var student = data.characters.find(function(c) { return String(c.id) === String(otherStudentId); });
+            var name = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+            conflictStudents.push(name);
+        } else {
+            var addResult = addClassToStudent(otherStudentId, disciplineId, weekNum, day, hour, duration, instructorId);
+            if (addResult.success) {
+                addedCount++;
+            }
+        }
+    });
     
     if (modal) {
         modal.remove();
@@ -1459,18 +1499,18 @@ function joinStudentToSlot(studentId, disciplineId, weekNum, day, hour, duration
     
     saveData().then(function() {
         if (typeof logActivity === 'function') {
-            logActivity('Student joined ' + getDiscipline(disciplineId).name + ' at Week ' + weekNum + ', Day ' + day + ', Hour ' + hour + ' (auto-group)');
+            logActivity('Added ' + getDiscipline(disciplineId).name + ' to ' + addedCount + ' students in group ' + group.displayName);
         }
         renderSchedule();
         if (typeof renderAutoGroups === 'function') {
             renderAutoGroups();
         }
-        var msg = '✅ Successfully joined ' + getDiscipline(disciplineId).name + '!';
-        if (group) {
-            msg += '\nGroup: ' + group.displayName;
-        }
-        if (addedCount > 0) {
-            msg += '\n\nAlso added to ' + addedCount + ' other student(s) in the group.';
+        
+        var msg = '✅ Added ' + getDiscipline(disciplineId).name + ' to ' + (addedCount + 1) + ' student(s)!';
+        msg += '\nGroup: ' + group.displayName;
+        
+        if (conflictStudents.length > 0) {
+            msg += '\n\n⚠ Could not add to these students (conflicts):\n' + conflictStudents.join('\n');
         }
         alert(msg);
     }).catch(function(err) {
@@ -1687,6 +1727,7 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
         
         if (result.success) {
             var addedCount = 0;
+            var conflictStudents = [];
             var group = null;
             
             // Create or update the group for this student
@@ -1707,7 +1748,11 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
                             }
                         }
                         
-                        if (!hasConflict) {
+                        if (hasConflict) {
+                            var student = data.characters.find(function(c) { return String(c.id) === String(otherStudentId); });
+                            var name = student ? [student.firstName, student.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+                            conflictStudents.push(name);
+                        } else {
                             var addResult = addClassToStudent(otherStudentId, disciplineId, weekNum, day, hour, duration, instructorId);
                             if (addResult.success) {
                                 addedCount++;
@@ -1730,8 +1775,9 @@ function showAddScheduleClassModal(studentId, week, day, hour) {
                 if (group) {
                     msg += '\nGroup: ' + group.displayName;
                 }
-                if (addedCount > 0) {
-                    msg += '\n\nAlso added to ' + addedCount + ' other student(s) in the group.';
+                msg += '\nAdded to ' + (addedCount + 1) + ' student(s) in the group.';
+                if (conflictStudents.length > 0) {
+                    msg += '\n\n⚠ Could not add to these students (conflicts):\n' + conflictStudents.join('\n');
                 }
                 alert(msg);
             }).catch(function(err) {
