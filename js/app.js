@@ -44,6 +44,7 @@ function updateDashboardStats() {
     var tournCount = document.getElementById('tournament-count');
     var studentCount = document.getElementById('student-count');
     var disciplineCount = document.getElementById('discipline-count');
+    var missionCount = document.getElementById('mission-count');
     var yearDisplay = document.getElementById('header-current-year');
     
     if (charCount) charCount.textContent = data.characters ? data.characters.length : 0;
@@ -56,6 +57,9 @@ function updateDashboardStats() {
     if (disciplineCount) {
         var count = data.curriculum && data.curriculum.disciplines ? data.curriculum.disciplines.length : 0;
         disciplineCount.textContent = count;
+    }
+    if (missionCount) {
+        missionCount.textContent = data.missions ? data.missions.length : 0;
     }
     if (yearDisplay) yearDisplay.textContent = data.currentYear || new Date().getFullYear();
 }
@@ -135,6 +139,11 @@ function renderAll() {
         var container = document.getElementById('app-container');
         if (container && typeof renderCurriculumView === 'function') {
             renderCurriculumView(container);
+        }
+    } else if (page === 'missions.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderMissionsView === 'function') {
+            renderMissionsView(container);
         }
     }
 }
