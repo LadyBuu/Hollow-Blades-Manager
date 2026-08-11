@@ -11,12 +11,12 @@
 <body>
     <header>
         <h1>Tournament <span>Manager</span></h1>
-<nav id="main-nav">
-    <a href="index.html">Dashboard</a>
-    <a href="characters.html">Characters</a>
-    <a href="tournaments.html">Tournaments</a>
-    <a href="curriculum.html">Curriculum</a>
-    <a href="missions.html">Missions</a>
+        <nav id="main-nav">
+            <a href="index.html" class="active">Dashboard</a>
+            <a href="characters.html">Characters</a>
+            <a href="tournaments.html">Tournaments</a>
+            <a href="curriculum.html">Curriculum</a>
+            <a href="missions.html">🎯 Missions</a>
         </nav>
         <div class="header-actions">
             <button id="export-json-btn" class="small">Export JSON</button>
@@ -61,6 +61,11 @@
                 <p class="stat-number" id="discipline-count">0</p>
                 <a href="curriculum.html" class="stat-link">Manage →</a>
             </div>
+            <div class="stat-card">
+                <h3>🎯 Missions</h3>
+                <p class="stat-number" id="mission-count">0</p>
+                <a href="missions.html" class="stat-link">Manage →</a>
+            </div>
         </div>
 
         <div class="dashboard-grid">
@@ -77,6 +82,7 @@
                     <a href="tournaments.html"><button class="primary small">Manage Teams</button></a>
                     <a href="tournaments.html"><button class="primary small">Create Tournament</button></a>
                     <a href="curriculum.html"><button class="primary small">Manage Disciplines</button></a>
+                    <a href="missions.html"><button class="primary small">Create Mission</button></a>
                 </div>
             </div>
         </div>
