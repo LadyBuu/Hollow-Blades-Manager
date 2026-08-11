@@ -122,32 +122,49 @@ function getParticipantName(participant, tourn) {
     
     // Handle string input
     if (typeof participant === 'string') {
-        const team = data.teams.find(t => t.name === participant);
+        // Try to find as team
+        var team = data.teams.find(function(t) { return t.name === participant; });
         if (team) return team.name;
-        const char = data.characters.find(c => {
-            const fullName = [c.firstName, c.middleName, c.lastName]
-                .filter(n => n)
+        // Try to find as character
+        var char = data.characters.find(function(c) {
+            var fullName = [c.firstName, c.middleName, c.lastName]
+                .filter(function(n) { return n; })
                 .join(' ');
             return fullName === participant;
         });
         if (char) return [char.firstName, char.middleName, char.lastName]
-            .filter(n => n)
+            .filter(function(n) { return n; })
             .join(' ');
         return participant;
     }
     
     // Handle object participant
     if (participant.type === 'char') {
-        const char = data.characters.find(c => String(c.id) === String(participant.id));
+        var char = data.characters.find(function(c) { return String(c.id) === String(participant.id); });
         if (char) {
             return [char.firstName, char.middleName, char.lastName]
-                .filter(n => n)
+                .filter(function(n) { return n; })
                 .join(' ');
+        }
+        // Try to find character by ID in any format
+        for (var i = 0; i < data.characters.length; i++) {
+            if (String(data.characters[i].id) === String(participant.id)) {
+                var c = data.characters[i];
+                return [c.firstName, c.middleName, c.lastName]
+                    .filter(function(n) { return n; })
+                    .join(' ');
+            }
         }
         return 'Unknown Character';
     } else if (participant.type === 'team') {
-        const team = data.teams.find(t => String(t.id) === String(participant.id));
+        var team = data.teams.find(function(t) { return String(t.id) === String(participant.id); });
         if (team) return team.name;
+        // Try to find team by ID in any format
+        for (var i = 0; i < data.teams.length; i++) {
+            if (String(data.teams[i].id) === String(participant.id)) {
+                return data.teams[i].name;
+            }
+        }
         return 'Unknown Team';
     }
     
@@ -173,6 +190,18 @@ function getActiveTeamsForWeek(week, excludeTournamentId) {
         if (isNaN(start)) return false;
         
         return start <= block.end && (isNaN(end) || end >= block.start);
+    }).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Get all teams (both academic and professional)
+ * @param {string} excludeTournamentId - Optional tournament ID to exclude
+ * @returns {Array} Array of all active teams
+ */
+function getAllActiveTeams(excludeTournamentId) {
+    return data.teams.filter(team => {
+        if (team.status === 'deleted') return false;
+        return true;
     }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -333,6 +362,7 @@ window.utils = {
     getCharacterTeamCount,
     getParticipantName,
     getActiveTeamsForWeek,
+    getAllActiveTeams,
     logActivity,
     getStudents,
     getNonCivilianCharacters,
