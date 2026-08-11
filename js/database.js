@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'TournamentManagerDB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_NAME = 'tournamentData';
 
 let db = null;
@@ -65,6 +65,10 @@ function loadData() {
                         currentWeek: 1
                     };
                 }
+                // Ensure missions exists
+                if (!loadedData.missions) {
+                    loadedData.missions = [];
+                }
                 data = loadedData;
                 migrateData();
                 resolve(data);
@@ -74,6 +78,7 @@ function loadData() {
                     characters: [],
                     teams: [],
                     tournaments: [],
+                    missions: [],
                     activities: [],
                     currentYear: new Date().getFullYear(),
                     currentWeek: 1,
@@ -139,6 +144,30 @@ function migrateData() {
             currentWeek: 1
         };
     }
+    
+    // Ensure missions exists
+    if (!data.missions) {
+        data.missions = [];
+    }
+    
+    // Migrate missions
+    data.missions.forEach(function(mission) {
+        if (!mission.status) mission.status = 'active';
+        if (!mission.createdAt) mission.createdAt = new Date().toISOString();
+        if (!mission.completedAt) mission.completedAt = null;
+        if (!mission.assignedTeamId) mission.assignedTeamId = null;
+        if (!mission.priority) mission.priority = 'medium';
+        if (!mission.tags) mission.tags = [];
+        if (!mission.objectives) mission.objectives = [];
+        if (!mission.progress) mission.progress = 0;
+        if (!mission.log) mission.log = [];
+        if (!mission.notes) mission.notes = '';
+        if (!mission.location) mission.location = '';
+        if (!mission.duration) mission.duration = '';
+        if (!mission.difficulty) mission.difficulty = 'medium';
+        if (!mission.pay) mission.pay = '';
+        if (!mission.objective) mission.objective = '';
+    });
     
     // Migrate characters
     data.characters.forEach(char => {
