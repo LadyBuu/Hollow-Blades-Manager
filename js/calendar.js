@@ -61,8 +61,8 @@ function renderWeeklyTable() {
             
             let memberHtml = '<div class="week-members">';
             membersInBlock.forEach(function(member) {
-                const char = data.characters.find(function(c) { return c.id === member.characterId; });
-                const name = char ? char.firstName : 'Unknown';
+                const char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
+                const name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
                 const isEliminated = checkIfEliminatedInWeek(char, blockStart, blockEnd);
                 const memberClass = 'member-name' + (isEliminated ? ' eliminated' : '');
                 memberHtml += '<span class="' + memberClass + '" title="' + (member.role || 'Member') + '">' + name + '</span>';
@@ -206,36 +206,37 @@ function renderUnassignedCharacters() {
  * Render eliminated characters for the current week block
  */
 function renderEliminatedCharacters() {
-    const container = document.getElementById('eliminated-characters');
+    var container = document.getElementById('eliminated-characters');
     if (!container) return;
     
-    const block = getWeekBlock(currentStartWeek || 1);
-    const weekStart = block.start;
-    const weekEnd = block.end;
+    var block = getWeekBlock(currentStartWeek || 1);
+    var weekStart = block.start;
+    var weekEnd = block.end;
     
-    const eliminatedEntries = [];
+    var eliminatedEntries = [];
     
     data.tournaments.forEach(function(tourn) {
         if (tourn.eliminations) {
             tourn.eliminations.forEach(function(elim) {
-                const week = parseInt(elim.week);
+                var week = parseInt(elim.week);
                 if (!isNaN(week) && week >= weekStart && week <= weekEnd) {
-                    const participant = { 
+                    var participant = { 
                         type: elim.participantType, 
                         id: elim.participantId 
                     };
-                    const name = getParticipantName(participant, tourn);
-                    let teamName = '';
+                    var name = getParticipantName(participant, tourn);
+                    var teamName = '';
                     
                     if (elim.participantType === 'char') {
-                        const char = data.characters.find(function(c) { return String(c.id) === String(elim.participantId); });
+                        var char = data.characters.find(function(c) { return String(c.id) === String(elim.participantId); });
                         if (char) {
+                            // Find what team this character was in during this week
                             data.teams.forEach(function(team) {
                                 if (team.members) {
                                     team.members.forEach(function(member) {
                                         if (String(member.characterId) === String(char.id)) {
-                                            const join = parseInt(member.joinPeriod);
-                                            const leave = parseInt(member.leavePeriod);
+                                            var join = parseInt(member.joinPeriod);
+                                            var leave = parseInt(member.leavePeriod);
                                             if (!isNaN(join) && join <= weekEnd && (isNaN(leave) || leave >= weekStart)) {
                                                 teamName = team.name;
                                             }
@@ -244,12 +245,18 @@ function renderEliminatedCharacters() {
                                 }
                             });
                         }
+                    } else if (elim.participantType === 'team') {
+                        var team = data.teams.find(function(t) { return String(t.id) === String(elim.participantId); });
+                        if (team) {
+                            teamName = team.name;
+                            name = teamName;
+                        }
                     }
                     
                     eliminatedEntries.push({
-                        name: name,
+                        name: name || 'Unknown',
                         team: teamName,
-                        tournament: tourn.name,
+                        tournament: tourn.name || 'Unknown Tournament',
                         week: week,
                         round: elim.matchRound || '?'
                     });
@@ -263,12 +270,13 @@ function renderEliminatedCharacters() {
         return;
     }
     
-    let html = '';
+    var html = '';
     eliminatedEntries.forEach(function(entry) {
-        const teamDisplay = entry.team ? ' (' + entry.team + ')' : '';
+        var teamDisplay = entry.team ? ' (' + entry.team + ')' : '';
+        var tournamentDisplay = entry.tournament || 'Unknown Tournament';
         html += '<div class="activity-item" style="color:var(--danger);">' +
             entry.name + teamDisplay + 
-            ' <span style="font-size:0.75rem;">eliminated in ' + entry.tournament + 
+            ' <span style="font-size:0.75rem;">eliminated in ' + tournamentDisplay + 
             ' (Wk ' + entry.week + ', Round ' + entry.round + ')</span>' +
         '</div>';
     });
