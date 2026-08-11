@@ -1,6 +1,7 @@
 /**
  * teams.js - Team Management
  * Handles team CRUD operations, member management, and ranking history
+ * Supports both Academic (weeks) and Professional (years) teams
  */
 
 // Team management state - use a single object to avoid redeclaration issues
@@ -32,10 +33,15 @@ function renderTeams() {
 
     var filteredTeams = data.teams.filter(function(team) {
         if (team.status === 'deleted') return false;
-        var start = parseInt(team.startPeriod);
-        var end = parseInt(team.endPeriod);
-        if (isNaN(start)) return true;
-        return start <= filterWeek && (isNaN(end) || end >= filterWeek);
+        // For academic teams, filter by week
+        if (team.type === 'academic') {
+            var start = parseInt(team.startPeriod);
+            var end = parseInt(team.endPeriod);
+            if (isNaN(start)) return true;
+            return start <= filterWeek && (isNaN(end) || end >= filterWeek);
+        }
+        // For professional and other types, always show
+        return true;
     });
 
     filteredTeams.sort(function(a, b) {
@@ -43,7 +49,7 @@ function renderTeams() {
     });
 
     if (filteredTeams.length === 0) {
-        container.innerHTML = '<p class="empty-state">No teams active in Week ' + filterWeek + '.<br><span style="font-size:0.8rem;color:var(--text-dim);">Try adjusting the filter week above.</span></p>';
+        container.innerHTML = '<p class="empty-state">No teams found.<br><span style="font-size:0.8rem;color:var(--text-dim);">Try adjusting the filter week above, or add your first team!</span></p>';
         return;
     }
 
@@ -67,9 +73,13 @@ function renderTeams() {
         var isExpanded = TeamState.expandedTeamId === team.id;
         var memberCount = getActiveMemberCount(team, filterWeek);
 
+        var typeLabel = team.type === 'academic' ? '📚 Academic' : 
+                        team.type === 'professional' ? '💼 Professional' : 
+                        team.type === 'internship' ? '📋 Internship' : team.type || '-';
+
         html += '<div class="list-item team-item" data-id="' + team.id + '">' +
             '<span><strong>' + team.name + '</strong>' + (isEliminated ? ' <span class="eliminated-badge">Eliminated</span>' : '') + '</span>' +
-            '<span>' + (team.type || '-') + '</span>' +
+            '<span style="font-size:0.75rem;">' + typeLabel + '</span>' +
             '<span>' + periodDisplay + '</span>' +
             '<span>' + (team.currentRank || '-') + '</span>' +
             '<span>' + memberCount + '</span>' +
@@ -90,7 +100,7 @@ function renderTeams() {
                 html += '<div class="member-entry empty">No active members this week</div>';
             } else {
                 activeMembers.forEach(function(member) {
-                    var char = data.characters.find(function(c) { return c.id === member.characterId; });
+                    var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
                     var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
                     var age = char ? getCharacterAge(char) : '-';
                     var deadMarker = char && char.deceased ? ' Deceased' : '';
@@ -145,7 +155,13 @@ function getTeamPeriodDisplay(team) {
         if (startBlock) return 'Wk ' + startBlock.label + '+';
         return '-';
     } else {
-        return team.startPeriod ? team.startPeriod + (team.endPeriod ? ' - ' + team.endPeriod : '') : '-';
+        // Professional or other types - show years
+        if (team.startPeriod && team.endPeriod) {
+            return team.startPeriod + ' - ' + team.endPeriod;
+        } else if (team.startPeriod) {
+            return 'From ' + team.startPeriod;
+        }
+        return '-';
     }
 }
 
@@ -177,9 +193,12 @@ function showTeamForm(editId) {
     var formElement = document.getElementById('team-form-inner');
     form.classList.remove('hidden');
     
+    // Update period labels based on team type
+    updatePeriodLabels();
+    
     if (editId) {
         title.textContent = 'Edit Team';
-        var team = data.teams.find(function(t) { return t.id === editId; });
+        var team = data.teams.find(function(t) { return String(t.id) === String(editId); });
         if (team) {
             document.getElementById('team-name').value = team.name || '';
             document.getElementById('team-type').value = team.type || '';
@@ -197,6 +216,8 @@ function showTeamForm(editId) {
             } else { 
                 addNameHistoryEntry(container); 
             }
+            // Update period labels after setting type
+            setTimeout(updatePeriodLabels, 50);
         }
     } else {
         title.textContent = 'Add Team';
@@ -205,8 +226,33 @@ function showTeamForm(editId) {
         var container = document.getElementById('name-history-container');
         container.innerHTML = '';
         addNameHistoryEntry(container);
+        document.getElementById('team-type').value = 'academic';
+        setTimeout(updatePeriodLabels, 50);
     }
     document.getElementById('team-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Update period labels based on team type
+ */
+function updatePeriodLabels() {
+    var type = document.getElementById('team-type').value;
+    var startLabel = document.querySelector('label[for="team-start"]');
+    var endLabel = document.querySelector('label[for="team-end"]');
+    var startInput = document.getElementById('team-start');
+    var endInput = document.getElementById('team-end');
+    
+    if (type === 'academic') {
+        if (startLabel) startLabel.textContent = 'Start Week';
+        if (endLabel) endLabel.textContent = 'End Week (optional)';
+        if (startInput) startInput.placeholder = 'Week (e.g., 1)';
+        if (endInput) endInput.placeholder = 'Week (e.g., 52)';
+    } else {
+        if (startLabel) startLabel.textContent = 'Start Year';
+        if (endLabel) endLabel.textContent = 'End Year (optional)';
+        if (startInput) startInput.placeholder = 'Year (e.g., 1920)';
+        if (endInput) endInput.placeholder = 'Year (e.g., 1930)';
+    }
 }
 
 /**
@@ -224,8 +270,8 @@ function addNameHistoryEntry(container, name, start, end) {
     entry.className = 'name-history-entry';
     entry.innerHTML = `
         <input type="text" class="name-history-name" placeholder="Team Name" value="${name || ''}">
-        <input type="number" class="name-history-start" placeholder="Start Week/Year" value="${start || ''}">
-        <input type="number" class="name-history-end" placeholder="End Week/Year" value="${end || ''}">
+        <input type="text" class="name-history-start" placeholder="Start" value="${start || ''}">
+        <input type="text" class="name-history-end" placeholder="End" value="${end || ''}">
         <button type="button" class="small danger remove-name">✕</button>
     `;
     container.appendChild(entry);
@@ -271,7 +317,7 @@ function saveTeam(e) {
     if (!teamData.type) { alert('Team type is required.'); return; }
     
     if (editId) {
-        var index = data.teams.findIndex(function(t) { return t.id === editId; });
+        var index = data.teams.findIndex(function(t) { return String(t.id) === String(editId); });
         if (index !== -1) {
             if (!teamData.members) teamData.members = data.teams[index].members || [];
             if (!teamData.rankingHistory) teamData.rankingHistory = data.teams[index].rankingHistory || [];
@@ -296,7 +342,7 @@ function saveTeam(e) {
         };
         data.teams.push(newTeam);
         if (typeof logActivity === 'function') {
-            logActivity('Added team: ' + teamData.name);
+            logActivity('Added team: ' + teamData.name + ' (' + teamData.type + ')');
         }
     }
     
@@ -312,16 +358,16 @@ function saveTeam(e) {
  * Delete a team
  */
 function deleteTeam(id) {
-    var team = data.teams.find(function(t) { return t.id === id; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(id); });
     if (!team) return;
     if (!confirm('Delete "' + team.name + '" permanently? This will also remove it from tournaments.')) return;
     
     data.tournaments.forEach(function(t) {
         if (t.teams) {
-            t.teams = t.teams.filter(function(entry) { return entry.teamId !== id; });
+            t.teams = t.teams.filter(function(entry) { return String(entry.teamId) !== String(id); });
         }
     });
-    data.teams = data.teams.filter(function(t) { return t.id !== id; });
+    data.teams = data.teams.filter(function(t) { return String(t.id) !== String(id); });
     if (typeof logActivity === 'function') {
         logActivity('Deleted team: ' + team.name);
     }
@@ -334,7 +380,7 @@ function deleteTeam(id) {
  */
 function openMemberModal(teamId) {
     var modal = document.getElementById('member-modal');
-    var team = data.teams.find(function(t) { return t.id === teamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team) return;
     
     TeamState.currentTeamId = teamId;
@@ -354,17 +400,17 @@ function openMemberModal(teamId) {
     var currentPeriod = parseInt(team.startPeriod) || 1;
     
     sortedChars.forEach(function(char) {
-        var inThisTeam = team.members && team.members.some(function(m) { return m.characterId === char.id; });
+        var inThisTeam = team.members && team.members.some(function(m) { return String(m.characterId) === String(char.id); });
         var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
         var deadMarker = char.deceased ? ' Deceased' : '';
         var inTeamMarker = '';
         
         if (!inThisTeam) {
             data.teams.forEach(function(t) {
-                if (t.id === team.id) return;
+                if (String(t.id) === String(team.id)) return;
                 if (t.members) {
                     t.members.forEach(function(m) {
-                        if (m.characterId === char.id) {
+                        if (String(m.characterId) === String(char.id)) {
                             var joinPeriod = parseInt(m.joinPeriod);
                             var leavePeriod = parseInt(m.leavePeriod);
                             if (!isNaN(joinPeriod) && joinPeriod <= currentPeriod && (isNaN(leavePeriod) || leavePeriod >= currentPeriod)) {
@@ -411,7 +457,7 @@ function renderMembers(team) {
     var periodLabel = team.type === 'academic' ? 'Wk' : 'Yr';
     var html = '';
     team.members.forEach(function(member, index) {
-        var char = data.characters.find(function(c) { return c.id === member.characterId; });
+        var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
         var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
         var age = char ? getCharacterAge(char) : '-';
         var deadMarker = char && char.deceased ? ' Deceased' : '';
@@ -450,10 +496,10 @@ function addMember() {
     
     if (!charId) { alert('Please select a character.'); return; }
     
-    var team = data.teams.find(function(t) { return t.id === TeamState.currentTeamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(TeamState.currentTeamId); });
     if (!team) return;
     
-    if (team.members && team.members.some(function(m) { return m.characterId === charId; })) {
+    if (team.members && team.members.some(function(m) { return String(m.characterId) === String(charId); })) {
         alert('This character is already in the team.');
         return;
     }
@@ -466,7 +512,7 @@ function addMember() {
         leavePeriod: leavePeriod || '' 
     });
     
-    var char = data.characters.find(function(c) { return c.id === charId; });
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
     if (typeof logActivity === 'function') {
         logActivity('Added ' + (char ? char.firstName : 'character') + ' to team: ' + team.name);
     }
@@ -480,11 +526,11 @@ function addMember() {
  */
 function removeMember(teamId, charId) {
     if (!confirm('Remove this member from the team?')) return;
-    var team = data.teams.find(function(t) { return t.id === teamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team) return;
     
-    team.members = team.members.filter(function(m) { return m.characterId !== charId; });
-    var char = data.characters.find(function(c) { return c.id === charId; });
+    team.members = team.members.filter(function(m) { return String(m.characterId) !== String(charId); });
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
     if (typeof logActivity === 'function') {
         logActivity('Removed ' + (char ? char.firstName : 'character') + ' from team: ' + team.name);
     }
@@ -497,11 +543,11 @@ function removeMember(teamId, charId) {
  * Open edit member modal
  */
 function openEditMemberModal(teamId, index) {
-    var team = data.teams.find(function(t) { return t.id === teamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team || !team.members || !team.members[index]) return;
     
     var member = team.members[index];
-    var char = data.characters.find(function(c) { return c.id === member.characterId; });
+    var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
     var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
     
     TeamState.currentEditMember = { teamId: teamId, index: index };
@@ -526,7 +572,7 @@ function saveEditMember(e) {
     
     var teamId = TeamState.currentEditMember.teamId;
     var index = TeamState.currentEditMember.index;
-    var team = data.teams.find(function(t) { return t.id === teamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team || !team.members || !team.members[index]) return;
     
     var role = document.getElementById('edit-member-role').value.trim();
@@ -569,7 +615,7 @@ function closeMemberModal() {
  */
 function openRankingModal(teamId) {
     var modal = document.getElementById('ranking-modal');
-    var team = data.teams.find(function(t) { return t.id === teamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team) return;
     
     TeamState.currentRankingTeamId = teamId;
@@ -631,7 +677,7 @@ function addRanking() {
     
     var period = document.getElementById('ranking-week').value;
     var rank = document.getElementById('ranking-rank').value;
-    var team = data.teams.find(function(t) { return t.id === TeamState.currentRankingTeamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(TeamState.currentRankingTeamId); });
     if (!team) return;
     
     if (!period) {
@@ -691,7 +737,7 @@ function addRanking() {
  */
 function removeRanking(teamId, index) {
     if (!confirm('Remove this ranking entry?')) return;
-    var team = data.teams.find(function(t) { return t.id === teamId; });
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team || !team.rankingHistory) return;
     
     team.rankingHistory.splice(index, 1);
@@ -728,15 +774,33 @@ function closeRankingModal() {
 function initTeamEvents() {
     var addBtn = document.getElementById('add-team-btn');
     if (addBtn) {
-        addBtn.addEventListener('click', function() { showTeamForm(); });
+        // Remove any existing listeners by cloning
+        var newAddBtn = addBtn.cloneNode(true);
+        addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+        newAddBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            showTeamForm();
+        });
     }
+    
     var cancelBtn = document.getElementById('cancel-team-btn');
     if (cancelBtn) {
-        cancelBtn.addEventListener('click', hideTeamForm);
+        var newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        newCancelBtn.addEventListener('click', hideTeamForm);
     }
+    
     var form = document.getElementById('team-form-inner');
     if (form) {
-        form.addEventListener('submit', saveTeam);
+        var newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+        newForm.addEventListener('submit', saveTeam);
+    }
+    
+    // Team type change handler to update labels
+    var typeSelect = document.getElementById('team-type');
+    if (typeSelect) {
+        typeSelect.addEventListener('change', updatePeriodLabels);
     }
     
     var filterBtn = document.getElementById('apply-filter-btn');
@@ -762,9 +826,10 @@ function initTeamEvents() {
         });
     }
 
-    var memberModal = document.querySelector('#member-modal .close-modal');
-    if (memberModal) {
-        memberModal.addEventListener('click', closeMemberModal);
+    // Member modal events
+    var memberModalClose = document.querySelector('#member-modal .close-modal');
+    if (memberModalClose) {
+        memberModalClose.addEventListener('click', closeMemberModal);
     }
     var memberModalBg = document.getElementById('member-modal');
     if (memberModalBg) {
@@ -777,9 +842,10 @@ function initTeamEvents() {
         addMemberBtn.addEventListener('click', addMember);
     }
 
-    var editMemberModal = document.querySelector('#edit-member-modal .close-modal');
-    if (editMemberModal) {
-        editMemberModal.addEventListener('click', closeEditMemberModal);
+    // Edit member modal events
+    var editMemberClose = document.querySelector('#edit-member-modal .close-modal');
+    if (editMemberClose) {
+        editMemberClose.addEventListener('click', closeEditMemberModal);
     }
     var editMemberBg = document.getElementById('edit-member-modal');
     if (editMemberBg) {
@@ -796,9 +862,10 @@ function initTeamEvents() {
         editForm.addEventListener('submit', saveEditMember);
     }
 
-    var rankingModal = document.querySelector('#ranking-modal .close-modal');
-    if (rankingModal) {
-        rankingModal.addEventListener('click', closeRankingModal);
+    // Ranking modal events
+    var rankingClose = document.querySelector('#ranking-modal .close-modal');
+    if (rankingClose) {
+        rankingClose.addEventListener('click', closeRankingModal);
     }
     var rankingBg = document.getElementById('ranking-modal');
     if (rankingBg) {
@@ -842,6 +909,7 @@ window.addRanking = addRanking;
 window.removeRanking = removeRanking;
 window.closeRankingModal = closeRankingModal;
 window.initTeamEvents = initTeamEvents;
+window.updatePeriodLabels = updatePeriodLabels;
 window.getTeamPeriodDisplay = getTeamPeriodDisplay;
 window.getActiveMembers = getActiveMembers;
 window.getActiveMemberCount = getActiveMemberCount;
