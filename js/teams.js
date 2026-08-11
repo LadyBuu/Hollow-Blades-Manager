@@ -10,7 +10,8 @@ var TeamState = {
     currentEditMember: null,
     currentRankingTeamId: null,
     expandedTeamId: null,
-    currentFilterWeek: 1
+    currentFilterWeek: 1,
+    currentFilterType: 'all'
 };
 
 // Convenience aliases
@@ -19,6 +20,7 @@ var currentEditMember = TeamState.currentEditMember;
 var currentRankingTeamId = TeamState.currentRankingTeamId;
 var expandedTeamId = TeamState.expandedTeamId;
 var currentFilterWeek = TeamState.currentFilterWeek;
+var currentFilterType = TeamState.currentFilterType;
 
 /**
  * Render the teams list with filtering
@@ -28,11 +30,21 @@ function renderTeams() {
     if (!container) return;
 
     var filterWeek = parseInt(document.getElementById('team-filter-week')?.value) || currentFilterWeek || 1;
+    var filterType = document.getElementById('team-filter-type')?.value || currentFilterType || 'all';
+    
     currentFilterWeek = filterWeek;
+    currentFilterType = filterType;
     TeamState.currentFilterWeek = filterWeek;
+    TeamState.currentFilterType = filterType;
 
     var filteredTeams = data.teams.filter(function(team) {
         if (team.status === 'deleted') return false;
+        
+        // Filter by type
+        if (filterType !== 'all' && team.type !== filterType) {
+            return false;
+        }
+        
         // For academic teams, filter by week
         if (team.type === 'academic') {
             var start = parseInt(team.startPeriod);
@@ -49,7 +61,14 @@ function renderTeams() {
     });
 
     if (filteredTeams.length === 0) {
-        container.innerHTML = '<p class="empty-state">No teams found.<br><span style="font-size:0.8rem;color:var(--text-dim);">Try adjusting the filter week above, or add your first team!</span></p>';
+        var typeLabels = {
+            'all': 'teams',
+            'academic': 'academic teams',
+            'professional': 'professional teams',
+            'internship': 'internship teams'
+        };
+        var label = typeLabels[filterType] || 'teams';
+        container.innerHTML = '<p class="empty-state">No ' + label + ' found.<br><span style="font-size:0.8rem;color:var(--text-dim);">Try adjusting the filters above, or add your first team!</span></p>';
         return;
     }
 
@@ -76,10 +95,14 @@ function renderTeams() {
         var typeLabel = team.type === 'academic' ? '📚 Academic' : 
                         team.type === 'professional' ? '💼 Professional' : 
                         team.type === 'internship' ? '📋 Internship' : team.type || '-';
+        
+        var typeColor = team.type === 'academic' ? 'var(--accent)' : 
+                        team.type === 'professional' ? 'var(--info)' : 
+                        team.type === 'internship' ? 'var(--warning)' : 'var(--text-dim)';
 
         html += '<div class="list-item team-item" data-id="' + team.id + '">' +
             '<span><strong>' + team.name + '</strong>' + (isEliminated ? ' <span class="eliminated-badge">Eliminated</span>' : '') + '</span>' +
-            '<span style="font-size:0.75rem;">' + typeLabel + '</span>' +
+            '<span style="color:' + typeColor + ';font-size:0.75rem;">' + typeLabel + '</span>' +
             '<span>' + periodDisplay + '</span>' +
             '<span>' + (team.currentRank || '-') + '</span>' +
             '<span>' + memberCount + '</span>' +
@@ -801,6 +824,14 @@ function initTeamEvents() {
     var typeSelect = document.getElementById('team-type');
     if (typeSelect) {
         typeSelect.addEventListener('change', updatePeriodLabels);
+    }
+    
+    // Filter by type
+    var filterType = document.getElementById('team-filter-type');
+    if (filterType) {
+        filterType.addEventListener('change', function() {
+            renderTeams();
+        });
     }
     
     var filterBtn = document.getElementById('apply-filter-btn');
