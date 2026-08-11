@@ -91,7 +91,14 @@ function renderTournamentsView(container) {
                     <!-- Team List -->
                     <div id="team-list">
                         <div class="filter-section">
-                            <label for="team-filter-week">Filter by Week:</label>
+                            <label for="team-filter-type">Team Type:</label>
+                            <select id="team-filter-type" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:0.75rem;width:auto;">
+                                <option value="all">All Types</option>
+                                <option value="academic">📚 Academic</option>
+                                <option value="professional">💼 Professional</option>
+                                <option value="internship">📋 Internship</option>
+                            </select>
+                            <label for="team-filter-week" style="margin-left:12px;">Filter by Week:</label>
                             <input type="number" id="team-filter-week" value="1" min="1" max="52" style="width:80px;">
                             <button id="apply-filter-btn" class="small primary">Apply</button>
                             <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows academic teams active during this 2-week block</span>
