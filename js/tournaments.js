@@ -25,6 +25,10 @@ function renderTournamentsView(container) {
             <div class="tab-content">
                 <!-- TAB 1: Teams -->
                 <div id="tab-teams" class="tab-panel active">
+                    <div class="page-header">
+                        <h2>Teams</h2>
+                        <button id="add-team-btn" class="primary">+ Add Team</button>
+                    </div>
                     <!-- Team Form -->
                     <div id="team-form" class="form-container hidden">
                         <h3 id="team-form-title">Add Team</h3>
@@ -44,12 +48,12 @@ function renderTournamentsView(container) {
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>Start Week/Year</label>
-                                    <input type="number" id="team-start" placeholder="Week or Year">
+                                    <label id="team-start-label">Start Week</label>
+                                    <input type="number" id="team-start" placeholder="Week (e.g., 1)">
                                 </div>
                                 <div class="form-group">
-                                    <label>End Week/Year</label>
-                                    <input type="number" id="team-end" placeholder="Week or Year (optional)">
+                                    <label id="team-end-label">End Week (optional)</label>
+                                    <input type="number" id="team-end" placeholder="Week (e.g., 52)">
                                 </div>
                                 <div class="form-group">
                                     <label>Current Ranking</label>
@@ -69,8 +73,8 @@ function renderTournamentsView(container) {
                                     <div id="name-history-container">
                                         <div class="name-history-entry">
                                             <input type="text" class="name-history-name" placeholder="Team Name">
-                                            <input type="number" class="name-history-start" placeholder="Start Week/Year">
-                                            <input type="number" class="name-history-end" placeholder="End Week/Year">
+                                            <input type="text" class="name-history-start" placeholder="Start Week/Year">
+                                            <input type="text" class="name-history-end" placeholder="End Week/Year">
                                             <button type="button" class="small danger remove-name">✕</button>
                                         </div>
                                     </div>
@@ -90,7 +94,7 @@ function renderTournamentsView(container) {
                             <label for="team-filter-week">Filter by Week:</label>
                             <input type="number" id="team-filter-week" value="1" min="1" max="52" style="width:80px;">
                             <button id="apply-filter-btn" class="small primary">Apply</button>
-                            <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active during this 2-week block</span>
+                            <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows academic teams active during this 2-week block</span>
                         </div>
                         <div class="list-header team-header">
                             <span>Team Name</span>
@@ -256,8 +260,8 @@ function renderTournamentsView(container) {
                             <option value="">Select character...</option>
                         </select>
                         <input type="text" id="member-role" placeholder="Role">
-                        <input type="number" id="member-join" placeholder="Join Week/Year">
-                        <input type="number" id="member-leave" placeholder="Leave Week/Year">
+                        <input type="text" id="member-join" placeholder="Join Week/Year">
+                        <input type="text" id="member-leave" placeholder="Leave Week/Year">
                         <button id="add-member-btn" class="primary small">Add Member</button>
                     </div>
                     <div id="members-list">
@@ -286,11 +290,11 @@ function renderTournamentsView(container) {
                         </div>
                         <div class="form-group">
                             <label>Join Week/Year</label>
-                            <input type="number" id="edit-member-join">
+                            <input type="text" id="edit-member-join">
                         </div>
                         <div class="form-group">
                             <label>Leave Week/Year</label>
-                            <input type="number" id="edit-member-leave">
+                            <input type="text" id="edit-member-leave">
                         </div>
                         <div class="form-actions">
                             <button type="button" id="cancel-edit-member" class="secondary">Cancel</button>
@@ -310,7 +314,7 @@ function renderTournamentsView(container) {
                 </div>
                 <div class="modal-body">
                     <div class="ranking-form">
-                        <input type="number" id="ranking-week" placeholder="Week Block (1, 3, 5...)" min="1">
+                        <input type="text" id="ranking-week" placeholder="Week Block (1, 3, 5...) or Year" min="1">
                         <span style="font-size:0.7rem;color:var(--text-dim);">For academic: enter the starting week (1=weeks 1-2, 3=weeks 3-4, etc.)</span>
                         <input type="number" id="ranking-rank" placeholder="Rank" min="1">
                         <button id="add-ranking-btn" class="primary small">Add Ranking</button>
@@ -860,25 +864,6 @@ function populateParticipantSelects(tourn) {
                 }
             });
         }
-        
-        // Also get all academic teams that are active
-        var activeTeams = getActiveTeamsForWeek(1);
-        activeTeams.forEach(function(team) {
-            if (!teamsInTournament.some(function(t) { return t.id === team.id; })) {
-                // Only show teams that are not already in the tournament
-                var alreadyInTournament = tourn.teams && tourn.teams.some(function(t) { return t.teamId === team.id; });
-                if (!alreadyInTournament) {
-                    // Only show non-deleted, active academic teams
-                    if (team.status !== 'deleted' && team.type === 'academic') {
-                        teamsInTournament.push({
-                            id: team.id,
-                            name: team.name,
-                            rank: team.currentRank
-                        });
-                    }
-                }
-            }
-        });
         
         teamsInTournament.sort(function(a, b) {
             return a.name.localeCompare(b.name);
