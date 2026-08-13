@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'TournamentManagerDB';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const STORE_NAME = 'tournamentData';
 
 let db = null;
@@ -199,6 +199,7 @@ function migrateData() {
         if (!team.startPeriod) team.startPeriod = '';
         if (!team.endPeriod) team.endPeriod = '';
         if (!team.type) team.type = 'academic';
+        if (!team.temporaryMission) team.temporaryMission = null;
     });
     
     // Migrate tournaments
