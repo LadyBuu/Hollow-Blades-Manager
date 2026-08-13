@@ -27,6 +27,12 @@ function initMissionsSystem() {
         if (!mission.objectives) mission.objectives = [];
         if (!mission.progress) mission.progress = 0;
         if (!mission.log) mission.log = [];
+        if (!mission.notes) mission.notes = '';
+        if (!mission.location) mission.location = '';
+        if (!mission.duration) mission.duration = '';
+        if (!mission.difficulty) mission.difficulty = 'medium';
+        if (!mission.pay) mission.pay = '';
+        if (!mission.objective) mission.objective = '';
     });
     saveData().catch(function(err) { console.error('Failed to save:', err); });
 }
@@ -76,14 +82,30 @@ function getTeamName(teamId) {
 }
 
 /**
+ * Get team type label by ID
+ */
+function getTeamTypeLabel(teamId) {
+    if (!teamId) return '';
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
+    if (!team) return '';
+    var typeMap = {
+        'academic': 'Academic',
+        'professional': 'Professional',
+        'temporary': 'Temporary',
+        'internship': 'Temporary'
+    };
+    return typeMap[team.type] || '';
+}
+
+/**
  * Get priority label and color
  */
 function getPriorityInfo(priority) {
     var map = {
-        'critical': { label: '🔴 Critical', color: 'var(--danger)' },
-        'high': { label: '🟠 High', color: 'var(--warning)' },
-        'medium': { label: '🟡 Medium', color: 'var(--warning)' },
-        'low': { label: '🟢 Low', color: 'var(--accent)' }
+        'critical': { label: 'Critical', color: 'var(--danger)' },
+        'high': { label: 'High', color: 'var(--warning)' },
+        'medium': { label: 'Medium', color: 'var(--warning)' },
+        'low': { label: 'Low', color: 'var(--accent)' }
     };
     return map[priority] || { label: 'Medium', color: 'var(--text-dim)' };
 }
@@ -98,6 +120,19 @@ function getStatusInfo(status) {
         'cancelled': { label: 'Cancelled', color: 'var(--danger)' }
     };
     return map[status] || { label: 'Active', color: 'var(--text-dim)' };
+}
+
+/**
+ * Get difficulty label
+ */
+function getDifficultyLabel(difficulty) {
+    var map = {
+        'easy': 'Easy',
+        'medium': 'Medium',
+        'hard': 'Hard',
+        'expert': 'Expert'
+    };
+    return map[difficulty] || difficulty || 'Medium';
 }
 
 /**
@@ -271,6 +306,39 @@ function removeObjective(missionId, objectiveIndex) {
 }
 
 /**
+ * Populate team selectors in forms - SHOWS ALL TEAM TYPES
+ */
+function populateTeamSelectors() {
+    var select = document.getElementById('mission-team');
+    if (!select) return;
+    
+    // Show all teams that are active (not deleted or inactive)
+    var teams = data.teams.filter(function(t) { 
+        return t.status !== 'deleted' && t.status !== 'inactive'; 
+    });
+    
+    // Sort by type then name
+    var typeOrder = { 'academic': 0, 'professional': 1, 'temporary': 2, 'internship': 2 };
+    teams.sort(function(a, b) {
+        var ta = typeOrder[a.type] !== undefined ? typeOrder[a.type] : 3;
+        var tb = typeOrder[b.type] !== undefined ? typeOrder[b.type] : 3;
+        if (ta !== tb) return ta - tb;
+        return a.name.localeCompare(b.name);
+    });
+    
+    select.innerHTML = '<option value="">Unassigned</option>';
+    teams.forEach(function(team) {
+        var option = document.createElement('option');
+        option.value = team.id;
+        var typeLabel = team.type === 'academic' ? 'Academic' : 
+                        team.type === 'professional' ? 'Professional' : 
+                        'Temporary';
+        option.textContent = team.name + ' (' + typeLabel + ')';
+        select.appendChild(option);
+    });
+}
+
+/**
  * Render the missions view
  */
 function renderMissionsView(container) {
@@ -278,7 +346,7 @@ function renderMissionsView(container) {
     
     container.innerHTML = `
         <div class="page-header">
-            <h2>🎯 Mission Manager</h2>
+            <h2>Mission Manager</h2>
             <button id="add-mission-btn" class="primary">+ New Mission</button>
         </div>
 
@@ -399,23 +467,6 @@ function renderMissionsView(container) {
 }
 
 /**
- * Populate team selectors in forms
- */
-function populateTeamSelectors() {
-    var select = document.getElementById('mission-team');
-    if (!select) return;
-    
-    var teams = data.teams.filter(function(t) { return t.status !== 'deleted'; });
-    select.innerHTML = '<option value="">Unassigned</option>';
-    teams.forEach(function(team) {
-        var option = document.createElement('option');
-        option.value = team.id;
-        option.textContent = team.name + (team.type ? ' (' + team.type + ')' : '');
-        select.appendChild(option);
-    });
-}
-
-/**
  * Render the missions list
  */
 function renderMissions() {
@@ -443,17 +494,20 @@ function renderMissions() {
         var priorityInfo = getPriorityInfo(mission.priority);
         var statusInfo = getStatusInfo(mission.status);
         var teamName = getTeamName(mission.assignedTeamId);
+        var teamType = getTeamTypeLabel(mission.assignedTeamId);
         var progressBar = mission.progress || 0;
+        var difficultyLabel = getDifficultyLabel(mission.difficulty);
         
-        html += '<div class="list-item" style="grid-template-columns:1.5fr 0.8fr 0.8fr 0.8fr 1fr;cursor:pointer;" data-id="' + mission.id + '">';
+        html += '<div class="list-item" style="grid-template-columns:1.2fr 0.6fr 0.6fr 0.6fr 0.6fr 1fr;cursor:pointer;" data-id="' + mission.id + '">';
         html += '<span><strong>' + mission.title + '</strong>';
         if (mission.status === 'completed') {
-            html += ' <span style="color:var(--info);font-size:0.6rem;">✅</span>';
+            html += ' <span style="color:var(--info);font-size:0.6rem;">✓</span>';
         }
         html += '</span>';
         html += '<span style="color:' + priorityInfo.color + ';font-size:0.75rem;">' + priorityInfo.label + '</span>';
+        html += '<span style="font-size:0.75rem;">' + difficultyLabel + '</span>';
         html += '<span style="color:' + statusInfo.color + ';font-size:0.75rem;">' + statusInfo.label + '</span>';
-        html += '<span style="font-size:0.75rem;">' + teamName + '</span>';
+        html += '<span style="font-size:0.75rem;">' + teamName + (teamType ? ' (' + teamType + ')' : '') + '</span>';
         html += '<span style="display:flex;align-items:center;gap:8px;">';
         html += '<div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">';
         html += '<div style="height:100%;width:' + progressBar + '%;background:var(--accent);border-radius:3px;"></div>';
@@ -488,14 +542,8 @@ function showMissionDetail(id) {
     var priorityInfo = getPriorityInfo(mission.priority);
     var statusInfo = getStatusInfo(mission.status);
     var teamName = getTeamName(mission.assignedTeamId);
-    
-    var difficultyMap = {
-        'easy': '🟢 Easy',
-        'medium': '🟡 Medium',
-        'hard': '🟠 Hard',
-        'expert': '🔴 Expert'
-    };
-    var difficultyLabel = difficultyMap[mission.difficulty] || mission.difficulty || 'Medium';
+    var teamType = getTeamTypeLabel(mission.assignedTeamId);
+    var difficultyLabel = getDifficultyLabel(mission.difficulty);
     
     var progressBar = mission.progress || 0;
     var createdAt = new Date(mission.createdAt).toLocaleDateString();
@@ -534,13 +582,15 @@ function showMissionDetail(id) {
         tagsHtml += '</div>';
     }
     
+    var teamDisplay = teamName + (teamType ? ' (' + teamType + ')' : '');
+    
     content.innerHTML = `
         <div class="detail-row"><span class="label">Status:</span> <span style="color:${statusInfo.color};font-weight:600;">${statusInfo.label}</span></div>
         <div class="detail-row"><span class="label">Priority:</span> <span style="color:${priorityInfo.color};font-weight:600;">${priorityInfo.label}</span></div>
-        <div class="detail-row"><span class="label">Team:</span> <span>${teamName}</span></div>
+        <div class="detail-row"><span class="label">Difficulty:</span> <span>${difficultyLabel}</span></div>
+        <div class="detail-row"><span class="label">Team:</span> <span>${teamDisplay}</span></div>
         <div class="detail-row"><span class="label">Location:</span> <span>${mission.location || 'Not specified'}</span></div>
         <div class="detail-row"><span class="label">Duration:</span> <span>${mission.duration || 'Not specified'}</span></div>
-        <div class="detail-row"><span class="label">Difficulty:</span> <span>${difficultyLabel}</span></div>
         <div class="detail-row"><span class="label">Pay:</span> <span>${mission.pay || 'Not specified'}</span></div>
         <div class="detail-row"><span class="label">Created:</span> <span>${createdAt}</span></div>
         <div class="detail-row"><span class="label">Completed:</span> <span>${completedAt}</span></div>
@@ -840,7 +890,9 @@ window.closeMissionDetail = closeMissionDetail;
 window.initMissionEvents = initMissionEvents;
 window.initMissionsSystem = initMissionsSystem;
 window.getTeamName = getTeamName;
+window.getTeamTypeLabel = getTeamTypeLabel;
 window.getPriorityInfo = getPriorityInfo;
 window.getStatusInfo = getStatusInfo;
+window.getDifficultyLabel = getDifficultyLabel;
 window.populateTeamSelectors = populateTeamSelectors;
 window.addObjectiveToList = addObjectiveToList;
