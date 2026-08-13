@@ -17,6 +17,16 @@ function initApp() {
                 initImportExport();
             }
             
+            // Initialize missions system
+            if (typeof initMissionsSystem === 'function') {
+                initMissionsSystem();
+            }
+            
+            // Initialize team manager system
+            if (typeof initTeamManagerSystem === 'function') {
+                initTeamManagerSystem();
+            }
+            
             // Update dashboard stats
             updateDashboardStats();
             renderActivityLog();
@@ -144,6 +154,11 @@ function renderAll() {
         var container = document.getElementById('app-container');
         if (container && typeof renderMissionsView === 'function') {
             renderMissionsView(container);
+        }
+    } else if (page === 'team-manager.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderTeamManagerView === 'function') {
+            renderTeamManagerView(container);
         }
     }
 }
