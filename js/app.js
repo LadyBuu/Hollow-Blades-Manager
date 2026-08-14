@@ -34,7 +34,6 @@ function initApp() {
             
             // Update dashboard stats
             updateDashboardStats();
-            renderActivityLog();
             
             // Set up year click
             var yearDisplay = document.getElementById('header-current-year');
@@ -80,25 +79,6 @@ function updateDashboardStats() {
 }
 
 /**
- * Render activity log
- */
-function renderActivityLog() {
-    var log = document.getElementById('activity-log');
-    if (!log) return;
-    
-    if (!data.activities || data.activities.length === 0) {
-        log.innerHTML = '<p class="empty-state">No recent activity</p>';
-        return;
-    }
-    
-    var html = '';
-    data.activities.slice(0, 10).forEach(function(a) {
-        html += '<div class="activity-item">' + a.message + '</div>';
-    });
-    log.innerHTML = html;
-}
-
-/**
  * Show year modal
  */
 function showYearModal() {
@@ -132,7 +112,6 @@ function renderAll() {
     
     if (page === 'index.html' || page === '') {
         updateDashboardStats();
-        renderActivityLog();
     } else if (page === 'characters.html') {
         if (typeof renderCharacters === 'function') {
             renderCharacters();
@@ -644,7 +623,6 @@ function deleteCharacter(id) {
 
 window.renderAll = renderAll;
 window.updateDashboardStats = updateDashboardStats;
-window.renderActivityLog = renderActivityLog;
 window.showYearModal = showYearModal;
 window.renderCharacters = renderCharacters;
 window.initCharacterEvents = initCharacterEvents;
