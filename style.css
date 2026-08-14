@@ -239,6 +239,7 @@ header nav a.active {
         order: 3;
         justify-content: center;
         gap: 3px;
+        flex-wrap: wrap;
     }
     .header-actions button.small {
         font-size: 0.55rem;
@@ -673,6 +674,365 @@ main {
 }
 
 /* ============================================================
+   FILTER SECTION
+   ============================================================ */
+.filter-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--panel-alt);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    border: 1px solid var(--border);
+}
+.filter-section label {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+.filter-section input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.8rem;
+    font-family: 'Inter', sans-serif;
+    width: 70px;
+}
+.filter-section input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.filter-section select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.8rem;
+    font-family: 'Inter', sans-serif;
+}
+
+/* ============================================================
+   LISTS
+   ============================================================ */
+.list-header {
+    display: grid;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--panel-alt);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    overflow-x: auto;
+}
+.list-item {
+    display: grid;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: none;
+    align-items: center;
+    overflow-x: auto;
+}
+.list-item:last-child {
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+.list-item .actions {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.list-item.deceased {
+    opacity: 0.55;
+    background: var(--panel-alt);
+    border-left: 3px solid var(--danger);
+}
+
+/* Character List */
+.list-header.char-header {
+    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr 1fr;
+}
+.list-item.char-item {
+    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr 1fr;
+}
+@media (max-width: 600px) {
+    .list-header.char-header {
+        grid-template-columns: 1.2fr 0.7fr 0.7fr 0.7fr 1fr;
+        font-size: 0.6rem;
+        gap: 4px;
+        padding: 6px 8px;
+    }
+    .list-item.char-item {
+        grid-template-columns: 1.2fr 0.7fr 0.7fr 0.7fr 1fr;
+        gap: 4px;
+        padding: 6px 8px;
+        font-size: 0.75rem;
+    }
+    .list-item.char-item .actions button {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+    }
+}
+
+/* Team List */
+.list-header.team-header {
+    grid-template-columns: 1.2fr 0.8fr 0.6fr 0.6fr 1fr;
+}
+.list-item.team-item {
+    grid-template-columns: 1.2fr 0.8fr 0.6fr 0.6fr 1fr;
+}
+@media (max-width: 600px) {
+    .list-header.team-header {
+        grid-template-columns: 1fr 0.6fr 0.5fr 0.5fr 0.8fr;
+        font-size: 0.6rem;
+        gap: 4px;
+        padding: 6px 8px;
+    }
+    .list-item.team-item {
+        grid-template-columns: 1fr 0.6fr 0.5fr 0.5fr 0.8fr;
+        gap: 4px;
+        padding: 6px 8px;
+        font-size: 0.7rem;
+    }
+    .list-item.team-item .actions button {
+        font-size: 0.55rem;
+        padding: 2px 4px;
+    }
+}
+
+/* Tournament List */
+.list-header.tourn-header {
+    grid-template-columns: 1fr 0.8fr 0.6fr 0.5fr 0.8fr;
+}
+.list-item.tourn-item {
+    grid-template-columns: 1fr 0.8fr 0.6fr 0.5fr 0.8fr;
+}
+@media (max-width: 600px) {
+    .list-header.tourn-header {
+        grid-template-columns: 1fr 0.6fr 0.4fr 0.4fr 0.6fr;
+        font-size: 0.6rem;
+        gap: 4px;
+        padding: 6px 8px;
+    }
+    .list-item.tourn-item {
+        grid-template-columns: 1fr 0.6fr 0.4fr 0.4fr 0.6fr;
+        gap: 4px;
+        padding: 6px 8px;
+        font-size: 0.7rem;
+    }
+    .list-item.tourn-item .actions button {
+        font-size: 0.55rem;
+        padding: 2px 4px;
+    }
+}
+
+/* Mission List */
+.list-header.mission-header {
+    grid-template-columns: 1.2fr 0.6fr 0.6fr 0.6fr 0.6fr 1fr;
+}
+.list-item.mission-item {
+    grid-template-columns: 1.2fr 0.6fr 0.6fr 0.6fr 0.6fr 1fr;
+}
+@media (max-width: 600px) {
+    .list-header.mission-header {
+        grid-template-columns: 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.6fr;
+        font-size: 0.55rem;
+        gap: 3px;
+        padding: 6px 8px;
+    }
+    .list-item.mission-item {
+        grid-template-columns: 1fr 0.5fr 0.5fr 0.5fr 0.5fr 0.6fr;
+        gap: 3px;
+        padding: 6px 8px;
+        font-size: 0.65rem;
+    }
+    .list-item.mission-item .actions button {
+        font-size: 0.5rem;
+        padding: 2px 4px;
+    }
+}
+
+/* ============================================================
+   BADGES
+   ============================================================ */
+.deceased-badge {
+    color: var(--danger);
+    font-size: 0.65rem;
+    margin-left: 4px;
+    font-weight: 600;
+}
+.eliminated-badge {
+    color: var(--danger);
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: var(--danger-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+}
+.conflict-badge {
+    color: var(--danger);
+    font-size: 0.6rem;
+    background: var(--danger-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+}
+.warning-badge {
+    color: var(--warning);
+    font-size: 0.6rem;
+    background: var(--warning-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+}
+
+/* ============================================================
+   TEAM MEMBERS EXPANDED
+   ============================================================ */
+.team-members-expanded {
+    grid-column: 1 / -1;
+    padding: 6px 10px 10px 10px;
+    background: var(--bg);
+    border-radius: 0 0 var(--radius) var(--radius);
+    border: 1px solid var(--border);
+    border-top: none;
+    margin-top: -6px;
+    margin-bottom: 2px;
+    overflow-x: auto;
+}
+.team-members-expanded .member-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 0.78rem;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.team-members-expanded .member-entry:last-child {
+    border-bottom: none;
+}
+.team-members-expanded .member-entry .role {
+    color: var(--accent);
+    font-size: 0.7rem;
+}
+.team-members-expanded .member-entry.empty {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+/* ============================================================
+   MEMBER MODAL
+   ============================================================ */
+.member-form {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: var(--panel-alt);
+    border-radius: var(--radius);
+    align-items: center;
+}
+.member-form select,
+.member-form input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: 'Inter', sans-serif;
+    flex: 1;
+    min-width: 80px;
+}
+.member-form select:focus,
+.member-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+#members-list .member-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--panel-alt);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+#members-list .member-entry .member-info {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    flex: 1;
+}
+#members-list .member-entry .member-info span {
+    font-size: 0.8rem;
+}
+#members-list .member-entry .member-info .role {
+    color: var(--accent);
+}
+#members-list .member-entry .member-info .years {
+    color: var(--text-dim);
+    font-size: 0.7rem;
+}
+#members-list .member-entry .member-actions {
+    display: flex;
+    gap: 4px;
+}
+
+/* ============================================================
+   RANKING MODAL
+   ============================================================ */
+.ranking-form {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: var(--panel-alt);
+    border-radius: var(--radius);
+    align-items: center;
+}
+.ranking-form input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.78rem;
+    font-family: 'Inter', sans-serif;
+    flex: 1;
+    min-width: 80px;
+}
+#ranking-list .ranking-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    background: var(--panel-alt);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* ============================================================
    CURRICULUM - Discipline List
    ============================================================ */
 #discipline-list {
@@ -766,130 +1126,6 @@ main {
         font-size: 0.45rem;
         padding: 1px 3px;
     }
-}
-
-/* ============================================================
-   CURRICULUM - Discipline Groups
-   ============================================================ */
-#discipline-groups-container {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-.discipline-groups-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    box-shadow: var(--shadow);
-    transition: border-color 0.2s;
-}
-.discipline-groups-card:hover {
-    border-color: var(--accent);
-}
-.discipline-groups-card .discipline-group-card {
-    background: var(--bg);
-    border: 1px solid var(--border-soft);
-    border-radius: var(--radius);
-    padding: 8px 12px;
-    flex: 1;
-    min-width: 120px;
-    max-width: 250px;
-    transition: border-color 0.2s;
-}
-.discipline-groups-card .discipline-group-card:hover {
-    border-color: var(--accent);
-}
-.discipline-groups-card .discipline-group-card .group-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-}
-.discipline-groups-card .discipline-group-card .group-header .group-name {
-    font-weight: 600;
-    color: var(--accent);
-}
-.discipline-groups-card .discipline-group-card .group-header .group-meta {
-    font-size: 0.7rem;
-    color: var(--text-dim);
-}
-.discipline-groups-card .discipline-group-card .group-students {
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px solid var(--border-soft);
-}
-.discipline-groups-card .discipline-group-card .group-students .student-tag {
-    background: var(--panel-alt);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.7rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.discipline-groups-card .discipline-group-card .group-students .student-tag .remove-from-discipline-group-btn {
-    background: none;
-    border: none;
-    color: var(--danger);
-    cursor: pointer;
-    font-size: 0.6rem;
-    padding: 0 2px;
-}
-.discipline-groups-card .discipline-group-card .group-students .student-tag .remove-from-discipline-group-btn:hover {
-    color: var(--danger);
-    opacity: 0.7;
-}
-
-/* Group capacity indicator */
-.group-capacity {
-    font-size: 0.6rem;
-    padding: 2px 6px;
-    border-radius: 10px;
-}
-.group-capacity.full {
-    background: var(--danger-soft);
-    color: var(--danger);
-}
-.group-capacity.near-full {
-    background: var(--warning-soft);
-    color: var(--warning);
-}
-.group-capacity.has-space {
-    background: var(--accent-soft);
-    color: var(--accent);
-}
-
-/* Auto-distribute button */
-.auto-distribute-section {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: var(--shadow);
-}
-.auto-distribute-section .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 12px;
-    margin: 8px 0;
-}
-.auto-distribute-section .stat-item {
-    text-align: center;
-    padding: 8px;
-    background: var(--bg);
-    border-radius: var(--radius);
-}
-.auto-distribute-section .stat-item .number {
-    font-size: 1.5rem;
-    font-weight: 700;
-    font-family: 'Fraunces', serif;
-    color: var(--accent);
-}
-.auto-distribute-section .stat-item .label {
-    font-size: 0.65rem;
-    color: var(--text-dim);
 }
 
 /* ============================================================
@@ -1571,367 +1807,6 @@ main {
     font-size: 0.7rem;
     display: inline-block;
     margin: 2px;
-}
-
-/* ============================================================
-   LISTS (General)
-   ============================================================ */
-.list-header {
-    display: grid;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--panel-alt);
-    border-radius: var(--radius) var(--radius) 0 0;
-    border: 1px solid var(--border);
-    border-bottom: none;
-    font-weight: 600;
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    overflow-x: auto;
-}
-.list-item {
-    display: grid;
-    gap: 8px;
-    padding: 8px 12px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-top: none;
-    align-items: center;
-    overflow-x: auto;
-}
-.list-item:last-child {
-    border-radius: 0 0 var(--radius) var(--radius);
-}
-.list-item .actions {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-.list-item.deceased {
-    opacity: 0.55;
-    background: var(--panel-alt);
-    border-left: 3px solid var(--danger);
-}
-
-/* Character List */
-.list-header.char-header {
-    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr 1fr;
-}
-.list-item.char-item {
-    grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr 1fr;
-}
-@media (max-width: 600px) {
-    .list-header.char-header {
-        grid-template-columns: 1.2fr 0.7fr 0.7fr 0.7fr 1fr;
-        font-size: 0.6rem;
-        gap: 4px;
-        padding: 6px 8px;
-    }
-    .list-item.char-item {
-        grid-template-columns: 1.2fr 0.7fr 0.7fr 0.7fr 1fr;
-        gap: 4px;
-        padding: 6px 8px;
-        font-size: 0.75rem;
-    }
-    .list-item.char-item .actions button {
-        font-size: 0.6rem;
-        padding: 2px 6px;
-    }
-}
-
-/* Team List */
-.list-header.team-header {
-    grid-template-columns: 1.2fr 0.8fr 1fr 0.7fr 0.7fr 1.2fr;
-}
-.list-item.team-item {
-    grid-template-columns: 1.2fr 0.8fr 1fr 0.7fr 0.7fr 1.2fr;
-}
-@media (max-width: 600px) {
-    .list-header.team-header {
-        grid-template-columns: 1fr 0.6fr 0.8fr 0.5fr 0.5fr 1fr;
-        font-size: 0.6rem;
-        gap: 4px;
-        padding: 6px 8px;
-    }
-    .list-item.team-item {
-        grid-template-columns: 1fr 0.6fr 0.8fr 0.5fr 0.5fr 1fr;
-        gap: 4px;
-        padding: 6px 8px;
-        font-size: 0.7rem;
-    }
-    .list-item.team-item .actions button {
-        font-size: 0.6rem;
-        padding: 2px 6px;
-    }
-}
-
-/* Tournament List */
-.list-header.tourn-header {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.2fr;
-}
-.list-item.tourn-item {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr 0.8fr 1.2fr;
-}
-@media (max-width: 600px) {
-    .list-header.tourn-header {
-        grid-template-columns: 1fr 0.6fr 0.7fr 0.7fr 0.7fr 1fr;
-        font-size: 0.6rem;
-        gap: 4px;
-        padding: 6px 8px;
-    }
-    .list-item.tourn-item {
-        grid-template-columns: 1fr 0.6fr 0.7fr 0.7fr 0.7fr 1fr;
-        gap: 4px;
-        padding: 6px 8px;
-        font-size: 0.7rem;
-    }
-    .list-item.tourn-item .actions button {
-        font-size: 0.6rem;
-        padding: 2px 6px;
-    }
-}
-
-/* ============================================================
-   BADGES
-   ============================================================ */
-.deceased-badge {
-    color: var(--danger);
-    font-size: 0.65rem;
-    margin-left: 4px;
-    font-weight: 600;
-}
-.eliminated-badge {
-    color: var(--danger);
-    font-size: 0.65rem;
-    font-weight: 600;
-    background: var(--danger-soft);
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 4px;
-}
-.conflict-badge {
-    color: var(--danger);
-    font-size: 0.6rem;
-    background: var(--danger-soft);
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 4px;
-}
-.warning-badge {
-    color: var(--warning);
-    font-size: 0.6rem;
-    background: var(--warning-soft);
-    padding: 1px 6px;
-    border-radius: 4px;
-    margin-left: 4px;
-}
-
-/* ============================================================
-   TEAM MEMBERS EXPANDED
-   ============================================================ */
-.team-members-expanded {
-    grid-column: 1 / -1;
-    padding: 6px 10px 10px 10px;
-    background: var(--bg);
-    border-radius: 0 0 var(--radius) var(--radius);
-    border: 1px solid var(--border);
-    border-top: none;
-    margin-top: -6px;
-    margin-bottom: 2px;
-    overflow-x: auto;
-}
-.team-members-expanded .member-entry {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 3px 6px;
-    border-bottom: 1px solid var(--border-soft);
-    font-size: 0.78rem;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-.team-members-expanded .member-entry:last-child {
-    border-bottom: none;
-}
-.team-members-expanded .member-entry .role {
-    color: var(--accent);
-    font-size: 0.7rem;
-}
-.team-members-expanded .member-entry.empty {
-    color: var(--text-dim);
-    font-style: italic;
-}
-
-/* ============================================================
-   MEMBER MODAL
-   ============================================================ */
-.member-form {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-    padding: 10px;
-    background: var(--panel-alt);
-    border-radius: var(--radius);
-    align-items: center;
-}
-.member-form select,
-.member-form input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.78rem;
-    font-family: 'Inter', sans-serif;
-    flex: 1;
-    min-width: 80px;
-}
-.member-form select:focus,
-.member-form input:focus {
-    outline: none;
-    border-color: var(--accent);
-}
-#members-list .member-entry {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 10px;
-    background: var(--panel-alt);
-    border-radius: 6px;
-    margin-bottom: 4px;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-#members-list .member-entry .member-info {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    align-items: center;
-    flex: 1;
-}
-#members-list .member-entry .member-info span {
-    font-size: 0.8rem;
-}
-#members-list .member-entry .member-info .role {
-    color: var(--accent);
-}
-#members-list .member-entry .member-info .years {
-    color: var(--text-dim);
-    font-size: 0.7rem;
-}
-#members-list .member-entry .member-actions {
-    display: flex;
-    gap: 4px;
-}
-
-/* ============================================================
-   RANKING MODAL
-   ============================================================ */
-.ranking-form {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-    padding: 10px;
-    background: var(--panel-alt);
-    border-radius: var(--radius);
-    align-items: center;
-}
-.ranking-form input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.78rem;
-    font-family: 'Inter', sans-serif;
-    flex: 1;
-    min-width: 80px;
-}
-#ranking-list .ranking-entry {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 10px;
-    background: var(--panel-alt);
-    border-radius: 6px;
-    margin-bottom: 4px;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-
-/* ============================================================
-   CALENDAR (Legacy)
-   ============================================================ */
-.calendar-container {
-    display: flex;
-    gap: 12px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    box-shadow: var(--shadow);
-    overflow-x: auto;
-    flex-direction: column;
-}
-@media (min-width: 768px) {
-    .calendar-container {
-        flex-direction: row;
-        padding: 20px;
-        gap: 20px;
-    }
-}
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    flex: 3;
-    min-width: 400px;
-}
-@media (max-width: 600px) {
-    .calendar-grid {
-        min-width: 350px;
-        gap: 3px;
-    }
-}
-.calendar-sidebar {
-    flex: 1;
-    min-width: 180px;
-    max-width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-@media (min-width: 768px) {
-    .calendar-sidebar {
-        min-width: 220px;
-        max-width: 320px;
-        gap: 16px;
-    }
-}
-.sidebar-section {
-    background: var(--bg);
-    border: 1px solid var(--border-soft);
-    border-radius: var(--radius);
-    padding: 10px;
-    overflow-x: auto;
-}
-@media (min-width: 768px) {
-    .sidebar-section {
-        padding: 12px;
-    }
-}
-.sidebar-section h4 {
-    font-size: 0.8rem;
-    color: var(--accent);
-    margin-bottom: 6px;
-}
-.sidebar-section .empty-state {
-    padding: 10px;
-    font-size: 0.75rem;
 }
 
 /* ============================================================
@@ -2778,35 +2653,252 @@ main {
 }
 
 /* ============================================================
-   FILTER SECTION
+   AUTO-GROUPS
    ============================================================ */
-.filter-section {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--panel-alt);
+.auto-group-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    border: 1px solid var(--border);
+    padding: 12px 16px;
 }
-.filter-section label {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-    font-weight: 500;
-}
-.filter-section input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 5px 8px;
-    font-size: 0.8rem;
-    font-family: 'Inter', sans-serif;
-    width: 70px;
-}
-.filter-section input:focus {
-    outline: none;
+.auto-group-card:hover {
     border-color: var(--accent);
+}
+
+.discipline-groups-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s;
+}
+.discipline-groups-card:hover {
+    border-color: var(--accent);
+}
+.discipline-groups-card .discipline-group-card {
+    background: var(--bg);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    flex: 1;
+    min-width: 120px;
+    max-width: 250px;
+    transition: border-color 0.2s;
+}
+.discipline-groups-card .discipline-group-card:hover {
+    border-color: var(--accent);
+}
+.discipline-groups-card .discipline-group-card .group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+.discipline-groups-card .discipline-group-card .group-header .group-name {
+    font-weight: 600;
+    color: var(--accent);
+}
+.discipline-groups-card .discipline-group-card .group-header .group-meta {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+.discipline-groups-card .discipline-group-card .group-students {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-soft);
+}
+.discipline-groups-card .discipline-group-card .group-students .student-tag {
+    background: var(--panel-alt);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.discipline-groups-card .discipline-group-card .group-students .student-tag .remove-from-discipline-group-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.6rem;
+    padding: 0 2px;
+}
+.discipline-groups-card .discipline-group-card .group-students .student-tag .remove-from-discipline-group-btn:hover {
+    color: var(--danger);
+    opacity: 0.7;
+}
+
+/* Group capacity indicator */
+.group-capacity {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+.group-capacity.full {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+.group-capacity.near-full {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+.group-capacity.has-space {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+/* Auto-distribute section */
+.auto-distribute-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+}
+.auto-distribute-section .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 12px;
+    margin: 8px 0;
+}
+.auto-distribute-section .stat-item {
+    text-align: center;
+    padding: 8px;
+    background: var(--bg);
+    border-radius: var(--radius);
+}
+.auto-distribute-section .stat-item .number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'Fraunces', serif;
+    color: var(--accent);
+}
+.auto-distribute-section .stat-item .label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+}
+
+/* ============================================================
+   RESPONSIVE FIXES FOR MOBILE
+   ============================================================ */
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 12px;
+        max-width: 100%;
+        border-radius: 0;
+        max-height: 100vh;
+    }
+    .modal-header h3 {
+        font-size: 1rem;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: 0.75rem;
+        padding: 5px 8px;
+    }
+    button {
+        font-size: 0.7rem;
+        padding: 6px 12px;
+    }
+    button.small {
+        font-size: 0.6rem;
+        padding: 3px 6px;
+    }
+    .filter-section {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+    .filter-section input,
+    .filter-section select {
+        width: 100%;
+    }
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .stat-card {
+        padding: 10px;
+    }
+    .stat-card .stat-number {
+        font-size: 1.5rem;
+    }
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .tab-nav {
+        gap: 1px;
+    }
+    .tab-btn {
+        font-size: 0.65rem;
+        padding: 4px 8px;
+    }
+    .list-header,
+    .list-item {
+        font-size: 0.6rem;
+        padding: 4px 6px;
+        gap: 4px;
+    }
+    .list-item .actions button {
+        font-size: 0.5rem;
+        padding: 1px 4px;
+    }
+    .page-header h2 {
+        font-size: 1.1rem;
+    }
+    .page-header {
+        margin-bottom: 10px;
+    }
+    .schedule-sidebar {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+@media print {
+    header {
+        position: static;
+        border-bottom: 1px solid #ccc;
+    }
+    .header-actions {
+        display: none !important;
+    }
+    .modal {
+        position: static;
+        background: none;
+        padding: 0;
+    }
+    .modal-content {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        max-height: none;
+    }
+    .modal.hidden {
+        display: block !important;
+    }
+    .close-modal {
+        display: none !important;
+    }
+    button {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .stat-card {
+        break-inside: avoid;
+    }
+    .list-item {
+        break-inside: avoid;
+    }
 }
