@@ -32,6 +32,11 @@ function initApp() {
                 initScheduleSystem();
             }
             
+            // Initialize student schedule system
+            if (typeof initStudentScheduleSystem === 'function') {
+                initStudentScheduleSystem();
+            }
+            
             // Update dashboard stats
             updateDashboardStats();
             
@@ -62,7 +67,10 @@ function updateDashboardStats() {
     var yearDisplay = document.getElementById('header-current-year');
     
     if (charCount) charCount.textContent = data.characters ? data.characters.length : 0;
-    if (teamCount) teamCount.textContent = data.teams ? data.teams.length : 0;
+    if (teamCount) {
+        var activeTeams = data.teams ? data.teams.filter(function(t) { return t.status !== 'deleted'; }).length : 0;
+        teamCount.textContent = activeTeams;
+    }
     if (tournCount) tournCount.textContent = data.tournaments ? data.tournaments.length : 0;
     if (studentCount) {
         var students = typeof getStudents === 'function' ? getStudents() : [];
