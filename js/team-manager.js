@@ -151,6 +151,145 @@ function getMissionTitle(missionId) {
 }
 
 /**
+ * Get member status for a specific week
+ */
+function getMemberStatusAtWeek(member, week) {
+    var weekNum = parseInt(week) || 1;
+    var join = parseInt(member.joinPeriod);
+    var leave = parseInt(member.leavePeriod);
+    
+    // Find the character
+    var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
+    
+    // Check if deceased
+    if (char && char.deceased) {
+        // Check if death happened before or during this week
+        if (char.deathYear) {
+            var deathYear = parseInt(char.deathYear);
+            if (!isNaN(deathYear) && deathYear <= weekNum) {
+                return 'deceased';
+            }
+        }
+        // If no death year but deceased, check if deathAge indicates death before current year
+        if (char.deathAge) {
+            var birthYear = parseInt(char.birthYear);
+            if (!isNaN(birthYear)) {
+                var deathYear = birthYear + parseInt(char.deathAge);
+                if (deathYear <= weekNum) {
+                    return 'deceased';
+                }
+            }
+        }
+        // If no way to determine, assume deceased if char.deceased is true
+        return 'deceased';
+    }
+    
+    // Check if eliminated
+    if (char && char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+            var elimWeek = parseInt(char.eliminatedWeeks[i]);
+            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+                return 'eliminated';
+            }
+        }
+    }
+    
+    // Check if left the team
+    if (!isNaN(leave) && leave < weekNum) {
+        return 'left';
+    }
+    
+    // Check if not joined yet
+    if (!isNaN(join) && join > weekNum) {
+        return 'future';
+    }
+    
+    // Check if currently active
+    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+        return 'active';
+    }
+    
+    return 'unknown';
+}
+
+/**
+ * Get member status label and color
+ */
+function getMemberStatusInfo(status) {
+    var map = {
+        'active': { label: 'Active', color: 'var(--accent)' },
+        'left': { label: 'Left', color: 'var(--text-dim)' },
+        'deceased': { label: 'Deceased', color: 'var(--danger)' },
+        'eliminated': { label: 'Eliminated', color: 'var(--danger)' },
+        'future': { label: 'Future Member', color: 'var(--warning)' },
+        'unknown': { label: 'Unknown', color: 'var(--text-dim)' }
+    };
+    return map[status] || map['unknown'];
+}
+
+/**
+ * Get character availability status for a specific time
+ */
+function getCharacterAvailability(charId, week, teamId) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) return { available: false, reason: 'Character not found' };
+    
+    var weekNum = parseInt(week) || 1;
+    
+    // Check if deceased
+    if (char.deceased) {
+        if (char.deathYear) {
+            var deathYear = parseInt(char.deathYear);
+            if (!isNaN(deathYear) && deathYear <= weekNum) {
+                return { available: false, reason: 'Deceased' };
+            }
+        }
+        if (char.deathAge) {
+            var birthYear = parseInt(char.birthYear);
+            if (!isNaN(birthYear)) {
+                var deathYear = birthYear + parseInt(char.deathAge);
+                if (deathYear <= weekNum) {
+                    return { available: false, reason: 'Deceased' };
+                }
+            }
+        }
+        return { available: false, reason: 'Deceased' };
+    }
+    
+    // Check if eliminated
+    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+            var elimWeek = parseInt(char.eliminatedWeeks[i]);
+            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+                return { available: false, reason: 'Eliminated from tournaments' };
+            }
+        }
+    }
+    
+    // Check if already in another team during this time
+    var teamIdStr = String(teamId);
+    for (var i = 0; i < data.teams.length; i++) {
+        var team = data.teams[i];
+        if (String(team.id) === teamIdStr) continue;
+        if (team.status === 'deleted' || team.status === 'inactive') continue;
+        if (team.members) {
+            for (var j = 0; j < team.members.length; j++) {
+                var member = team.members[j];
+                if (String(member.characterId) === String(charId)) {
+                    var join = parseInt(member.joinPeriod);
+                    var leave = parseInt(member.leavePeriod);
+                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+                        return { available: false, reason: 'In team: ' + team.name };
+                    }
+                }
+            }
+        }
+    }
+    
+    return { available: true, reason: 'Available' };
+}
+
+/**
  * Render the team manager view
  */
 function renderTeamManagerView(container) {
