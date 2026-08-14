@@ -2,6 +2,7 @@
  * team-manager.js - Team Manager
  * Divided into three tabs: Academic, Professional, Temporary
  * Each tab shows only the appropriate team type with relevant filters
+ * Shows current members and full history (all members ever part of the team)
  */
 
 var teamManagerState = {
@@ -92,7 +93,15 @@ function getTeamName(teamId) {
 }
 
 /**
- * Get active members for a team in a week
+ * Get all members of a team (full history)
+ */
+function getAllTeamMembers(team) {
+    if (!team || !team.members) return [];
+    return team.members.slice();
+}
+
+/**
+ * Get current active members for a team at a specific week/period
  */
 function getActiveMembers(team, week) {
     if (!team.members) return [];
@@ -102,6 +111,145 @@ function getActiveMembers(team, week) {
         var leave = parseInt(m.leavePeriod);
         return !isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum);
     });
+}
+
+/**
+ * Get member status for a specific week
+ */
+function getMemberStatusAtWeek(member, week) {
+    var weekNum = parseInt(week) || 1;
+    var join = parseInt(member.joinPeriod);
+    var leave = parseInt(member.leavePeriod);
+    
+    // Find the character
+    var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
+    
+    // Check if deceased
+    if (char && char.deceased) {
+        // Check if death happened before or during this week
+        if (char.deathYear) {
+            var deathYear = parseInt(char.deathYear);
+            if (!isNaN(deathYear) && deathYear <= weekNum) {
+                return 'deceased';
+            }
+        }
+        // If no death year but deceased, check if deathAge indicates death before current year
+        if (char.deathAge) {
+            var birthYear = parseInt(char.birthYear);
+            if (!isNaN(birthYear)) {
+                var deathYear = birthYear + parseInt(char.deathAge);
+                if (deathYear <= weekNum) {
+                    return 'deceased';
+                }
+            }
+        }
+        // If no way to determine, assume deceased if char.deceased is true
+        return 'deceased';
+    }
+    
+    // Check if eliminated
+    if (char && char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+            var elimWeek = parseInt(char.eliminatedWeeks[i]);
+            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+                return 'eliminated';
+            }
+        }
+    }
+    
+    // Check if left the team
+    if (!isNaN(leave) && leave < weekNum) {
+        return 'left';
+    }
+    
+    // Check if not joined yet
+    if (!isNaN(join) && join > weekNum) {
+        return 'future';
+    }
+    
+    // Check if currently active
+    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+        return 'active';
+    }
+    
+    return 'unknown';
+}
+
+/**
+ * Get member status label and color
+ */
+function getMemberStatusInfo(status) {
+    var map = {
+        'active': { label: 'Active', color: 'var(--accent)' },
+        'left': { label: 'Left', color: 'var(--text-dim)' },
+        'deceased': { label: 'Deceased', color: 'var(--danger)' },
+        'eliminated': { label: 'Eliminated', color: 'var(--danger)' },
+        'future': { label: 'Future Member', color: 'var(--warning)' },
+        'unknown': { label: 'Unknown', color: 'var(--text-dim)' }
+    };
+    return map[status] || map['unknown'];
+}
+
+/**
+ * Get character availability status for a specific time
+ */
+function getCharacterAvailability(charId, week, teamId) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) return { available: false, reason: 'Character not found' };
+    
+    var weekNum = parseInt(week) || 1;
+    
+    // Check if deceased
+    if (char.deceased) {
+        if (char.deathYear) {
+            var deathYear = parseInt(char.deathYear);
+            if (!isNaN(deathYear) && deathYear <= weekNum) {
+                return { available: false, reason: 'Deceased' };
+            }
+        }
+        if (char.deathAge) {
+            var birthYear = parseInt(char.birthYear);
+            if (!isNaN(birthYear)) {
+                var deathYear = birthYear + parseInt(char.deathAge);
+                if (deathYear <= weekNum) {
+                    return { available: false, reason: 'Deceased' };
+                }
+            }
+        }
+        return { available: false, reason: 'Deceased' };
+    }
+    
+    // Check if eliminated
+    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+            var elimWeek = parseInt(char.eliminatedWeeks[i]);
+            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+                return { available: false, reason: 'Eliminated from tournaments' };
+            }
+        }
+    }
+    
+    // Check if already in another team during this time
+    var teamIdStr = String(teamId);
+    for (var i = 0; i < data.teams.length; i++) {
+        var team = data.teams[i];
+        if (String(team.id) === teamIdStr) continue;
+        if (team.status === 'deleted' || team.status === 'inactive') continue;
+        if (team.members) {
+            for (var j = 0; j < team.members.length; j++) {
+                var member = team.members[j];
+                if (String(member.characterId) === String(charId)) {
+                    var join = parseInt(member.joinPeriod);
+                    var leave = parseInt(member.leavePeriod);
+                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+                        return { available: false, reason: 'In team: ' + team.name };
+                    }
+                }
+            }
+        }
+    }
+    
+    return { available: true, reason: 'Available' };
 }
 
 /**
@@ -254,7 +402,7 @@ function renderTeamManagerView(container) {
 
         <!-- Member Modal -->
         <div id="member-modal" class="modal hidden">
-            <div class="modal-content">
+            <div class="modal-content" style="max-width:700px;">
                 <div class="modal-header">
                     <h3 id="modal-team-name">Team Members</h3>
                     <button class="close-modal">&times;</button>
@@ -268,6 +416,9 @@ function renderTeamManagerView(container) {
                         <input type="text" id="member-join" placeholder="Join Week/Year">
                         <input type="text" id="member-leave" placeholder="Leave Week/Year">
                         <button id="add-member-btn" class="primary small">Add Member</button>
+                    </div>
+                    <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">
+                        Shows all members who have ever been in this team. Status indicates their current state.
                     </div>
                     <div id="members-list">
                         <p class="empty-state">No members in this team</p>
@@ -502,19 +653,24 @@ function renderTeamList(teams, tab) {
         
         if (isExpanded) {
             html += '<div class="team-members-expanded" data-team-id="' + team.id + '">';
-            if (team.members && team.members.length > 0) {
-                team.members.forEach(function(member) {
+            // Show current active members
+            var activeMembers = getActiveMembers(team, filterWeek);
+            if (activeMembers.length > 0) {
+                html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:4px;">Current Active Members:</div>';
+                activeMembers.forEach(function(member) {
                     var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
                     var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
                     var age = char ? getCharacterAge(char) : '-';
                     var deadMarker = char && char.deceased ? ' Deceased' : '';
-                    html += '<div class="member-entry">' +
+                    var status = getMemberStatusAtWeek(member, filterWeek);
+                    var statusInfo = getMemberStatusInfo(status);
+                    html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;">' +
                         '<span>' + name + deadMarker + ' <span class="role">(' + (member.role || 'Member') + ')</span></span>' +
-                        '<span style="color:var(--text-dim);font-size:0.75rem;">Age: ' + age + ' | Joined: ' + (member.joinPeriod || '?') + (member.leavePeriod ? ' → ' + member.leavePeriod : '') + '</span>' +
+                        '<span style="color:var(--text-dim);font-size:0.75rem;">Age: ' + age + ' | Joined: ' + (member.joinPeriod || '?') + (member.leavePeriod ? ' → ' + member.leavePeriod : '') + ' | <span style="color:' + statusInfo.color + ';">' + statusInfo.label + '</span></span>' +
                     '</div>';
                 });
             } else {
-                html += '<div class="member-entry empty">No members</div>';
+                html += '<div class="member-entry empty" style="color:var(--text-dim);font-size:0.8rem;">No active members this week</div>';
             }
             html += '</div>';
         }
@@ -832,7 +988,7 @@ function closeTeamForm() {
 }
 
 /**
- * Open member management modal
+ * Open member management modal - shows full member history
  */
 function openMemberModal(teamId, tab) {
     var modal = document.getElementById('member-modal');
@@ -841,28 +997,63 @@ function openMemberModal(teamId, tab) {
     
     teamManagerState.currentTeamId = teamId;
     var periodLabel = team.type === 'academic' ? 'Week' : 'Period';
-    document.getElementById('modal-team-name').textContent = team.name + ' - Members';
+    document.getElementById('modal-team-name').textContent = team.name + ' - Members (Full History)';
     
     var select = document.getElementById('member-character');
     select.innerHTML = '<option value="">Select character...</option>';
     
+    var currentWeek = teamManagerState.filterWeek || 1;
+    
+    // Get all characters and sort by availability
     var sortedChars = data.characters.slice().sort(function(a, b) {
         var nameA = [a.firstName, a.middleName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         var nameB = [b.firstName, b.middleName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         return nameA.localeCompare(nameB);
     });
     
+    // Separate available and unavailable characters
+    var availableChars = [];
+    var unavailableChars = [];
+    
     sortedChars.forEach(function(char) {
+        var availability = getCharacterAvailability(char.id, currentWeek, teamId);
         var inThisTeam = team.members && team.members.some(function(m) { return String(m.characterId) === String(char.id); });
+        
+        if (inThisTeam) {
+            // Already in team - show at top
+            availableChars.unshift({ char: char, availability: availability, inTeam: true });
+        } else if (availability.available) {
+            availableChars.push({ char: char, availability: availability, inTeam: false });
+        } else {
+            unavailableChars.push({ char: char, availability: availability, inTeam: false });
+        }
+    });
+    
+    // Add available characters first, then unavailable
+    var allChars = availableChars.concat(unavailableChars);
+    
+    allChars.forEach(function(item) {
+        var char = item.char;
+        var availability = item.availability;
+        var inThisTeam = item.inTeam;
+        
         var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
         var deadMarker = char.deceased ? ' Deceased' : '';
+        var statusMarker = '';
+        var style = '';
+        
+        if (inThisTeam) {
+            statusMarker = ' ✓';
+            style = 'color:var(--accent);font-weight:600;';
+        } else if (!availability.available) {
+            statusMarker = ' (' + availability.reason + ')';
+            style = 'color:var(--text-dim);font-style:italic;text-decoration:line-through;';
+        }
+        
         var option = document.createElement('option');
         option.value = char.id;
-        option.textContent = name + deadMarker + (inThisTeam ? ' ✓' : '');
-        if (inThisTeam) {
-            option.style.color = 'var(--accent)';
-            option.style.fontWeight = '600';
-        }
+        option.textContent = name + deadMarker + statusMarker;
+        option.style.cssText = style;
         select.appendChild(option);
     });
     
@@ -879,7 +1070,7 @@ function openMemberModal(teamId, tab) {
 }
 
 /**
- * Render members in the member modal
+ * Render members in the member modal - shows full history with status
  */
 function renderMembers(team) {
     var container = document.getElementById('members-list');
@@ -889,18 +1080,41 @@ function renderMembers(team) {
     }
     
     var periodLabel = team.type === 'academic' ? 'Wk' : 'Period';
+    var currentWeek = teamManagerState.filterWeek || 1;
     var html = '';
-    team.members.forEach(function(member, index) {
+    
+    // Sort members: active first, then by join period
+    var sortedMembers = team.members.slice().sort(function(a, b) {
+        var aActive = getMemberStatusAtWeek(a, currentWeek) === 'active';
+        var bActive = getMemberStatusAtWeek(b, currentWeek) === 'active';
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        var aJoin = parseInt(a.joinPeriod) || 0;
+        var bJoin = parseInt(b.joinPeriod) || 0;
+        return aJoin - bJoin;
+    });
+    
+    sortedMembers.forEach(function(member, index) {
         var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
         var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
         var age = char ? getCharacterAge(char) : '-';
         var deadMarker = char && char.deceased ? ' Deceased' : '';
-        html += '<div class="member-entry">' +
+        
+        var status = getMemberStatusAtWeek(member, currentWeek);
+        var statusInfo = getMemberStatusInfo(status);
+        
+        var periodDisplay = periodLabel + (member.joinPeriod || '?');
+        if (member.leavePeriod) {
+            periodDisplay += ' → ' + periodLabel + member.leavePeriod;
+        }
+        
+        html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;">' +
             '<div class="member-info">' +
                 '<span><strong>' + name + deadMarker + '</strong></span>' +
                 '<span class="role">' + (member.role || 'Member') + '</span>' +
-                '<span class="years">' + periodLabel + (member.joinPeriod || '?') + (member.leavePeriod ? ' → ' + periodLabel + member.leavePeriod : '') + '</span>' +
+                '<span class="years">' + periodDisplay + '</span>' +
                 '<span class="years">Age: ' + age + '</span>' +
+                '<span style="color:' + statusInfo.color + ';font-size:0.7rem;font-weight:600;">' + statusInfo.label + '</span>' +
             '</div>' +
             '<div class="member-actions">' +
                 '<button class="small edit-member" data-index="' + index + '">Edit</button>' +
@@ -941,9 +1155,19 @@ function addMember() {
     var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team) return;
     
+    // Check if already in team
     if (team.members && team.members.some(function(m) { return String(m.characterId) === String(charId); })) {
         alert('This character is already in the team.');
         return;
+    }
+    
+    // Check availability
+    var currentWeek = teamManagerState.filterWeek || 1;
+    var availability = getCharacterAvailability(charId, currentWeek, teamId);
+    if (!availability.available) {
+        if (!confirm('This character is currently not available: ' + availability.reason + '\n\nAdd them anyway?')) {
+            return;
+        }
     }
     
     if (!team.members) team.members = [];
@@ -1340,7 +1564,7 @@ function initTeamManagerEvents() {
     var rankBg = document.getElementById('ranking-modal');
     if (rankBg) {
         rankBg.addEventListener('click', function(e) {
-            if (e.target === this) closeRankingModal();
+            if (e.target === this) closeRankingModal());
         });
     }
     var addRankBtn = document.getElementById('add-ranking-btn');
@@ -1353,9 +1577,13 @@ function initTeamManagerEvents() {
 window.renderTeamManagerView = renderTeamManagerView;
 window.getFilteredTeams = getFilteredTeams;
 window.getTeamName = getTeamName;
+window.getAllTeamMembers = getAllTeamMembers;
 window.getActiveMembers = getActiveMembers;
 window.getActiveMemberCount = getActiveMemberCount;
 window.getTeamPeriodDisplay = getTeamPeriodDisplay;
+window.getMemberStatusAtWeek = getMemberStatusAtWeek;
+window.getMemberStatusInfo = getMemberStatusInfo;
+window.getCharacterAvailability = getCharacterAvailability;
 window.showTeamForm = showTeamForm;
 window.saveTeam = saveTeam;
 window.deleteTeam = deleteTeam;
