@@ -84,7 +84,7 @@ function renderTournamentsView(container) {
                                 <option value="">Select a team...</option>
                             </select>
                             <button id="add-team-to-tournament" class="primary small">Add Team</button>
-                            <button id="refresh-teams-btn" class="secondary small">⟳ Refresh</button>
+                            <button id="refresh-teams-btn" class="secondary small">Refresh</button>
                         </div>
                         <div style="margin-top:4px;font-size:0.7rem;color:var(--text-dim);">
                             Only academic teams active in the tournament's week range are shown.
@@ -445,6 +445,7 @@ function populateEliminationSelector(tourn) {
     
     var teams = tourn.teams || [];
     var alreadyEliminated = (tourn.eliminations || []).map(function(e) { return e.characterId; });
+    var currentWeek = parseInt(tourn.startWeek) || 1;
     
     var chars = [];
     teams.forEach(function(entry) {
@@ -453,21 +454,47 @@ function populateEliminationSelector(tourn) {
             team.members.forEach(function(member) {
                 var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
                 if (char && !alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) {
-                    chars.push({
-                        id: char.id,
-                        name: [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' '),
-                        teamName: team.name
-                    });
+                    // Check if character is available (not deceased, not eliminated)
+                    var status = 'active';
+                    if (char.deceased) status = 'deceased';
+                    else if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+                        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+                            if (parseInt(char.eliminatedWeeks[i]) <= currentWeek) {
+                                status = 'eliminated';
+                                break;
+                            }
+                        }
+                    }
+                    // Only show active or eliminated (not deceased)
+                    if (status !== 'deceased') {
+                        var statusLabel = status === 'eliminated' ? ' (eliminated)' : '';
+                        chars.push({
+                            id: char.id,
+                            name: [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' '),
+                            teamName: team.name,
+                            status: status,
+                            statusLabel: statusLabel
+                        });
+                    }
                 }
             });
         }
     });
     
     select.innerHTML = '<option value="">Select character...</option>';
+    // Sort: active first, then eliminated
+    chars.sort(function(a, b) {
+        if (a.status === 'active' && b.status !== 'active') return -1;
+        if (a.status !== 'active' && b.status === 'active') return 1;
+        return a.name.localeCompare(b.name);
+    });
     chars.forEach(function(char) {
         var option = document.createElement('option');
         option.value = char.id;
-        option.textContent = char.name + ' (' + char.teamName + ')';
+        option.textContent = char.name + ' (' + char.teamName + ')' + char.statusLabel;
+        if (char.status === 'eliminated') {
+            option.style.color = 'var(--warning)';
+        }
         select.appendChild(option);
     });
     
