@@ -97,7 +97,7 @@ function exportCSV() {
     
     // Teams
     lines.push('\n# TEAMS');
-    lines.push('TeamName,TeamType,StartPeriod,EndPeriod,CurrentRank,Status,NameHistory');
+    lines.push('TeamName,TeamType,StartPeriod,EndPeriod,CurrentRank,Status,NameHistory,TemporaryMission');
     data.teams.forEach(function(t) {
         var nameHistoryStr = '';
         if (t.nameHistory) {
@@ -112,7 +112,8 @@ function exportCSV() {
             t.endPeriod || '',
             t.currentRank || '',
             csvField(t.status || 'active'),
-            csvField(nameHistoryStr)
+            csvField(nameHistoryStr),
+            csvField(t.temporaryMission || '')
         ].join(','));
     });
     
@@ -122,7 +123,7 @@ function exportCSV() {
     data.teams.forEach(function(t) {
         if (t.members) {
             t.members.forEach(function(m) {
-                var char = data.characters.find(function(c) { return c.id === m.characterId; });
+                var char = data.characters.find(function(c) { return String(c.id) === String(m.characterId); });
                 var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
                 lines.push([
                     csvField(t.name),
@@ -152,31 +153,33 @@ function exportCSV() {
     
     // Tournaments
     lines.push('\n# TOURNAMENTS');
-    lines.push('TournamentName,Mode,AcademicYear,StartWeek,EndWeek,EliminationsPerRound,Status,Description');
+    lines.push('TournamentName,StartWeek,EndWeek,AcademicYear,Status,Winner');
     data.tournaments.forEach(function(t) {
+        var winnerName = '';
+        if (t.winner) {
+            var winnerTeam = data.teams.find(function(team) { return String(team.id) === String(t.winner); });
+            if (winnerTeam) winnerName = winnerTeam.name;
+        }
         lines.push([
             csvField(t.name),
-            csvField(t.mode || 'team'),
-            csvField(t.academicYear || ''),
             t.startWeek || '',
             t.endWeek || '',
-            t.eliminationsPerRound || 4,
-            csvField(t.status || 'draft'),
-            csvField(t.description || '')
+            csvField(t.academicYear || ''),
+            csvField(t.status || 'active'),
+            csvField(winnerName)
         ].join(','));
     });
     
     // Tournament Teams
     lines.push('\n# TOURNAMENT TEAMS');
-    lines.push('TournamentName,TeamName,Seed');
+    lines.push('TournamentName,TeamName');
     data.tournaments.forEach(function(t) {
         if (t.teams) {
             t.teams.forEach(function(entry) {
-                var team = data.teams.find(function(tm) { return tm.id === entry.teamId; });
+                var team = data.teams.find(function(tm) { return String(tm.id) === String(entry.teamId); });
                 lines.push([
                     csvField(t.name),
-                    csvField(team ? team.name : ''),
-                    entry.seed || ''
+                    csvField(team ? team.name : '')
                 ].join(','));
             });
         }
@@ -184,19 +187,18 @@ function exportCSV() {
     
     // Tournament Matches
     lines.push('\n# TOURNAMENT MATCHES');
-    lines.push('TournamentName,Round,Participant1,Participant2,Winner');
+    lines.push('TournamentName,Team1,Team2,Winner');
     data.tournaments.forEach(function(t) {
         if (t.matches) {
             t.matches.forEach(function(m) {
-                var p1 = getParticipantName(m.participant1, t);
-                var p2 = getParticipantName(m.participant2, t);
-                var winner = m.winner ? getParticipantName(m.winner, t) : '';
+                var team1 = data.teams.find(function(tm) { return String(tm.id) === String(m.team1Id); });
+                var team2 = data.teams.find(function(tm) { return String(tm.id) === String(m.team2Id); });
+                var winner = m.winner ? data.teams.find(function(tm) { return String(tm.id) === String(m.winner); }) : null;
                 lines.push([
                     csvField(t.name),
-                    m.round || '',
-                    csvField(p1),
-                    csvField(p2),
-                    csvField(winner)
+                    csvField(team1 ? team1.name : ''),
+                    csvField(team2 ? team2.name : ''),
+                    csvField(winner ? winner.name : '')
                 ].join(','));
             });
         }
@@ -204,20 +206,67 @@ function exportCSV() {
     
     // Tournament Eliminations
     lines.push('\n# TOURNAMENT ELIMINATIONS');
-    lines.push('TournamentName,Participant,Week,Round');
+    lines.push('TournamentName,CharacterName,TeamName,Week');
     data.tournaments.forEach(function(t) {
         if (t.eliminations) {
             t.eliminations.forEach(function(e) {
-                var name = getParticipantName({ type: e.participantType, id: e.participantId }, t);
+                var char = data.characters.find(function(c) { return String(c.id) === String(e.characterId); });
+                var charName = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+                var team = e.teamId ? data.teams.find(function(tm) { return String(tm.id) === String(e.teamId); }) : null;
                 lines.push([
                     csvField(t.name),
-                    csvField(name),
-                    e.week || '',
-                    e.matchRound || ''
+                    csvField(charName),
+                    csvField(team ? team.name : ''),
+                    e.week || ''
                 ].join(','));
             });
         }
     });
+    
+    // Missions
+    lines.push('\n# MISSIONS');
+    lines.push('Title,Status,Priority,Difficulty,Team,Location,Duration,Pay,Progress');
+    if (data.missions) {
+        data.missions.forEach(function(m) {
+            var teamName = m.assignedTeamId ? getTeamName(m.assignedTeamId) : '';
+            lines.push([
+                csvField(m.title || ''),
+                csvField(m.status || 'active'),
+                csvField(m.priority || 'medium'),
+                csvField(m.difficulty || 'medium'),
+                csvField(teamName),
+                csvField(m.location || ''),
+                csvField(m.duration || ''),
+                csvField(m.pay || ''),
+                m.progress || '0'
+            ].join(','));
+        });
+    }
+    
+    // Curriculum - Disciplines
+    lines.push('\n# DISCIPLINES');
+    lines.push('DisciplineName,Type,Instructors,StartWeek,EndWeek,WeeklyHours,MaxStudents,Weight');
+    if (data.curriculum && data.curriculum.disciplines) {
+        data.curriculum.disciplines.forEach(function(d) {
+            var instructors = '';
+            if (d.instructorIds) {
+                instructors = d.instructorIds.map(function(id) {
+                    var inst = data.characters.find(function(c) { return String(c.id) === String(id); });
+                    return inst ? [inst.firstName, inst.lastName].filter(function(n) { return n; }).join(' ') : '';
+                }).filter(function(n) { return n; }).join(';');
+            }
+            lines.push([
+                csvField(d.name || ''),
+                csvField(d.type || 'mandatory'),
+                csvField(instructors),
+                d.startWeek || '',
+                d.endWeek || '',
+                d.weeklyHours || '',
+                d.maxStudents || '',
+                d.weight || '1'
+            ].join(','));
+        });
+    }
     
     var csvContent = lines.join('\n');
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -248,6 +297,7 @@ function importCSV(file) {
                 characters: [],
                 teams: [],
                 tournaments: [],
+                missions: [],
                 activities: [],
                 currentYear: data.currentYear || new Date().getFullYear(),
                 currentWeek: 1,
@@ -258,11 +308,22 @@ function importCSV(file) {
                     examDays: {},
                     grades: {},
                     rankings: {},
-                    currentWeek: 1
+                    currentWeek: 1,
+                    classInstructors: {},
+                    classLabels: {},
+                    classGroupLabels: {},
+                    classDurations: {},
+                    instructorClasses: {},
+                    instructorTemplates: {},
+                    instructorBlocks: {},
+                    instructorGroups: {},
+                    disciplineGroups: {},
+                    autoGroups: {}
                 }
             };
             var charMap = {};
             var teamMap = {};
+            var missionMap = {};
             
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
@@ -276,7 +337,9 @@ function importCSV(file) {
                 if (line.startsWith('# TOURNAMENT TEAMS')) { section = 'tournament_teams'; continue; }
                 if (line.startsWith('# TOURNAMENT MATCHES')) { section = 'tournament_matches'; continue; }
                 if (line.startsWith('# TOURNAMENT ELIMINATIONS')) { section = 'tournament_eliminations'; continue; }
-                if (line.startsWith('FirstName,') || line.startsWith('TeamName,') || line.startsWith('TournamentName,')) {
+                if (line.startsWith('# MISSIONS')) { section = 'missions'; continue; }
+                if (line.startsWith('# DISCIPLINES')) { section = 'disciplines'; continue; }
+                if (line.startsWith('FirstName,') || line.startsWith('TeamName,') || line.startsWith('TournamentName,') || line.startsWith('Title,')) {
                     continue;
                 }
                 
@@ -319,12 +382,13 @@ function importCSV(file) {
                         specialty: values[17] || '',
                         careerStatus: careerStatus,
                         eliminatedWeeks: [],
+                        eliminations: [],
                         createdAt: new Date().toISOString()
                     };
                     newData.characters.push(char);
                     var key = (char.firstName + '|' + char.lastName).toLowerCase();
                     charMap[key] = char;
-                } else if (section === 'teams' && values.length >= 7) {
+                } else if (section === 'teams' && values.length >= 8) {
                     var nameHistory = [];
                     if (values[6]) {
                         var nameParts = values[6].split(';');
@@ -348,6 +412,7 @@ function importCSV(file) {
                         currentRank: values[4] || '',
                         status: values[5] || 'active',
                         nameHistory: nameHistory,
+                        temporaryMission: values[7] || null,
                         members: [],
                         rankingHistory: [],
                         createdAt: new Date().toISOString()
@@ -383,68 +448,46 @@ function importCSV(file) {
                             rank: values[2] || ''
                         });
                     }
-                } else if (section === 'tournaments' && values.length >= 8) {
+                } else if (section === 'tournaments' && values.length >= 6) {
                     var tourn = {
                         id: generateId('tourn'),
                         name: values[0] || '',
-                        mode: values[1] || 'team',
-                        academicYear: values[2] || '',
-                        startWeek: values[3] || '',
-                        endWeek: values[4] || '',
-                        eliminationsPerRound: parseInt(values[5]) || 4,
-                        status: values[6] || 'draft',
-                        description: values[7] || '',
+                        startWeek: values[1] || '1',
+                        endWeek: values[2] || '4',
+                        academicYear: values[3] || '',
+                        status: values[4] || 'active',
+                        winner: null,
                         teams: [],
-                        participants: [],
                         matches: [],
                         eliminations: [],
-                        winners: [],
                         createdAt: new Date().toISOString()
                     };
+                    // Handle winner
+                    if (values[5]) {
+                        var winnerTeam = Object.values(teamMap).find(function(t) { return t.name === values[5]; });
+                        if (winnerTeam) tourn.winner = winnerTeam.id;
+                    }
                     newData.tournaments.push(tourn);
-                } else if (section === 'tournament_teams' && values.length >= 3) {
+                } else if (section === 'tournament_teams' && values.length >= 2) {
                     var tournName = values[0];
                     var teamName = values[1];
                     var tourn = newData.tournaments.find(function(t) { return t.name === tournName; });
                     var team = teamMap[teamName.toLowerCase()];
                     if (tourn && team) {
-                        tourn.teams.push({ teamId: team.id, seed: parseInt(values[2]) || tourn.teams.length + 1 });
-                        if (!tourn.participants) tourn.participants = [];
-                        if (!tourn.participants.some(function(p) { return p.id === team.id && p.type === 'team'; })) {
-                            tourn.participants.push({ type: 'team', id: team.id });
-                        }
+                        tourn.teams.push({ teamId: team.id });
                     }
-                } else if (section === 'tournament_matches' && values.length >= 5) {
+                } else if (section === 'tournament_matches' && values.length >= 4) {
                     var tournName = values[0];
                     var tourn = newData.tournaments.find(function(t) { return t.name === tournName; });
                     if (tourn) {
-                        var p1Name = values[2];
-                        var p2Name = values[3];
-                        var winnerName = values[4];
-                        
-                        var findParticipant = function(name) {
-                            if (!name) return null;
-                            var char = newData.characters.find(function(c) {
-                                var fullName = [c.firstName, c.middleName, c.lastName].filter(function(n) { return n; }).join(' ');
-                                return fullName === name;
-                            });
-                            if (char) return { type: 'char', id: char.id };
-                            var team = newData.teams.find(function(t) { return t.name === name; });
-                            if (team) return { type: 'team', id: team.id };
-                            return null;
-                        };
-                        
-                        var p1 = findParticipant(p1Name);
-                        var p2 = findParticipant(p2Name);
-                        var winner = winnerName ? findParticipant(winnerName) : null;
-                        
-                        if (p1 && p2) {
-                            if (!tourn.matches) tourn.matches = [];
+                        var team1 = teamMap[values[1].toLowerCase()];
+                        var team2 = teamMap[values[2].toLowerCase()];
+                        var winner = values[3] ? teamMap[values[3].toLowerCase()] : null;
+                        if (team1 && team2) {
                             tourn.matches.push({
-                                round: values[1] || '',
-                                participant1: p1,
-                                participant2: p2,
-                                winner: winner
+                                team1Id: team1.id,
+                                team2Id: team2.id,
+                                winner: winner ? winner.id : null
                             });
                         }
                     }
@@ -452,32 +495,79 @@ function importCSV(file) {
                     var tournName = values[0];
                     var tourn = newData.tournaments.find(function(t) { return t.name === tournName; });
                     if (tourn) {
-                        var name = values[1];
-                        var char = newData.characters.find(function(c) {
+                        var charName = values[1];
+                        var char = Object.values(charMap).find(function(c) {
                             var fullName = [c.firstName, c.middleName, c.lastName].filter(function(n) { return n; }).join(' ');
-                            return fullName === name;
+                            return fullName === charName;
                         });
                         if (char) {
-                            if (!tourn.eliminations) tourn.eliminations = [];
+                            var teamName = values[2];
+                            var team = teamMap[teamName.toLowerCase()];
                             tourn.eliminations.push({
-                                participantId: char.id,
-                                participantType: 'char',
-                                week: values[2] || '',
-                                matchRound: values[3] || ''
+                                characterId: char.id,
+                                week: parseInt(values[3]) || 1,
+                                teamId: team ? team.id : null
                             });
-                        } else {
-                            var team = newData.teams.find(function(t) { return t.name === name; });
-                            if (team) {
-                                if (!tourn.eliminations) tourn.eliminations = [];
-                                tourn.eliminations.push({
-                                    participantId: team.id,
-                                    participantType: 'team',
-                                    week: values[2] || '',
-                                    matchRound: values[3] || ''
-                                });
+                            // Mark character as eliminated
+                            if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+                            if (char.eliminatedWeeks.indexOf(parseInt(values[3])) === -1) {
+                                char.eliminatedWeeks.push(parseInt(values[3]));
                             }
                         }
                     }
+                } else if (section === 'missions' && values.length >= 9) {
+                    var mission = {
+                        id: generateId('miss'),
+                        title: values[0] || '',
+                        status: values[1] || 'active',
+                        priority: values[2] || 'medium',
+                        difficulty: values[3] || 'medium',
+                        assignedTeamId: null,
+                        location: values[5] || '',
+                        duration: values[6] || '',
+                        pay: values[7] || '',
+                        progress: parseInt(values[8]) || 0,
+                        description: '',
+                        objectives: [],
+                        notes: '',
+                        tags: [],
+                        log: [],
+                        createdAt: new Date().toISOString(),
+                        completedAt: null
+                    };
+                    // Find team
+                    if (values[4]) {
+                        var team = teamMap[values[4].toLowerCase()];
+                        if (team) mission.assignedTeamId = team.id;
+                    }
+                    newData.missions.push(mission);
+                } else if (section === 'disciplines' && values.length >= 8) {
+                    var instructorIds = [];
+                    if (values[2]) {
+                        var instructorNames = values[2].split(';');
+                        instructorNames.forEach(function(name) {
+                            var inst = Object.values(charMap).find(function(c) {
+                                var fullName = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
+                                return fullName === name;
+                            });
+                            if (inst) instructorIds.push(inst.id);
+                        });
+                    }
+                    var discipline = {
+                        id: generateId('disc'),
+                        name: values[0] || '',
+                        type: values[1] || 'mandatory',
+                        instructorIds: instructorIds,
+                        startWeek: values[3] || '',
+                        endWeek: values[4] || '',
+                        weeklyHours: values[5] || '',
+                        maxStudents: values[6] || '',
+                        weight: parseFloat(values[7]) || 1,
+                        curriculum: '',
+                        gradingSystem: [],
+                        createdAt: new Date().toISOString()
+                    };
+                    newData.curriculum.disciplines.push(discipline);
                 }
             }
             
@@ -492,10 +582,12 @@ function importCSV(file) {
                 renderAll();
                 alert('Imported successfully!\nCharacters: ' + data.characters.length +
                     '\nTeams: ' + data.teams.length +
-                    '\nTournaments: ' + data.tournaments.length);
+                    '\nTournaments: ' + data.tournaments.length +
+                    '\nMissions: ' + (data.missions ? data.missions.length : 0));
             }).catch(function(err) { alert('Failed to save data: ' + err.message); });
         } catch (err) {
             alert('Failed to import CSV: ' + err.message);
+            console.error(err);
         }
     };
     reader.readAsText(file);
@@ -509,12 +601,13 @@ function exportTemplateCSV() {
         '# CHARACTERS',
         'FirstName,MiddleName,LastName,BirthYear,Gender,AssociatedNames,EyeColor,HairColor,SkinColor,Height,Build,AppearanceNotes,Notes,Deceased,DeathYear,DeathCause,DeathAge,Specialty,CareerStatus',
         'John,,Doe,1990,Male,,Blue,Brown,Fair,5\'10",Athletic,,Example character,false,,,,,',
-        'Jane,Mary,Smith,1992,Female,The Shadow,Green,Black,Olive,5\'7",Slim,Scar on cheek,,false,,,,,trainee:2020-2023;rookie:2023-',
+        'Jane,Mary,Smith,1992,Female,The Shadow,Green,Black,Olive,5\'7",Slim,Scar on cheek,,false,,,,,trainee:1920-1923;rookie:1923-',
         '',
         '# TEAMS',
-        'TeamName,TeamType,StartPeriod,EndPeriod,CurrentRank,Status,NameHistory',
-        'Example Team,academic,1,2,1,active,Example Team:1-2',
-        'Another Team,academic,3,4,2,active,Another Team:3-4',
+        'TeamName,TeamType,StartPeriod,EndPeriod,CurrentRank,Status,NameHistory,TemporaryMission',
+        'Example Team,academic,1,2,1,active,Example Team:1-2,',
+        'Another Team,academic,3,4,2,active,Another Team:3-4,',
+        'Professional Team,professional,1920,1925,1,active,,',
         '',
         '# TEAM MEMBERS',
         'TeamName,CharacterName,Role,JoinPeriod,LeavePeriod',
@@ -527,21 +620,31 @@ function exportTemplateCSV() {
         'Another Team,3,2',
         '',
         '# TOURNAMENTS',
-        'TournamentName,Mode,AcademicYear,StartWeek,EndWeek,EliminationsPerRound,Status,Description',
-        'Spring Cup,team,2025-2026,1,12,4,active,Annual spring tournament',
+        'TournamentName,StartWeek,EndWeek,AcademicYear,Status,Winner',
+        'Spring Cup,1,4,1920-1921,active,',
         '',
         '# TOURNAMENT TEAMS',
-        'TournamentName,TeamName,Seed',
-        'Spring Cup,Example Team,1',
-        'Spring Cup,Another Team,2',
+        'TournamentName,TeamName',
+        'Spring Cup,Example Team',
+        'Spring Cup,Another Team',
         '',
         '# TOURNAMENT MATCHES',
-        'TournamentName,Round,Participant1,Participant2,Winner',
-        'Spring Cup,1,Example Team,Another Team,Example Team',
+        'TournamentName,Team1,Team2,Winner',
+        'Spring Cup,Example Team,Another Team,Example Team',
         '',
         '# TOURNAMENT ELIMINATIONS',
-        'TournamentName,Participant,Week,Round',
-        'Spring Cup,Another Team,1,1'
+        'TournamentName,CharacterName,TeamName,Week',
+        'Spring Cup,Jane Smith,Another Team,2',
+        '',
+        '# MISSIONS',
+        'Title,Status,Priority,Difficulty,Team,Location,Duration,Pay,Progress',
+        'Operation Nightfall,active,high,hard,Example Team,Berlin,2 weeks,5000 credits,50',
+        'Rescue Mission,active,medium,medium,Another Team,London,3 days,2000 credits,0',
+        '',
+        '# DISCIPLINES',
+        'DisciplineName,Type,Instructors,StartWeek,EndWeek,WeeklyHours,MaxStudents,Weight',
+        'Combat Training,mandatory,John Doe,1,10,4,20,2',
+        'Stealth,mandatory,Jane Smith,1,8,3,15,1.5'
     ];
     
     var csvContent = lines.join('\n');
@@ -592,6 +695,7 @@ function importJSON(file) {
             data = imported;
             if (!data.currentYear) data.currentYear = new Date().getFullYear();
             if (!data.currentWeek) data.currentWeek = 1;
+            if (!data.missions) data.missions = [];
             if (!data.curriculum) {
                 data.curriculum = {
                     disciplines: [],
@@ -600,8 +704,23 @@ function importJSON(file) {
                     examDays: {},
                     grades: {},
                     rankings: {},
-                    currentWeek: 1
+                    currentWeek: 1,
+                    classInstructors: {},
+                    classLabels: {},
+                    classGroupLabels: {},
+                    classDurations: {},
+                    instructorClasses: {},
+                    instructorTemplates: {},
+                    instructorBlocks: {},
+                    instructorGroups: {},
+                    disciplineGroups: {},
+                    autoGroups: {}
                 };
+            }
+            
+            // Run migration on imported data
+            if (typeof migrateData === 'function') {
+                migrateData();
             }
             
             saveData().then(function() {
@@ -611,6 +730,7 @@ function importJSON(file) {
             }).catch(function(err) { alert('Failed to save data: ' + err.message); });
         } catch (err) {
             alert('Failed to import JSON: ' + err.message);
+            console.error(err);
         }
     };
     reader.readAsText(file);
@@ -669,3 +789,5 @@ window.importCSV = importCSV;
 window.exportTemplateCSV = exportTemplateCSV;
 window.exportJSON = exportJSON;
 window.importJSON = importJSON;
+window.csvField = csvField;
+window.parseCSVLine = parseCSVLine;
