@@ -164,7 +164,16 @@ function renderTournaments() {
     var html = '';
     data.tournaments.forEach(function(tourn) {
         var teamCount = tourn.teams ? tourn.teams.length : 0;
-        var statusColor = tourn.status === 'active' ? 'var(--accent)' : (tourn.status === 'completed' ? 'var(--info)' : 'var(--text-dim)');
+        
+        // Determine status display
+        var statusText = tourn.status || 'draft';
+        var statusColor = 'var(--text-dim)';
+        if (tourn.status === 'active') {
+            statusColor = 'var(--accent)';
+        } else if (tourn.status === 'completed') {
+            statusColor = 'var(--info)';
+        }
+        
         var weekDisplay = 'Wk ' + (tourn.startWeek || '?') + ' - Wk ' + (tourn.endWeek || '?');
         
         // Check if winner is set
@@ -180,7 +189,7 @@ function renderTournaments() {
             '<span><strong>' + tourn.name + '</strong>' + winnerDisplay + '</span>' +
             '<span style="font-size:0.75rem;">' + weekDisplay + '</span>' +
             '<span>' + teamCount + '</span>' +
-            '<span style="color:' + statusColor + ';font-size:0.75rem;">' + (tourn.status || 'draft') + '</span>' +
+            '<span style="color:' + statusColor + ';font-size:0.75rem;font-weight:600;">' + statusText + '</span>' +
             '<span class="actions">' +
                 '<button class="small view-tournament" data-id="' + tourn.id + '">View</button>' +
                 '<button class="small edit-tournament" data-id="' + tourn.id + '">Edit</button>' +
@@ -338,10 +347,18 @@ function viewTournament(id) {
             winnerDisplay = ' | Winner: <span style="color:var(--accent);font-weight:600;">' + winnerTeam.name + '</span>';
         }
     }
+    
+    var statusColor = 'var(--text-dim)';
+    if (tourn.status === 'active') {
+        statusColor = 'var(--accent)';
+    } else if (tourn.status === 'completed') {
+        statusColor = 'var(--info)';
+    }
+    
     info.innerHTML = 
         '<span style="color:var(--text-dim);font-size:0.8rem;">Weeks ' + tourn.startWeek + ' - ' + tourn.endWeek + 
         (tourn.academicYear ? ' | ' + tourn.academicYear : '') + 
-        ' | Status: ' + (tourn.status || 'active') + 
+        ' | Status: <span style="color:' + statusColor + ';font-weight:600;">' + (tourn.status || 'active') + '</span>' +
         winnerDisplay + '</span>';
     
     // Populate selectors
@@ -540,6 +557,7 @@ function removeTeamFromTournament(tournId, teamId) {
     // If this team was the winner, clear it
     if (tourn.winner && String(tourn.winner) === String(teamId)) {
         tourn.winner = null;
+        tourn.status = 'active';
     }
     
     var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
@@ -654,6 +672,7 @@ function setMatchWinner(tournId, matchIndex, teamId) {
     var tourn = data.tournaments.find(function(t) { return String(t.id) === String(tournId); });
     if (!tourn || !tourn.matches || !tourn.matches[matchIndex]) return;
     
+    // Set the match winner
     tourn.matches[matchIndex].winner = teamId;
     
     var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
@@ -661,27 +680,32 @@ function setMatchWinner(tournId, matchIndex, teamId) {
         logActivity('Set winner for match in tournament: ' + tourn.name + ' - ' + (team ? team.name : ''));
     }
     
-    // Update tournament winner to the winner of the last match
+    // Update tournament winner based on matches
     updateTournamentWinner(tourn);
     
+    // Save and refresh
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
 }
 
 /**
  * Update tournament winner based on the last match winner
+ * Also sets tournament status to 'completed' when a winner is found
  */
 function updateTournamentWinner(tourn) {
     if (!tourn.matches || tourn.matches.length === 0) {
         tourn.winner = null;
+        tourn.status = 'active';
         return;
     }
     
     // Find the last match with a winner
     var lastWinner = null;
+    var lastMatchIndex = -1;
     for (var i = tourn.matches.length - 1; i >= 0; i--) {
         if (tourn.matches[i].winner) {
             lastWinner = tourn.matches[i].winner;
+            lastMatchIndex = i;
             break;
         }
     }
@@ -689,11 +713,13 @@ function updateTournamentWinner(tourn) {
     if (lastWinner) {
         tourn.winner = lastWinner;
         // Mark tournament as completed if a winner is set
-        if (tourn.status !== 'completed') {
-            tourn.status = 'completed';
+        tourn.status = 'completed';
+        if (typeof logActivity === 'function') {
+            var team = data.teams.find(function(t) { return String(t.id) === String(lastWinner); });
+            logActivity('Tournament ' + tourn.name + ' completed! Winner: ' + (team ? team.name : 'Unknown'));
         }
     } else {
-        // If no match has a winner, clear the tournament winner
+        // If no match has a winner, clear the tournament winner and set status back to active
         tourn.winner = null;
         tourn.status = 'active';
     }
@@ -827,11 +853,13 @@ function renderWinner(tourn) {
         container.style.color = 'var(--accent)';
         container.style.fontWeight = '600';
         container.style.fontSize = '1.1rem';
+        container.style.display = 'block';
     } else {
         container.innerHTML = 'Not determined yet';
         container.style.color = 'var(--text-dim)';
         container.style.fontWeight = 'normal';
         container.style.fontSize = '1rem';
+        container.style.display = 'block';
     }
 }
 
