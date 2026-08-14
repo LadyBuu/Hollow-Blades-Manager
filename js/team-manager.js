@@ -1501,7 +1501,7 @@ function initTeamManagerEvents() {
     var formModal = document.getElementById('team-form-modal');
     if (formModal) {
         formModal.addEventListener('click', function(e) {
-            if (e.target === this) closeTeamForm());
+            if (e.target === this) closeTeamForm();
         });
     }
     
