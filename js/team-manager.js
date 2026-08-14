@@ -163,14 +163,12 @@ function getMemberStatusAtWeek(member, week) {
     
     // Check if deceased
     if (char && char.deceased) {
-        // Check if death happened before or during this week
         if (char.deathYear) {
             var deathYear = parseInt(char.deathYear);
             if (!isNaN(deathYear) && deathYear <= weekNum) {
                 return 'deceased';
             }
         }
-        // If no death year but deceased, check if deathAge indicates death before current year
         if (char.deathAge) {
             var birthYear = parseInt(char.birthYear);
             if (!isNaN(birthYear)) {
@@ -180,7 +178,6 @@ function getMemberStatusAtWeek(member, week) {
                 }
             }
         }
-        // If no way to determine, assume deceased if char.deceased is true
         return 'deceased';
     }
     
@@ -980,7 +977,7 @@ function closeTeamForm() {
 }
 
 /**
- * Open member management modal - shows full member history
+ * Open member management modal - shows full member history with character status
  */
 function openMemberModal(teamId, tab) {
     var modal = document.getElementById('member-modal');
@@ -1010,14 +1007,15 @@ function openMemberModal(teamId, tab) {
     sortedChars.forEach(function(char) {
         var availability = getCharacterAvailability(char.id, currentWeek, teamId);
         var inThisTeam = team.members && team.members.some(function(m) { return String(m.characterId) === String(char.id); });
+        var status = getCurrentStatus(char);
         
         if (inThisTeam) {
             // Already in team - show at top
-            availableChars.unshift({ char: char, availability: availability, inTeam: true });
+            availableChars.unshift({ char: char, availability: availability, inTeam: true, status: status });
         } else if (availability.available) {
-            availableChars.push({ char: char, availability: availability, inTeam: false });
+            availableChars.push({ char: char, availability: availability, inTeam: false, status: status });
         } else {
-            unavailableChars.push({ char: char, availability: availability, inTeam: false });
+            unavailableChars.push({ char: char, availability: availability, inTeam: false, status: status });
         }
     });
     
@@ -1028,6 +1026,7 @@ function openMemberModal(teamId, tab) {
         var char = item.char;
         var availability = item.availability;
         var inThisTeam = item.inTeam;
+        var status = item.status;
         
         var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
         var deadMarker = char.deceased ? ' Deceased' : '';
@@ -1044,7 +1043,9 @@ function openMemberModal(teamId, tab) {
         
         var option = document.createElement('option');
         option.value = char.id;
-        option.textContent = name + deadMarker + statusMarker;
+        // Show name + status (trainee, instructor, etc.) + availability info
+        var statusDisplay = status ? ' [' + status + ']' : '';
+        option.textContent = name + statusDisplay + deadMarker + statusMarker;
         option.style.cssText = style;
         select.appendChild(option);
     });
@@ -1075,18 +1076,22 @@ function renderMembers(team) {
     var currentWeek = teamManagerState.filterWeek || 1;
     var html = '';
     
-    // Sort members: active first, then by join period
-    var sortedMembers = team.members.slice().sort(function(a, b) {
-        var aActive = getMemberStatusAtWeek(a, currentWeek) === 'active';
-        var bActive = getMemberStatusAtWeek(b, currentWeek) === 'active';
+    // Sort members: active first, then by join period - preserve original index
+    var sortedMembers = team.members.slice().map(function(member, idx) {
+        return { member: member, originalIndex: idx };
+    }).sort(function(a, b) {
+        var aActive = getMemberStatusAtWeek(a.member, currentWeek) === 'active';
+        var bActive = getMemberStatusAtWeek(b.member, currentWeek) === 'active';
         if (aActive && !bActive) return -1;
         if (!aActive && bActive) return 1;
-        var aJoin = parseInt(a.joinPeriod) || 0;
-        var bJoin = parseInt(b.joinPeriod) || 0;
+        var aJoin = parseInt(a.member.joinPeriod) || 0;
+        var bJoin = parseInt(b.member.joinPeriod) || 0;
         return aJoin - bJoin;
     });
     
-    sortedMembers.forEach(function(member, index) {
+    sortedMembers.forEach(function(item) {
+        var member = item.member;
+        var originalIndex = item.originalIndex;
         var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
         var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
         var age = char ? getCharacterAge(char) : '-';
@@ -1100,7 +1105,7 @@ function renderMembers(team) {
             periodDisplay += ' → ' + periodLabel + member.leavePeriod;
         }
         
-        html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;">' +
+        html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;" data-member-index="' + originalIndex + '">' +
             '<div class="member-info">' +
                 '<span><strong>' + name + deadMarker + '</strong></span>' +
                 '<span class="role">' + (member.role || 'Member') + '</span>' +
@@ -1109,20 +1114,26 @@ function renderMembers(team) {
                 '<span style="color:' + statusInfo.color + ';font-size:0.7rem;font-weight:600;">' + statusInfo.label + '</span>' +
             '</div>' +
             '<div class="member-actions">' +
-                '<button class="small edit-member" data-index="' + index + '">Edit</button>' +
+                '<button class="small edit-member" data-index="' + originalIndex + '">Edit</button>' +
                 '<button class="small danger remove-member" data-char="' + member.characterId + '">Remove</button>' +
             '</div>' +
         '</div>';
     });
     container.innerHTML = html;
     
+    // Re-attach event listeners
     container.querySelectorAll('.edit-member').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            openEditMemberModal(team.id, parseInt(this.dataset.index));
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var index = parseInt(this.dataset.index);
+            if (!isNaN(index)) {
+                openEditMemberModal(team.id, index);
+            }
         });
     });
     container.querySelectorAll('.remove-member').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
             removeMember(team.id, this.dataset.char);
         });
     });
@@ -1205,7 +1216,10 @@ function removeMember(teamId, charId) {
  */
 function openEditMemberModal(teamId, index) {
     var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
-    if (!team || !team.members || !team.members[index]) return;
+    if (!team || !team.members || !team.members[index]) {
+        alert('Member not found.');
+        return;
+    }
     
     var member = team.members[index];
     var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
@@ -1487,7 +1501,7 @@ function initTeamManagerEvents() {
     var formModal = document.getElementById('team-form-modal');
     if (formModal) {
         formModal.addEventListener('click', function(e) {
-            if (e.target === this) closeTeamForm();
+            if (e.target === this) closeTeamForm());
         });
     }
     
