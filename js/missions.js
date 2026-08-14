@@ -306,16 +306,26 @@ function removeObjective(missionId, objectiveIndex) {
 }
 
 /**
- * Populate team selectors in forms - SHOWS ALL TEAM TYPES
+ * Populate team selectors in forms - SHOWS ALL TEAM TYPES using team manager
  */
 function populateTeamSelectors() {
     var select = document.getElementById('mission-team');
     if (!select) return;
     
-    // Show all teams that are active (not deleted or inactive)
-    var teams = data.teams.filter(function(t) { 
-        return t.status !== 'deleted' && t.status !== 'inactive'; 
-    });
+    // Use the team manager's filtered teams function if available
+    var teams = [];
+    if (typeof getFilteredTeams === 'function') {
+        // Get all active teams of all types
+        var academic = getFilteredTeams('academic', 'active');
+        var professional = getFilteredTeams('professional', 'active');
+        var temporary = getFilteredTeams('temporary', 'active');
+        teams = academic.concat(professional).concat(temporary);
+    } else {
+        // Fallback
+        teams = data.teams.filter(function(t) { 
+            return t.status !== 'deleted' && t.status !== 'inactive'; 
+        });
+    }
     
     // Sort by type then name
     var typeOrder = { 'academic': 0, 'professional': 1, 'temporary': 2, 'internship': 2 };
