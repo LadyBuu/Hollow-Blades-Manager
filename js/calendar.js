@@ -64,7 +64,8 @@ function renderWeeklyTable() {
                 const char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
                 const name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
                 const isEliminated = checkIfEliminatedInWeek(char, blockStart, blockEnd);
-                const memberClass = 'member-name' + (isEliminated ? ' eliminated' : '');
+                const isDeceased = char && char.deceased;
+                const memberClass = 'member-name' + (isEliminated ? ' eliminated' : '') + (isDeceased ? ' deceased' : '');
                 memberHtml += '<span class="' + memberClass + '" title="' + (member.role || 'Member') + '">' + name + '</span>';
             });
             memberHtml += '</div>';
@@ -116,7 +117,9 @@ function isTeamActiveInBlock(team, blockStart, blockEnd) {
  * Check if a character is eliminated in a week block
  */
 function checkIfEliminatedInWeek(char, blockStart, blockEnd) {
-    if (!char || !char.eliminatedWeeks) return false;
+    if (!char) return false;
+    if (char.deceased) return true;
+    if (!char.eliminatedWeeks) return false;
     return char.eliminatedWeeks.some(function(week) {
         const w = parseInt(week);
         return !isNaN(w) && w >= blockStart && w <= blockEnd;
@@ -185,11 +188,15 @@ function renderUnassignedCharacters() {
     });
 
     const unassigned = data.characters.filter(function(char) {
-        return !char.deceased && assignedIds.indexOf(char.id) === -1;
+        if (char.deceased) return false;
+        // Check if eliminated during this block
+        const isEliminated = checkIfEliminatedInWeek(char, weekStart, weekEnd);
+        if (isEliminated) return false;
+        return assignedIds.indexOf(char.id) === -1;
     });
 
     if (unassigned.length === 0) {
-        container.innerHTML = '<p class="empty-state">All characters assigned to teams</p>';
+        container.innerHTML = '<p class="empty-state">All available characters assigned to teams</p>';
         return;
     }
 
@@ -221,36 +228,28 @@ function renderEliminatedCharacters() {
                 var week = parseInt(elim.week);
                 if (!isNaN(week) && week >= weekStart && week <= weekEnd) {
                     var participant = { 
-                        type: elim.participantType, 
-                        id: elim.participantId 
+                        type: 'char', 
+                        id: elim.characterId 
                     };
                     var name = getParticipantName(participant, tourn);
                     var teamName = '';
                     
-                    if (elim.participantType === 'char') {
-                        var char = data.characters.find(function(c) { return String(c.id) === String(elim.participantId); });
-                        if (char) {
-                            // Find what team this character was in during this week
-                            data.teams.forEach(function(team) {
-                                if (team.members) {
-                                    team.members.forEach(function(member) {
-                                        if (String(member.characterId) === String(char.id)) {
-                                            var join = parseInt(member.joinPeriod);
-                                            var leave = parseInt(member.leavePeriod);
-                                            if (!isNaN(join) && join <= weekEnd && (isNaN(leave) || leave >= weekStart)) {
-                                                teamName = team.name;
-                                            }
+                    var char = data.characters.find(function(c) { return String(c.id) === String(elim.characterId); });
+                    if (char) {
+                        // Find what team this character was in during this week
+                        data.teams.forEach(function(team) {
+                            if (team.members) {
+                                team.members.forEach(function(member) {
+                                    if (String(member.characterId) === String(char.id)) {
+                                        var join = parseInt(member.joinPeriod);
+                                        var leave = parseInt(member.leavePeriod);
+                                        if (!isNaN(join) && join <= weekEnd && (isNaN(leave) || leave >= weekStart)) {
+                                            teamName = team.name;
                                         }
-                                    });
-                                }
-                            });
-                        }
-                    } else if (elim.participantType === 'team') {
-                        var team = data.teams.find(function(t) { return String(t.id) === String(elim.participantId); });
-                        if (team) {
-                            teamName = team.name;
-                            name = teamName;
-                        }
+                                    }
+                                });
+                            }
+                        });
                     }
                     
                     eliminatedEntries.push({
@@ -370,13 +369,22 @@ function initWeeklyEvents() {
     const nextBtn = document.getElementById('next-weeks-btn');
     
     if (prevBtn) {
-        prevBtn.addEventListener('click', prevWeeks);
+        // Remove any existing listeners by cloning
+        const newPrevBtn = prevBtn.cloneNode(true);
+        prevBtn.parentNode.replaceChild(newPrevBtn, prevBtn);
+        newPrevBtn.addEventListener('click', prevWeeks);
     }
     if (nextBtn) {
-        nextBtn.addEventListener('click', nextWeeks);
+        const newNextBtn = nextBtn.cloneNode(true);
+        nextBtn.parentNode.replaceChild(newNextBtn, nextBtn);
+        newNextBtn.addEventListener('click', nextWeeks);
     }
 }
 
 // Export for use in other files
 window.renderWeeklyView = renderWeeklyView;
 window.initWeeklyEvents = initWeeklyEvents;
+window.prevWeeks = prevWeeks;
+window.nextWeeks = nextWeeks;
+window.currentStartWeek = currentStartWeek;
+window.visibleWeeks = visibleWeeks;
