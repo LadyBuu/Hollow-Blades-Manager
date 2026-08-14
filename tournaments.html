@@ -31,24 +31,7 @@
     </header>
 
     <main id="app-container">
-        <div class="page-header">
-            <h2>Tournament Manager</h2>
-            <button id="add-tournament-btn" class="primary">+ Create Tournament</button>
-        </div>
-
-        <div id="tournament-list">
-            <div class="list-header tourn-header">
-                <span>Tournament</span>
-                <span>Mode</span>
-                <span>Weeks</span>
-                <span>Participants</span>
-                <span>Status</span>
-                <span>Actions</span>
-            </div>
-            <div id="tournaments-container">
-                <p class="empty-state">No tournaments created yet. Create your first tournament!</p>
-            </div>
-        </div>
+        <!-- Content rendered by tournaments.js -->
     </main>
 
     <div id="modal-container" class="modal hidden">
@@ -65,7 +48,6 @@
     <script src="js/utils.js"></script>
     <script src="js/export.js"></script>
     <script src="js/tournaments.js"></script>
-    <script src="js/calendar.js"></script>
     <script src="js/app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
