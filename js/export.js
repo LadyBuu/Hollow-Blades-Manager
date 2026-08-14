@@ -63,7 +63,7 @@ function exportCSV() {
     
     // Characters
     lines.push('# CHARACTERS');
-    lines.push('FirstName,MiddleName,LastName,BirthYear,Gender,AssociatedNames,EyeColor,HairColor,SkinColor,Height,Build,AppearanceNotes,Notes,Deceased,DeathYear,DeathCause,DeathAge,Specialty,CareerStatus');
+    lines.push('FirstName,MiddleName,LastName,BirthYear,Gender,AssociatedNames,EyeColor,HairColor,SkinColor,Height,Build,AppearanceNotes,Notes,Deceased,DeathYear,DeathCause,DeathAge,Specialty,CareerStatus,EliminatedWeeks');
     
     data.characters.forEach(function(c) {
         var careerStr = '';
@@ -72,6 +72,7 @@ function exportCSV() {
                 return s.status + ':' + s.startYear + '-' + (s.endYear || 'present');
             }).join(';');
         }
+        var elimWeeks = (c.eliminatedWeeks || []).join(';');
         lines.push([
             csvField(c.firstName || ''),
             csvField(c.middleName || ''),
@@ -91,7 +92,8 @@ function exportCSV() {
             csvField(c.deathCause || ''),
             c.deathAge || '',
             csvField(c.specialty || ''),
-            csvField(careerStr)
+            csvField(careerStr),
+            csvField(elimWeeks)
         ].join(','));
     });
     
@@ -117,20 +119,25 @@ function exportCSV() {
         ].join(','));
     });
     
-    // Team Members
+    // Team Members - includes full history with status
     lines.push('\n# TEAM MEMBERS');
-    lines.push('TeamName,CharacterName,Role,JoinPeriod,LeavePeriod');
+    lines.push('TeamName,CharacterName,Role,JoinPeriod,LeavePeriod,Status');
     data.teams.forEach(function(t) {
         if (t.members) {
             t.members.forEach(function(m) {
                 var char = data.characters.find(function(c) { return String(c.id) === String(m.characterId); });
                 var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+                var status = 'active';
+                if (char && char.deceased) status = 'deceased';
+                else if (char && char.eliminatedWeeks && char.eliminatedWeeks.length > 0) status = 'eliminated';
+                else if (m.leavePeriod) status = 'left';
                 lines.push([
                     csvField(t.name),
                     csvField(name),
                     csvField(m.role || ''),
                     m.joinPeriod || '',
-                    m.leavePeriod || ''
+                    m.leavePeriod || '',
+                    csvField(status)
                 ].join(','));
             });
         }
@@ -225,10 +232,16 @@ function exportCSV() {
     
     // Missions
     lines.push('\n# MISSIONS');
-    lines.push('Title,Status,Priority,Difficulty,Team,Location,Duration,Pay,Progress');
+    lines.push('Title,Status,Priority,Difficulty,Team,Location,Duration,Pay,Progress,Objectives');
     if (data.missions) {
         data.missions.forEach(function(m) {
             var teamName = m.assignedTeamId ? getTeamName(m.assignedTeamId) : '';
+            var objectivesStr = '';
+            if (m.objectives) {
+                objectivesStr = m.objectives.map(function(o) {
+                    return o.text + (o.done ? '✓' : '');
+                }).join(';');
+            }
             lines.push([
                 csvField(m.title || ''),
                 csvField(m.status || 'active'),
@@ -238,7 +251,8 @@ function exportCSV() {
                 csvField(m.location || ''),
                 csvField(m.duration || ''),
                 csvField(m.pay || ''),
-                m.progress || '0'
+                m.progress || '0',
+                csvField(objectivesStr)
             ].join(','));
         });
     }
@@ -324,6 +338,7 @@ function importCSV(file) {
             var charMap = {};
             var teamMap = {};
             var missionMap = {};
+            var tournMap = {};
             
             for (var i = 0; i < lines.length; i++) {
                 var line = lines[i].trim();
@@ -345,7 +360,7 @@ function importCSV(file) {
                 
                 var values = parseCSVLine(line);
                 
-                if (section === 'characters' && values.length >= 19) {
+                if (section === 'characters' && values.length >= 20) {
                     var careerStatus = [];
                     if (values[18]) {
                         var careerParts = values[18].split(';');
@@ -359,6 +374,10 @@ function importCSV(file) {
                                 });
                             }
                         });
+                    }
+                    var eliminatedWeeks = [];
+                    if (values[19]) {
+                        eliminatedWeeks = values[19].split(';').map(function(w) { return parseInt(w); }).filter(function(w) { return !isNaN(w); });
                     }
                     var char = {
                         id: generateId('char'),
@@ -381,12 +400,12 @@ function importCSV(file) {
                         deathAge: values[16] || '',
                         specialty: values[17] || '',
                         careerStatus: careerStatus,
-                        eliminatedWeeks: [],
+                        eliminatedWeeks: eliminatedWeeks,
                         eliminations: [],
                         createdAt: new Date().toISOString()
                     };
                     newData.characters.push(char);
-                    var key = (char.firstName + '|' + char.lastName).toLowerCase();
+                    var key = (char.firstName + '|' + (char.lastName || '')).toLowerCase();
                     charMap[key] = char;
                 } else if (section === 'teams' && values.length >= 8) {
                     var nameHistory = [];
@@ -419,7 +438,7 @@ function importCSV(file) {
                     };
                     newData.teams.push(team);
                     teamMap[team.name.toLowerCase()] = team;
-                } else if (section === 'members' && values.length >= 5) {
+                } else if (section === 'members' && values.length >= 6) {
                     var teamName = values[0];
                     var charName = values[1];
                     var team = teamMap[teamName.toLowerCase()];
@@ -468,6 +487,7 @@ function importCSV(file) {
                         if (winnerTeam) tourn.winner = winnerTeam.id;
                     }
                     newData.tournaments.push(tourn);
+                    tournMap[tourn.name.toLowerCase()] = tourn;
                 } else if (section === 'tournament_teams' && values.length >= 2) {
                     var tournName = values[0];
                     var teamName = values[1];
@@ -515,7 +535,18 @@ function importCSV(file) {
                             }
                         }
                     }
-                } else if (section === 'missions' && values.length >= 9) {
+                } else if (section === 'missions' && values.length >= 10) {
+                    var objectives = [];
+                    if (values[9]) {
+                        var objParts = values[9].split(';');
+                        objParts.forEach(function(part) {
+                            if (part.trim()) {
+                                var done = part.endsWith('✓');
+                                var text = part.replace('✓', '').trim();
+                                objectives.push({ text: text, done: done });
+                            }
+                        });
+                    }
                     var mission = {
                         id: generateId('miss'),
                         title: values[0] || '',
@@ -527,8 +558,8 @@ function importCSV(file) {
                         duration: values[6] || '',
                         pay: values[7] || '',
                         progress: parseInt(values[8]) || 0,
+                        objectives: objectives,
                         description: '',
-                        objectives: [],
                         notes: '',
                         tags: [],
                         log: [],
@@ -599,9 +630,9 @@ function importCSV(file) {
 function exportTemplateCSV() {
     var lines = [
         '# CHARACTERS',
-        'FirstName,MiddleName,LastName,BirthYear,Gender,AssociatedNames,EyeColor,HairColor,SkinColor,Height,Build,AppearanceNotes,Notes,Deceased,DeathYear,DeathCause,DeathAge,Specialty,CareerStatus',
-        'John,,Doe,1990,Male,,Blue,Brown,Fair,5\'10",Athletic,,Example character,false,,,,,',
-        'Jane,Mary,Smith,1992,Female,The Shadow,Green,Black,Olive,5\'7",Slim,Scar on cheek,,false,,,,,trainee:1920-1923;rookie:1923-',
+        'FirstName,MiddleName,LastName,BirthYear,Gender,AssociatedNames,EyeColor,HairColor,SkinColor,Height,Build,AppearanceNotes,Notes,Deceased,DeathYear,DeathCause,DeathAge,Specialty,CareerStatus,EliminatedWeeks',
+        'John,,Doe,1990,Male,,Blue,Brown,Fair,5\'10",Athletic,,Example character,false,,,,,,',
+        'Jane,Mary,Smith,1992,Female,The Shadow,Green,Black,Olive,5\'7",Slim,Scar on cheek,,false,,,,,trainee:1920-1923;rookie:1923-,',
         '',
         '# TEAMS',
         'TeamName,TeamType,StartPeriod,EndPeriod,CurrentRank,Status,NameHistory,TemporaryMission',
@@ -610,9 +641,9 @@ function exportTemplateCSV() {
         'Professional Team,professional,1920,1925,1,active,,',
         '',
         '# TEAM MEMBERS',
-        'TeamName,CharacterName,Role,JoinPeriod,LeavePeriod',
-        'Example Team,John Doe,Captain,1,',
-        'Example Team,Jane Smith,Member,1,',
+        'TeamName,CharacterName,Role,JoinPeriod,LeavePeriod,Status',
+        'Example Team,John Doe,Captain,1,,active',
+        'Example Team,Jane Smith,Member,1,2,left',
         '',
         '# TEAM RANKINGS',
         'TeamName,Period,Rank',
@@ -637,9 +668,9 @@ function exportTemplateCSV() {
         'Spring Cup,Jane Smith,Another Team,2',
         '',
         '# MISSIONS',
-        'Title,Status,Priority,Difficulty,Team,Location,Duration,Pay,Progress',
-        'Operation Nightfall,active,high,hard,Example Team,Berlin,2 weeks,5000 credits,50',
-        'Rescue Mission,active,medium,medium,Another Team,London,3 days,2000 credits,0',
+        'Title,Status,Priority,Difficulty,Team,Location,Duration,Pay,Progress,Objectives',
+        'Operation Nightfall,active,high,hard,Example Team,Berlin,2 weeks,5000 credits,50,Infiltrate base;Retrieve documents✓',
+        'Rescue Mission,active,medium,medium,Another Team,London,3 days,2000 credits,0,Find hostages;Extract safely',
         '',
         '# DISCIPLINES',
         'DisciplineName,Type,Instructors,StartWeek,EndWeek,WeeklyHours,MaxStudents,Weight',
