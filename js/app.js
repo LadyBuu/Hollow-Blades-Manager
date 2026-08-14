@@ -27,6 +27,11 @@ function initApp() {
                 initTeamManagerSystem();
             }
             
+            // Initialize curriculum system
+            if (typeof initScheduleSystem === 'function') {
+                initScheduleSystem();
+            }
+            
             // Update dashboard stats
             updateDashboardStats();
             renderActivityLog();
@@ -139,11 +144,6 @@ function renderAll() {
         var container = document.getElementById('app-container');
         if (container && typeof renderTournamentsView === 'function') {
             renderTournamentsView(container);
-            setTimeout(function() {
-                if (typeof initWeeklyEvents === 'function') {
-                    initWeeklyEvents();
-                }
-            }, 100);
         }
     } else if (page === 'curriculum.html') {
         var container = document.getElementById('app-container');
@@ -345,7 +345,7 @@ function addEliminationEntry(container, tournamentId, week, reason) {
 }
 
 /**
- * Show character form for add or edit - FIXED positioning
+ * Show character form for add or edit
  */
 function showCharacterForm(editId) {
     var form = document.getElementById('character-form');
@@ -368,7 +368,7 @@ function showCharacterForm(editId) {
     
     if (editId) {
         title.textContent = 'Edit Character';
-        var char = data.characters.find(function(c) { return c.id === editId; });
+        var char = data.characters.find(function(c) { return String(c.id) === String(editId); });
         if (char) {
             document.getElementById('char-firstname').value = char.firstName || '';
             document.getElementById('char-middlename').value = char.middleName || '';
@@ -567,7 +567,7 @@ function saveCharacter(e) {
     }
     
     if (editId) {
-        var index = data.characters.findIndex(function(c) { return c.id === editId; });
+        var index = data.characters.findIndex(function(c) { return String(c.id) === String(editId); });
         if (index !== -1) {
             // Preserve the id and createdAt
             charData.id = data.characters[index].id;
@@ -620,16 +620,16 @@ function saveCharacter(e) {
  */
 function deleteCharacter(id) {
     if (!confirm('Delete this character permanently?')) return;
-    var char = data.characters.find(function(c) { return c.id === id; });
+    var char = data.characters.find(function(c) { return String(c.id) === String(id); });
     if (!char) return;
     
     data.teams.forEach(function(team) {
         if (team.members) {
-            team.members = team.members.filter(function(m) { return m.characterId !== id; });
+            team.members = team.members.filter(function(m) { return String(m.characterId) !== String(id); });
         }
     });
     
-    data.characters = data.characters.filter(function(c) { return c.id !== id; });
+    data.characters = data.characters.filter(function(c) { return String(c.id) !== String(id); });
     if (typeof logActivity === 'function') {
         logActivity('Deleted character: ' + char.firstName);
     }
