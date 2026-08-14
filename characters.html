@@ -14,8 +14,10 @@
         <nav id="main-nav">
             <a href="index.html">Dashboard</a>
             <a href="characters.html" class="active">Characters</a>
+            <a href="team-manager.html">Teams</a>
             <a href="tournaments.html">Tournaments</a>
             <a href="curriculum.html">Curriculum</a>
+            <a href="missions.html">Missions</a>
         </nav>
         <div class="header-actions">
             <button id="export-json-btn" class="small">Export JSON</button>
@@ -34,7 +36,7 @@
             <button id="add-character-btn" class="primary">+ Add Character</button>
         </div>
 
-        <!-- Character Form - Now positioned inline under the header -->
+        <!-- Character Form -->
         <div id="character-form" class="form-container hidden">
             <h3 id="form-title">Add Character</h3>
             <form id="char-form">
@@ -139,9 +141,9 @@
                         </div>
                     </div>
 
-                    <!-- ELIMINATION SECTION - NEW -->
+                    <!-- ELIMINATION SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
-                        <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">▣ Tournament Eliminations</label>
+                        <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">Tournament Eliminations</label>
                         <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Eliminations are separate from death. A character can be eliminated from a tournament but still alive.</p>
                         <div id="elimination-container">
                             <div class="elimination-entry-form" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
