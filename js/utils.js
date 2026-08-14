@@ -104,7 +104,7 @@ function getCurrentStatus(char) {
 function getCharacterTeamCount(charId) {
     let count = 0;
     data.teams.forEach(team => {
-        if (team.members && team.members.some(m => m.characterId === charId)) {
+        if (team.members && team.members.some(m => String(m.characterId) === String(charId))) {
             count++;
         }
     });
@@ -172,17 +172,17 @@ function getParticipantName(participant, tourn) {
 }
 
 /**
- * Get active teams for a given week
+ * Get active academic teams for a given week
  * @param {number} week - Week number
  * @param {string} excludeTournamentId - Optional tournament ID to exclude
- * @returns {Array} Array of active teams
+ * @returns {Array} Array of active academic teams
  */
 function getActiveTeamsForWeek(week, excludeTournamentId) {
     const weekNum = parseInt(week) || 1;
     const block = getWeekBlock(weekNum);
     
     return data.teams.filter(team => {
-        if (team.status === 'deleted') return false;
+        if (team.status === 'deleted' || team.status === 'inactive') return false;
         if (team.type !== 'academic') return false;
         
         const start = parseInt(team.startPeriod);
@@ -194,15 +194,39 @@ function getActiveTeamsForWeek(week, excludeTournamentId) {
 }
 
 /**
- * Get all teams (both academic and professional)
+ * Get all active teams (all types)
  * @param {string} excludeTournamentId - Optional tournament ID to exclude
  * @returns {Array} Array of all active teams
  */
 function getAllActiveTeams(excludeTournamentId) {
     return data.teams.filter(team => {
-        if (team.status === 'deleted') return false;
+        if (team.status === 'deleted' || team.status === 'inactive') return false;
         return true;
     }).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Get teams of a specific type
+ * @param {string} type - Team type (academic, professional, temporary)
+ * @param {string} status - Status filter (active, inactive, all)
+ * @returns {Array} Array of filtered teams
+ */
+function getTeamsByType(type, status) {
+    var teams = data.teams.filter(function(t) {
+        if (t.status === 'deleted') return false;
+        if (t.type !== type) return false;
+        return true;
+    });
+    
+    if (status === 'active') {
+        teams = teams.filter(function(t) { return t.status === 'active'; });
+    } else if (status === 'inactive') {
+        teams = teams.filter(function(t) { return t.status === 'inactive' || t.status === 'deprecated'; });
+    }
+    
+    return teams.sort(function(a, b) {
+        return a.name.localeCompare(b.name);
+    });
 }
 
 /**
@@ -299,7 +323,25 @@ function getAvailableDisciplines(week) {
  */
 function getStudentSchedule(studentId, week) {
     if (!data.curriculum) {
-        data.curriculum = { disciplines: [], schedules: {}, restDays: {}, examDays: {}, grades: {}, rankings: {}, currentWeek: 1 };
+        data.curriculum = { 
+            disciplines: [], 
+            schedules: {}, 
+            restDays: {}, 
+            examDays: {}, 
+            grades: {}, 
+            rankings: {}, 
+            currentWeek: 1,
+            classInstructors: {},
+            classLabels: {},
+            classGroupLabels: {},
+            classDurations: {},
+            instructorClasses: {},
+            instructorTemplates: {},
+            instructorBlocks: {},
+            instructorGroups: {},
+            disciplineGroups: {},
+            autoGroups: {}
+        };
     }
     if (!data.curriculum.schedules) {
         data.curriculum.schedules = {};
@@ -351,6 +393,126 @@ function getDisciplineHours(studentId, week) {
     return hours;
 }
 
+/**
+ * Check if a character is eliminated in a specific week
+ * @param {string} charId - Character ID
+ * @param {number} week - Week number
+ * @returns {boolean} True if eliminated
+ */
+function isCharacterEliminated(charId, week) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) return false;
+    if (char.deceased) return true;
+    
+    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+        var weekNum = parseInt(week) || 1;
+        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+            var elimWeek = parseInt(char.eliminatedWeeks[i]);
+            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Get all characters eliminated in a specific week
+ * @param {number} week - Week number
+ * @returns {Array} Array of eliminated character IDs
+ */
+function getEliminatedCharacters(week) {
+    var weekNum = parseInt(week) || 1;
+    var result = [];
+    data.characters.forEach(function(char) {
+        if (isCharacterEliminated(char.id, weekNum)) {
+            result.push(char.id);
+        }
+    });
+    return result;
+}
+
+/**
+ * Get team member count (active members only)
+ * @param {Object} team - Team object
+ * @param {number} week - Week to check
+ * @returns {number} Number of active members
+ */
+function getActiveTeamMemberCount(team, week) {
+    if (!team || !team.members) return 0;
+    var weekNum = parseInt(week) || 1;
+    var count = 0;
+    team.members.forEach(function(member) {
+        var join = parseInt(member.joinPeriod);
+        var leave = parseInt(member.leavePeriod);
+        if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+            count++;
+        }
+    });
+    return count;
+}
+
+/**
+ * Get active members of a team
+ * @param {Object} team - Team object
+ * @param {number} week - Week to check
+ * @returns {Array} Array of active members
+ */
+function getActiveTeamMembers(team, week) {
+    if (!team || !team.members) return [];
+    var weekNum = parseInt(week) || 1;
+    var result = [];
+    team.members.forEach(function(member) {
+        var join = parseInt(member.joinPeriod);
+        var leave = parseInt(member.leavePeriod);
+        if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+            result.push(member);
+        }
+    });
+    return result;
+}
+
+/**
+ * Format date for display
+ * @param {string} dateString - ISO date string
+ * @returns {string} Formatted date
+ */
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    var date = new Date(dateString);
+    return date.toLocaleDateString();
+}
+
+/**
+ * Truncate a string to a certain length
+ * @param {string} str - String to truncate
+ * @param {number} length - Maximum length
+ * @returns {string} Truncated string
+ */
+function truncateString(str, length) {
+    if (!str) return '';
+    if (str.length <= length) return str;
+    return str.substring(0, length) + '...';
+}
+
+/**
+ * Debounce a function
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Milliseconds to wait
+ * @returns {Function} Debounced function
+ */
+function debounce(func, wait) {
+    let timeout;
+    return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(function() {
+            func.apply(context, args);
+        }, wait);
+    };
+}
+
 // Make utils available globally
 window.utils = {
     generateId,
@@ -363,6 +525,7 @@ window.utils = {
     getParticipantName,
     getActiveTeamsForWeek,
     getAllActiveTeams,
+    getTeamsByType,
     logActivity,
     getStudents,
     getNonCivilianCharacters,
@@ -371,5 +534,41 @@ window.utils = {
     getAvailableDisciplines,
     getStudentSchedule,
     getTotalHours,
-    getDisciplineHours
+    getDisciplineHours,
+    isCharacterEliminated,
+    getEliminatedCharacters,
+    getActiveTeamMemberCount,
+    getActiveTeamMembers,
+    formatDate,
+    truncateString,
+    debounce
 };
+
+// Also expose individual functions globally for convenience
+window.generateId = generateId;
+window.getWeekBlock = getWeekBlock;
+window.getRankingBlock = getRankingBlock;
+window.calculateAge = calculateAge;
+window.getCharacterAge = getCharacterAge;
+window.getCurrentStatus = getCurrentStatus;
+window.getCharacterTeamCount = getCharacterTeamCount;
+window.getParticipantName = getParticipantName;
+window.getActiveTeamsForWeek = getActiveTeamsForWeek;
+window.getAllActiveTeams = getAllActiveTeams;
+window.getTeamsByType = getTeamsByType;
+window.logActivity = logActivity;
+window.getStudents = getStudents;
+window.getNonCivilianCharacters = getNonCivilianCharacters;
+window.getInstructors = getInstructors;
+window.getDiscipline = getDiscipline;
+window.getAvailableDisciplines = getAvailableDisciplines;
+window.getStudentSchedule = getStudentSchedule;
+window.getTotalHours = getTotalHours;
+window.getDisciplineHours = getDisciplineHours;
+window.isCharacterEliminated = isCharacterEliminated;
+window.getEliminatedCharacters = getEliminatedCharacters;
+window.getActiveTeamMemberCount = getActiveTeamMemberCount;
+window.getActiveTeamMembers = getActiveTeamMembers;
+window.formatDate = formatDate;
+window.truncateString = truncateString;
+window.debounce = debounce;
