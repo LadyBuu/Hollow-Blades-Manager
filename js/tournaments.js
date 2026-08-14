@@ -1,7 +1,7 @@
 /**
  * tournaments.js - Tournament Management
  * Handles tournament creation, team selection, match management, and eliminations
- * Features: Select multiple teams, choose winner, eliminate individual members
+ * Winner is determined by match results - last match winner becomes tournament winner
  */
 
 var tournamentState = {
@@ -130,17 +130,15 @@ function renderTournamentsView(container) {
                         </div>
                     </div>
 
-                    <!-- Winner Section -->
+                    <!-- Tournament Winner Display (auto-calculated from matches) -->
                     <div id="winner-section" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--accent);">
                         <h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Tournament Winner</h4>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                            <select id="winner-team-select" style="flex:1;min-width:120px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
-                                <option value="">Select winner...</option>
-                            </select>
-                            <button id="set-winner-btn" class="primary small">Set Winner</button>
-                            <button id="clear-winner-btn" class="secondary small">Clear</button>
+                        <div id="winner-display" style="font-weight:600;color:var(--accent);font-size:1.1rem;">
+                            Not determined yet
                         </div>
-                        <div id="winner-display" style="margin-top:6px;font-weight:600;color:var(--accent);"></div>
+                        <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">
+                            Winner is determined by the last match result. Set a match winner below.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -169,8 +167,17 @@ function renderTournaments() {
         var statusColor = tourn.status === 'active' ? 'var(--accent)' : (tourn.status === 'completed' ? 'var(--info)' : 'var(--text-dim)');
         var weekDisplay = 'Wk ' + (tourn.startWeek || '?') + ' - Wk ' + (tourn.endWeek || '?');
         
+        // Check if winner is set
+        var winnerDisplay = '';
+        if (tourn.winner) {
+            var winnerTeam = data.teams.find(function(t) { return String(t.id) === String(tourn.winner); });
+            if (winnerTeam) {
+                winnerDisplay = ' ★ ' + winnerTeam.name;
+            }
+        }
+        
         html += '<div class="list-item tourn-item" data-id="' + tourn.id + '">' +
-            '<span><strong>' + tourn.name + '</strong></span>' +
+            '<span><strong>' + tourn.name + '</strong>' + winnerDisplay + '</span>' +
             '<span style="font-size:0.75rem;">' + weekDisplay + '</span>' +
             '<span>' + teamCount + '</span>' +
             '<span style="color:' + statusColor + ';font-size:0.75rem;">' + (tourn.status || 'draft') + '</span>' +
@@ -248,7 +255,7 @@ function saveTournament(e) {
     if (editId) {
         var index = data.tournaments.findIndex(function(t) { return String(t.id) === String(editId); });
         if (index !== -1) {
-            // Preserve teams, matches, eliminations
+            // Preserve teams, matches, eliminations, winner
             var existing = data.tournaments[index];
             data.tournaments[index] = Object.assign({}, existing, tournData);
             if (typeof logActivity === 'function') {
@@ -324,16 +331,23 @@ function viewTournament(id) {
     
     // Info
     var info = document.getElementById('tournament-info');
+    var winnerDisplay = '';
+    if (tourn.winner) {
+        var winnerTeam = data.teams.find(function(t) { return String(t.id) === String(tourn.winner); });
+        if (winnerTeam) {
+            winnerDisplay = ' | Winner: <span style="color:var(--accent);font-weight:600;">' + winnerTeam.name + '</span>';
+        }
+    }
     info.innerHTML = 
         '<span style="color:var(--text-dim);font-size:0.8rem;">Weeks ' + tourn.startWeek + ' - ' + tourn.endWeek + 
         (tourn.academicYear ? ' | ' + tourn.academicYear : '') + 
-        ' | Status: ' + (tourn.status || 'active') + '</span>';
+        ' | Status: ' + (tourn.status || 'active') + 
+        winnerDisplay + '</span>';
     
     // Populate selectors
     populateTeamSelector(tourn);
     populateMatchSelectors(tourn);
     populateEliminationSelector(tourn);
-    populateWinnerSelector(tourn);
     
     // Render sections
     renderTournamentTeams(tourn);
@@ -443,29 +457,6 @@ function populateEliminationSelector(tourn) {
     if (chars.length === 0) {
         select.innerHTML += '<option value="" disabled>No characters available</option>';
     }
-}
-
-/**
- * Populate winner selector
- */
-function populateWinnerSelector(tourn) {
-    var select = document.getElementById('winner-team-select');
-    if (!select) return;
-    
-    var teams = tourn.teams || [];
-    select.innerHTML = '<option value="">Select winner...</option>';
-    teams.forEach(function(entry) {
-        var team = data.teams.find(function(t) { return String(t.id) === String(entry.teamId); });
-        if (team) {
-            var option = document.createElement('option');
-            option.value = team.id;
-            option.textContent = team.name;
-            if (tourn.winner && String(tourn.winner) === String(team.id)) {
-                option.selected = true;
-            }
-            select.appendChild(option);
-        }
-    });
 }
 
 /**
@@ -657,7 +648,7 @@ function removeMatch(tournId, index) {
 }
 
 /**
- * Set match winner
+ * Set match winner - also updates tournament winner to the last match winner
  */
 function setMatchWinner(tournId, matchIndex, teamId) {
     var tourn = data.tournaments.find(function(t) { return String(t.id) === String(tournId); });
@@ -670,9 +661,42 @@ function setMatchWinner(tournId, matchIndex, teamId) {
         logActivity('Set winner for match in tournament: ' + tourn.name + ' - ' + (team ? team.name : ''));
     }
     
-    // Check if this team becomes tournament winner (optional - can be manually set)
+    // Update tournament winner to the winner of the last match
+    updateTournamentWinner(tourn);
+    
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
+}
+
+/**
+ * Update tournament winner based on the last match winner
+ */
+function updateTournamentWinner(tourn) {
+    if (!tourn.matches || tourn.matches.length === 0) {
+        tourn.winner = null;
+        return;
+    }
+    
+    // Find the last match with a winner
+    var lastWinner = null;
+    for (var i = tourn.matches.length - 1; i >= 0; i--) {
+        if (tourn.matches[i].winner) {
+            lastWinner = tourn.matches[i].winner;
+            break;
+        }
+    }
+    
+    if (lastWinner) {
+        tourn.winner = lastWinner;
+        // Mark tournament as completed if a winner is set
+        if (tourn.status !== 'completed') {
+            tourn.status = 'completed';
+        }
+    } else {
+        // If no match has a winner, clear the tournament winner
+        tourn.winner = null;
+        tourn.status = 'active';
+    }
 }
 
 /**
@@ -793,64 +817,22 @@ function removeElimination(tournId, index) {
 }
 
 /**
- * Render winner
+ * Render winner display (auto-calculated from matches)
  */
 function renderWinner(tourn) {
     var container = document.getElementById('winner-display');
     if (tourn.winner) {
         var team = data.teams.find(function(t) { return String(t.id) === String(tourn.winner); });
         container.innerHTML = '★ ' + (team ? team.name : 'Unknown Team');
-        container.style.display = 'block';
+        container.style.color = 'var(--accent)';
+        container.style.fontWeight = '600';
+        container.style.fontSize = '1.1rem';
     } else {
-        container.innerHTML = 'No winner set';
+        container.innerHTML = 'Not determined yet';
         container.style.color = 'var(--text-dim)';
         container.style.fontWeight = 'normal';
+        container.style.fontSize = '1rem';
     }
-}
-
-/**
- * Set tournament winner
- */
-function setTournamentWinner() {
-    var modal = document.getElementById('tournament-detail-modal');
-    var tournId = modal.dataset.tournamentId;
-    var tourn = data.tournaments.find(function(t) { return String(t.id) === String(tournId); });
-    if (!tourn) return;
-    
-    var teamId = document.getElementById('winner-team-select').value;
-    if (!teamId) { alert('Please select a winner.'); return; }
-    
-    tourn.winner = teamId;
-    tourn.status = 'completed';
-    
-    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
-    if (typeof logActivity === 'function') {
-        logActivity('Set tournament winner: ' + (team ? team.name : '') + ' for ' + tourn.name);
-    }
-    
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    viewTournament(tournId);
-}
-
-/**
- * Clear tournament winner
- */
-function clearTournamentWinner() {
-    var modal = document.getElementById('tournament-detail-modal');
-    var tournId = modal.dataset.tournamentId;
-    var tourn = data.tournaments.find(function(t) { return String(t.id) === String(tournId); });
-    if (!tourn) return;
-    
-    if (!confirm('Clear the tournament winner?')) return;
-    
-    tourn.winner = null;
-    tourn.status = 'active';
-    
-    if (typeof logActivity === 'function') {
-        logActivity('Cleared tournament winner for: ' + tourn.name);
-    }
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    viewTournament(tournId);
 }
 
 /**
@@ -915,7 +897,6 @@ function initTournamentEvents() {
                     populateTeamSelector(tourn);
                     populateMatchSelectors(tourn);
                     populateEliminationSelector(tourn);
-                    populateWinnerSelector(tourn);
                 }
             }
         });
@@ -953,18 +934,6 @@ function initTournamentEvents() {
             removeElimination(tournId, index);
         });
     }
-    
-    // Set winner
-    var setWinnerBtn = document.getElementById('set-winner-btn');
-    if (setWinnerBtn) {
-        setWinnerBtn.addEventListener('click', setTournamentWinner);
-    }
-    
-    // Clear winner
-    var clearWinnerBtn = document.getElementById('clear-winner-btn');
-    if (clearWinnerBtn) {
-        clearWinnerBtn.addEventListener('click', clearTournamentWinner);
-    }
 }
 
 // Make functions globally available
@@ -983,12 +952,10 @@ window.removeMatch = removeMatch;
 window.setMatchWinner = setMatchWinner;
 window.addElimination = addElimination;
 window.removeElimination = removeElimination;
-window.setTournamentWinner = setTournamentWinner;
-window.clearTournamentWinner = clearTournamentWinner;
+window.updateTournamentWinner = updateTournamentWinner;
 window.populateTeamSelector = populateTeamSelector;
 window.populateMatchSelectors = populateMatchSelectors;
 window.populateEliminationSelector = populateEliminationSelector;
-window.populateWinnerSelector = populateWinnerSelector;
 window.renderTournamentTeams = renderTournamentTeams;
 window.renderMatches = renderMatches;
 window.renderEliminations = renderEliminations;
