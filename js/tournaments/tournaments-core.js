@@ -65,9 +65,31 @@ function updateTournament(id, updates) {
  * Delete a tournament
  */
 function deleteTournament(id) {
-    if (!data.tournaments) return false;
+    if (!confirm('Delete this tournament permanently?')) return;
+    var tourn = getTournament(id);
+    if (!tourn) return;
+    
+    var tournName = tourn.name;
+    
+    // Remove from data
     data.tournaments = data.tournaments.filter(function(t) { return String(t.id) !== String(id); });
-    return true;
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Deleted tournament: ' + tournName);
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    
+    // Close detail modal if open
+    var detailModal = document.getElementById('tournament-detail-modal');
+    if (detailModal) {
+        detailModal.classList.add('hidden');
+    }
+    
+    // Re-render the list
+    if (typeof renderTournamentsList === 'function') {
+        renderTournamentsList();
+    }
 }
 
 /**
