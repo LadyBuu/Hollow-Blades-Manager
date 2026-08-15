@@ -7,7 +7,7 @@
 var tournamentState = {
     currentTournamentId: null,
     selectedWeek: 1,
-    currentMode: 'teams', // 'teams' or 'individuals'
+    currentMode: 'teams',
     expandedMatch: null,
     editingMatch: null
 };
@@ -367,6 +367,7 @@ function saveTournament(e) {
             matches: [],
             eliminations: [],
             winner: null,
+            winners: [],
             createdAt: new Date().toISOString()
         };
         data.tournaments.push(newTourn);
@@ -1212,7 +1213,7 @@ function completeMatch(tournId, roundIndex, matchIndex) {
     var hasWinner = match.winnerIds && match.winnerIds.length > 0;
     var hasLoser = match.loserIds && match.loserIds.length > 0;
     
-    // At least one winner and one loser needed for multiplayer
+    // At least one winner needed
     if (!hasWinner) {
         alert('Please select at least one winner for this match.');
         return;
@@ -1228,6 +1229,18 @@ function completeMatch(tournId, roundIndex, matchIndex) {
     if (both) {
         alert('A participant cannot be both winner and loser.');
         return;
+    }
+    
+    // For 1v1, ensure exactly 1 winner and 1 loser
+    if (allParticipants.length === 2) {
+        if (match.winnerIds.length !== 1) {
+            alert('For 1v1 matches, exactly 1 winner must be selected.');
+            return;
+        }
+        if (match.loserIds.length !== 1) {
+            alert('For 1v1 matches, exactly 1 loser must be selected.');
+            return;
+        }
     }
     
     // Mark match as completed
@@ -1257,6 +1270,7 @@ function completeMatch(tournId, roundIndex, matchIndex) {
 function determineTournamentWinner(tourn) {
     if (!tourn.rounds || tourn.rounds.length === 0) {
         tourn.winner = null;
+        tourn.winners = [];
         return;
     }
     
@@ -1264,6 +1278,7 @@ function determineTournamentWinner(tourn) {
     var lastRound = tourn.rounds[tourn.rounds.length - 1];
     if (lastRound.status !== 'completed') {
         tourn.winner = null;
+        tourn.winners = [];
         return;
     }
     
@@ -1276,6 +1291,8 @@ function determineTournamentWinner(tourn) {
         }
     });
     
+    tourn.winners = winners;
+    
     // If only one winner, that's the tournament winner
     if (winners.length === 1) {
         tourn.winner = winners[0];
@@ -1284,15 +1301,15 @@ function determineTournamentWinner(tourn) {
             logActivity('Tournament ' + tourn.name + ' completed! Winner: ' + winnerName);
         }
     } else if (winners.length > 1) {
-        // Multiple winners - store all as winner (for display)
+        // Multiple winners
         tourn.winner = winners[0]; // Primary winner
-        tourn.winners = winners; // All winners
         if (typeof logActivity === 'function') {
             var names = winners.map(function(w) { return getParticipantNameById(w, tourn); });
             logActivity('Tournament ' + tourn.name + ' completed! Winners: ' + names.join(', '));
         }
     } else {
         tourn.winner = null;
+        tourn.winners = [];
     }
 }
 
@@ -1370,48 +1387,9 @@ function addRound() {
     if (!tourn.rounds) tourn.rounds = [];
     
     var roundNumber = tourn.rounds.length + 1;
-    var roundLabel = String.fromCharCode(65 + tourn.rounds.length);
     
     // Get available participants (not eliminated, not already in this round)
-    var availableParticipants = [];
-    if (tourn.participants) {
-        tourn.participants.forEach(function(p) {
-            var charId = p.characterId;
-            // Check if not eliminated
-            var isEliminated = false;
-            if (tourn.eliminations) {
-                tourn.eliminations.forEach(function(elim) {
-                    if (String(elim.characterId) === String(charId)) {
-                        var elimWeek = parseInt(elim.week);
-                        if (!isNaN(elimWeek) && elimWeek <= parseInt(tourn.startWeek)) {
-                            isEliminated = true;
-                        }
-                    }
-                });
-            }
-            // Check if already in this round
-            var inRound = false;
-            tourn.rounds.forEach(function(r) {
-                if (r.matches) {
-                    r.matches.forEach(function(m) {
-                        if (m.participants && m.participants.some(function(id) { return String(id) === String(charId); })) {
-                            if (m.status === 'completed') {
-                                // Check if loser - if loser, eliminated
-                                if (m.loserIds && m.loserIds.some(function(id) { return String(id) === String(charId); })) {
-                                    isEliminated = true;
-                                }
-                                inRound = true;
-                            }
-                        }
-                    });
-                }
-            });
-            
-            if (!isEliminated && !inRound) {
-                availableParticipants.push(charId);
-            }
-        });
-    }
+    var availableParticipants = getAvailableParticipantsForRound(tourn, roundNumber);
     
     if (availableParticipants.length < 2) {
         alert('Not enough available participants for a new round. Need at least 2 participants.');
@@ -1423,7 +1401,67 @@ function addRound() {
 }
 
 /**
- * Show round match creator
+ * Get available participants for a round
+ */
+function getAvailableParticipantsForRound(tourn, roundNumber) {
+    var availableParticipants = [];
+    var startWeek = parseInt(tourn.startWeek) || 1;
+    
+    if (tourn.participants) {
+        tourn.participants.forEach(function(p) {
+            var charId = p.characterId;
+            
+            // Check if eliminated
+            var isEliminated = false;
+            if (tourn.eliminations) {
+                tourn.eliminations.forEach(function(elim) {
+                    if (String(elim.characterId) === String(charId)) {
+                        var elimWeek = parseInt(elim.week);
+                        if (!isNaN(elimWeek) && elimWeek <= startWeek) {
+                            isEliminated = true;
+                        }
+                    }
+                });
+            }
+            
+            // Check if already in any previous round as loser
+            if (!isEliminated && tourn.rounds) {
+                tourn.rounds.forEach(function(r) {
+                    if (r.matches) {
+                        r.matches.forEach(function(m) {
+                            if (m.participants && m.participants.some(function(id) { return String(id) === String(charId); })) {
+                                if (m.loserIds && m.loserIds.some(function(id) { return String(id) === String(charId); })) {
+                                    isEliminated = true;
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Check if already in this round (shouldn't happen, but just in case)
+            var inRound = false;
+            tourn.rounds.forEach(function(r) {
+                if (r.roundNumber === roundNumber && r.matches) {
+                    r.matches.forEach(function(m) {
+                        if (m.participants && m.participants.some(function(id) { return String(id) === String(charId); })) {
+                            inRound = true;
+                        }
+                    });
+                }
+            });
+            
+            if (!isEliminated && !inRound) {
+                availableParticipants.push(charId);
+            }
+        });
+    }
+    
+    return availableParticipants;
+}
+
+/**
+ * Show round match creator with participant selection
  */
 function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
     var modal = document.getElementById('match-detail-modal');
@@ -1431,12 +1469,23 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
     
     var content = document.getElementById('match-detail-content');
     
+    // State for this creator
+    var creatorState = {
+        selectedIds: [],
+        createdMatches: [],
+        availableParticipants: availableParticipants.slice(),
+        matchType: 3 // default 1v1v1
+    };
+    
     var html = '<div style="margin-bottom:12px;">';
-    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Available participants: ' + availableParticipants.length + '</p>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">';
+    html += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
+    html += '<span style="color:var(--text-dim);font-size:0.8rem;">Available participants: <strong id="available-count">' + availableParticipants.length + '</strong></span>';
+    html += '<span style="color:var(--text-dim);font-size:0.8rem;">Matches created: <strong id="created-count">0</strong></span>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;" id="available-participants-display">';
     availableParticipants.forEach(function(id) {
         var name = getParticipantNameById(id, null);
-        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;">' + name + '</span>';
+        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);" data-id="' + id + '">' + name + '</span>';
     });
     html += '</div>';
     html += '</div>';
@@ -1445,160 +1494,340 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
     html += '<label style="font-size:0.7rem;color:var(--text-dim);">Match Type:</label>';
     html += '<select id="new-match-type" style="padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;margin-left:8px;width:auto;">';
     html += '<option value="2">1v1 (2 players)</option>';
-    html += '<option value="3">1v1v1 (3 players)</option>';
+    html += '<option value="3" selected>1v1v1 (3 players)</option>';
     html += '<option value="4">1v1v1v1 (4 players)</option>';
     html += '</select>';
     html += '</div>';
     
-    html += '<div id="new-match-participants" style="margin-bottom:12px;">';
-    // Will be populated by JS
+    html += '<div id="new-match-participants" style="margin-bottom:12px;padding:8px;background:var(--panel-alt);border-radius:6px;border:1px solid var(--border-soft);min-height:50px;">';
+    html += '<div style="color:var(--text-dim);font-size:0.7rem;text-align:center;padding:8px;">No participants selected. Use "Add Participant" below.</div>';
     html += '</div>';
     
     html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">';
     html += '<button id="add-participant-to-match" class="small secondary">+ Add Participant</button>';
+    html += '<button id="clear-match-participants" class="small secondary">Clear All</button>';
+    html += '<button id="create-match-btn" class="primary small" style="margin-left:8px;">Create Match</button>';
+    html += '</div>';
+    
+    html += '<div style="margin-bottom:12px;padding:8px;background:var(--bg);border-radius:6px;border:1px solid var(--border-soft);">';
+    html += '<p style="font-size:0.7rem;color:var(--text-dim);">';
+    html += '• Select participants using the dropdown below, then click "Add Participant".<br>';
+    html += '• When you have enough participants, click "Create Match" to create the match.<br>';
+    html += '• Created matches will appear in the list below.';
+    html += '</p></div>';
+    
+    // Show created matches
+    html += '<div id="created-matches-list" style="margin-bottom:12px;">';
+    html += '<p style="color:var(--text-dim);font-size:0.7rem;">No matches created yet.</p>';
     html += '</div>';
     
     html += '<div class="form-actions" style="margin-top:8px;">';
     html += '<button type="button" id="cancel-match-creator" class="secondary">Cancel</button>';
-    html += '<button type="button" id="save-match-creator" class="primary">Create Matches</button>';
+    html += '<button type="button" id="save-match-creator" class="primary">Save All Matches (' + creatorState.createdMatches.length + ')</button>';
     html += '</div>';
     
     content.innerHTML = html;
     
-    // Populate initial participants
-    var participantsContainer = document.getElementById('new-match-participants');
-    var selectedIds = [];
+    // Store state in content
+    content.dataset.tournId = tournId;
+    content.dataset.roundNumber = roundNumber;
+    content.dataset.creatorState = JSON.stringify(creatorState);
     
-    function updateParticipantSelects() {
-        var matchType = parseInt(document.getElementById('new-match-type').value) || 2;
-        var available = availableParticipants.filter(function(id) {
-            return selectedIds.indexOf(id) === -1;
-        });
+    // Get the participant add button
+    var addBtn = document.getElementById('add-participant-to-match');
+    var clearBtn = document.getElementById('clear-match-participants');
+    var createBtn = document.getElementById('create-match-btn');
+    var saveBtn = document.getElementById('save-match-creator');
+    var cancelBtn = document.getElementById('cancel-match-creator');
+    var matchTypeSelect = document.getElementById('new-match-type');
+    
+    // Initialize the participant selector
+    var selectedContainer = document.getElementById('new-match-participants');
+    var createdList = document.getElementById('created-matches-list');
+    
+    function updateSelectedDisplay() {
+        var matchType = parseInt(matchTypeSelect.value) || 2;
+        var maxParticipants = matchType;
         
-        var html = '';
-        for (var i = 0; i < matchType; i++) {
-            html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
-            html += '<select class="match-participant-select" data-index="' + i + '" style="flex:1;padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;">';
-            html += '<option value="">Select participant...</option>';
-            available.forEach(function(id) {
+        // Update available count
+        var availCount = document.getElementById('available-count');
+        if (availCount) availCount.textContent = creatorState.availableParticipants.length;
+        
+        var createdCount = document.getElementById('created-count');
+        if (createdCount) createdCount.textContent = creatorState.createdMatches.length;
+        
+        // Update selected display
+        if (creatorState.selectedIds.length === 0) {
+            selectedContainer.innerHTML = '<div style="color:var(--text-dim);font-size:0.7rem;text-align:center;padding:8px;">No participants selected. Use the dropdown below to add participants.</div>';
+        } else {
+            var html = '<div style="margin-bottom:4px;"><span style="font-size:0.7rem;color:var(--text-dim);">Selected (' + creatorState.selectedIds.length + '/' + maxParticipants + '):</span></div>';
+            creatorState.selectedIds.forEach(function(id, index) {
                 var name = getParticipantNameById(id, null);
-                var selected = selectedIds[i] === id ? 'selected' : '';
-                html += '<option value="' + id + '" ' + selected + '>' + name + '</option>';
+                html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
+                html += '<span style="background:var(--accent-soft);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--accent);">' + name + '</span>';
+                html += '<button class="small danger remove-selected-participant" data-index="' + index + '" style="padding:0 4px;font-size:0.6rem;">✕</button>';
+                html += '</div>';
             });
-            html += '</select>';
-            if (i > 0) {
-                html += '<button class="small danger remove-participant-btn" data-index="' + i + '">✕</button>';
+            var remaining = maxParticipants - creatorState.selectedIds.length;
+            if (remaining > 0) {
+                html += '<div style="color:var(--text-dim);font-size:0.6rem;margin-top:2px;">Add ' + remaining + ' more participant(s) to complete this match.</div>';
+            } else {
+                html += '<div style="color:var(--accent);font-size:0.6rem;margin-top:2px;">✓ Match is ready to be created! Click "Create Match".</div>';
             }
-            html += '</div>';
+            selectedContainer.innerHTML = html;
         }
-        participantsContainer.innerHTML = html;
         
-        // Update selectedIds from selects
-        participantsContainer.querySelectorAll('.match-participant-select').forEach(function(sel) {
-            sel.onchange = function() {
+        // Remove selected participant buttons
+        selectedContainer.querySelectorAll('.remove-selected-participant').forEach(function(btn) {
+            btn.onclick = function() {
                 var idx = parseInt(this.dataset.index);
-                if (this.value) {
-                    selectedIds[idx] = this.value;
-                } else {
-                    delete selectedIds[idx];
+                var removedId = creatorState.selectedIds[idx];
+                creatorState.selectedIds.splice(idx, 1);
+                // Add back to available
+                if (removedId && creatorState.availableParticipants.indexOf(removedId) === -1) {
+                    creatorState.availableParticipants.push(removedId);
+                    creatorState.availableParticipants.sort();
                 }
-                updateParticipantSelects();
+                updateSelectedDisplay();
+                updateAvailableDisplay();
             };
         });
         
-        participantsContainer.querySelectorAll('.remove-participant-btn').forEach(function(btn) {
+        // Update create button state
+        if (createBtn) {
+            if (creatorState.selectedIds.length >= 2 && creatorState.selectedIds.length <= maxParticipants) {
+                createBtn.disabled = false;
+                createBtn.style.opacity = '1';
+            } else {
+                createBtn.disabled = true;
+                createBtn.style.opacity = '0.5';
+            }
+        }
+        
+        // Update save button
+        if (saveBtn) {
+            var matchCount = creatorState.createdMatches.length;
+            saveBtn.textContent = 'Save All Matches (' + matchCount + ')';
+            if (matchCount === 0) {
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = '0.5';
+            } else {
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = '1';
+            }
+        }
+    }
+    
+    function updateAvailableDisplay() {
+        var container = document.getElementById('available-participants-display');
+        if (!container) return;
+        
+        if (creatorState.availableParticipants.length === 0) {
+            container.innerHTML = '<span style="color:var(--text-dim);font-size:0.7rem;">No participants available</span>';
+            var availCount = document.getElementById('available-count');
+            if (availCount) availCount.textContent = '0';
+            return;
+        }
+        
+        var html = '';
+        creatorState.availableParticipants.forEach(function(id) {
+            var name = getParticipantNameById(id, null);
+            html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);" data-id="' + id + '">' + name + '</span>';
+        });
+        container.innerHTML = html;
+    }
+    
+    function updateCreatedMatchesDisplay() {
+        if (creatorState.createdMatches.length === 0) {
+            createdList.innerHTML = '<p style="color:var(--text-dim);font-size:0.7rem;">No matches created yet.</p>';
+            return;
+        }
+        
+        var html = '<div style="margin-bottom:4px;"><span style="font-size:0.7rem;color:var(--text-dim);">Created Matches:</span></div>';
+        creatorState.createdMatches.forEach(function(match, index) {
+            var names = match.participants.map(function(id) {
+                return getParticipantNameById(id, null);
+            });
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--bg);border-radius:4px;margin-bottom:4px;border-left:3px solid var(--accent);">';
+            html += '<span style="font-size:0.75rem;">Match ' + (index + 1) + ': <strong>' + names.join(' vs ') + '</strong></span>';
+            html += '<button class="small danger remove-created-match" data-index="' + index + '" style="padding:0 4px;font-size:0.6rem;">✕</button>';
+            html += '</div>';
+        });
+        createdList.innerHTML = html;
+        
+        createdList.querySelectorAll('.remove-created-match').forEach(function(btn) {
             btn.onclick = function() {
                 var idx = parseInt(this.dataset.index);
-                delete selectedIds[idx];
-                // Rebuild selectors with updated selectedIds
-                updateParticipantSelects();
+                var match = creatorState.createdMatches[idx];
+                // Return participants to available
+                match.participants.forEach(function(id) {
+                    if (creatorState.availableParticipants.indexOf(id) === -1) {
+                        creatorState.availableParticipants.push(id);
+                        creatorState.availableParticipants.sort();
+                    }
+                });
+                creatorState.createdMatches.splice(idx, 1);
+                updateCreatedMatchesDisplay();
+                updateAvailableDisplay();
+                updateSelectedDisplay();
             };
         });
     }
     
-    updateParticipantSelects();
-    
     // Add participant button
-    var addBtn = document.getElementById('add-participant-to-match');
     if (addBtn) {
         addBtn.onclick = function() {
-            var available = availableParticipants.filter(function(id) {
-                return selectedIds.indexOf(id) === -1;
-            });
-            if (available.length === 0) {
+            var matchType = parseInt(matchTypeSelect.value) || 2;
+            
+            if (creatorState.selectedIds.length >= matchType) {
+                alert('You have already selected the maximum number of participants for this match type (' + matchType + '). Click "Create Match" to create the match.');
+                return;
+            }
+            
+            if (creatorState.availableParticipants.length === 0) {
                 alert('No more participants available.');
                 return;
             }
-            // Add a new slot
-            var matchType = parseInt(document.getElementById('new-match-type').value) || 2;
-            var currentCount = Object.keys(selectedIds).length;
-            if (currentCount >= matchType) {
-                alert('Match type allows only ' + matchType + ' participants.');
-                return;
+            
+            // Create a temporary dropdown to select a participant
+            var container = document.getElementById('new-match-participants');
+            var selectHtml = '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
+            selectHtml += '<select id="temp-participant-select" style="flex:1;padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.7rem;">';
+            selectHtml += '<option value="">Select participant...</option>';
+            creatorState.availableParticipants.forEach(function(id) {
+                var name = getParticipantNameById(id, null);
+                selectHtml += '<option value="' + id + '">' + name + '</option>';
+            });
+            selectHtml += '</select>';
+            selectHtml += '<button id="confirm-add-participant" class="primary small" style="padding:2px 8px;">Add</button>';
+            selectHtml += '<button id="cancel-add-participant" class="secondary small" style="padding:2px 8px;">✕</button>';
+            selectHtml += '</div>';
+            
+            // Insert after the selected display
+            var selectedDisplay = container.querySelector('div');
+            if (selectedDisplay) {
+                var wrapper = document.createElement('div');
+                wrapper.innerHTML = selectHtml;
+                var selectElement = wrapper.firstElementChild;
+                container.insertBefore(selectElement, selectedDisplay.nextSibling);
+            } else {
+                container.innerHTML = selectHtml + container.innerHTML;
             }
-            // Find first available participant
-            var firstAvailable = available[0];
-            selectedIds[currentCount] = firstAvailable;
-            updateParticipantSelects();
+            
+            var confirmBtn = document.getElementById('confirm-add-participant');
+            var cancelBtn2 = document.getElementById('cancel-add-participant');
+            var tempSelect = document.getElementById('temp-participant-select');
+            
+            if (confirmBtn) {
+                confirmBtn.onclick = function() {
+                    var id = tempSelect.value;
+                    if (!id) {
+                        alert('Please select a participant.');
+                        return;
+                    }
+                    // Remove from available
+                    var idx = creatorState.availableParticipants.indexOf(id);
+                    if (idx !== -1) {
+                        creatorState.availableParticipants.splice(idx, 1);
+                    }
+                    creatorState.selectedIds.push(id);
+                    // Remove the temp select
+                    var parent = tempSelect.parentElement;
+                    if (parent) parent.remove();
+                    updateSelectedDisplay();
+                    updateAvailableDisplay();
+                };
+            }
+            if (cancelBtn2) {
+                cancelBtn2.onclick = function() {
+                    var parent = tempSelect.parentElement;
+                    if (parent) parent.remove();
+                };
+            }
         };
     }
     
-    // Cancel button
-    var cancelBtn = document.getElementById('cancel-match-creator');
-    if (cancelBtn) {
-        cancelBtn.onclick = function() {
-            modal.classList.add('hidden');
+    // Clear button
+    if (clearBtn) {
+        clearBtn.onclick = function() {
+            // Return all selected to available
+            creatorState.selectedIds.forEach(function(id) {
+                if (creatorState.availableParticipants.indexOf(id) === -1) {
+                    creatorState.availableParticipants.push(id);
+                    creatorState.availableParticipants.sort();
+                }
+            });
+            creatorState.selectedIds = [];
+            updateSelectedDisplay();
+            updateAvailableDisplay();
+        };
+    }
+    
+    // Create match button
+    if (createBtn) {
+        createBtn.onclick = function() {
+            var matchType = parseInt(matchTypeSelect.value) || 2;
+            
+            if (creatorState.selectedIds.length < 2) {
+                alert('Please select at least 2 participants.');
+                return;
+            }
+            if (creatorState.selectedIds.length > matchType) {
+                alert('You have selected too many participants for this match type (' + matchType + ').');
+                return;
+            }
+            
+            // Create the match
+            creatorState.createdMatches.push({
+                participants: creatorState.selectedIds.slice()
+            });
+            
+            // Clear selected
+            creatorState.selectedIds = [];
+            updateSelectedDisplay();
+            updateAvailableDisplay();
+            updateCreatedMatchesDisplay();
+            
+            // Show success
+            var btn = this;
+            var origText = btn.textContent;
+            btn.textContent = '✓ Created!';
+            setTimeout(function() {
+                btn.textContent = origText;
+            }, 1000);
         };
     }
     
     // Save button
-    var saveBtn = document.getElementById('save-match-creator');
     if (saveBtn) {
         saveBtn.onclick = function() {
-            var participantIds = [];
-            participantsContainer.querySelectorAll('.match-participant-select').forEach(function(sel) {
-                if (sel.value) {
-                    participantIds.push(sel.value);
-                }
-            });
-            
-            if (participantIds.length < 2) {
-                alert('Please select at least 2 participants for the match.');
-                return;
-            }
-            
-            // Create the round and match
             var tourn = data.tournaments.find(function(t) { return String(t.id) === String(tournId); });
             if (!tourn) return;
             
+            if (creatorState.createdMatches.length === 0) {
+                alert('No matches to save. Create at least one match first.');
+                return;
+            }
+            
+            // Create the round
             if (!tourn.rounds) tourn.rounds = [];
             
-            // Check if round already exists
-            var existingRound = tourn.rounds.find(function(r) { return r.roundNumber === roundNumber; });
-            if (existingRound) {
-                // Add match to existing round
-                if (!existingRound.matches) existingRound.matches = [];
-                existingRound.matches.push({
-                    participants: participantIds,
-                    winnerIds: [],
-                    loserIds: [],
-                    status: 'pending',
-                    roundNumber: roundNumber
-                });
-            } else {
-                // Create new round
-                tourn.rounds.push({
-                    roundNumber: roundNumber,
-                    status: 'pending',
-                    matches: [{
-                        participants: participantIds,
+            var round = {
+                roundNumber: roundNumber,
+                status: 'pending',
+                matches: creatorState.createdMatches.map(function(m) {
+                    return {
+                        participants: m.participants,
                         winnerIds: [],
                         loserIds: [],
                         status: 'pending',
                         roundNumber: roundNumber
-                    }]
-                });
-            }
+                    };
+                })
+            };
+            
+            tourn.rounds.push(round);
+            tourn.status = 'active';
             
             saveData().catch(function(err) { console.error('Failed to save:', err); });
             modal.classList.add('hidden');
@@ -1606,18 +1835,29 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
         };
     }
     
-    // Match type change
-    var typeSelect = document.getElementById('new-match-type');
-    if (typeSelect) {
-        typeSelect.onchange = function() {
-            // Reset selectedIds
-            selectedIds = [];
-            updateParticipantSelects();
+    // Cancel button
+    if (cancelBtn) {
+        cancelBtn.onclick = function() {
+            modal.classList.add('hidden');
         };
     }
     
-    modal.dataset.tournId = tournId;
-    modal.classList.remove('hidden');
+    // Match type change
+    if (matchTypeSelect) {
+        matchTypeSelect.onchange = function() {
+            // If too many selected for new type, warn
+            var newType = parseInt(this.value) || 2;
+            if (creatorState.selectedIds.length > newType) {
+                alert('You have ' + creatorState.selectedIds.length + ' participants selected, but this match type only allows ' + newType + '. Please clear some selections.');
+            }
+            updateSelectedDisplay();
+        };
+    }
+    
+    // Initial display
+    updateSelectedDisplay();
+    updateAvailableDisplay();
+    updateCreatedMatchesDisplay();
 }
 
 /**
@@ -2253,7 +2493,6 @@ function initTournamentEvents() {
 
 /**
  * Auto-generate rounds for a tournament
- * This creates balanced matches based on participants
  */
 function autoGenerateRounds(tournId) {
     var tourn = data.tournaments.find(function(t) { return String(t.id) === String(tournId); });
@@ -2277,8 +2516,7 @@ function autoGenerateRounds(tournId) {
     tourn.rounds = [];
     
     var participantIds = tourn.participants.map(function(p) { return p.characterId; });
-    var matchSize = 3; // Default to 1v1v1 for more interesting matches
-    var numMatches = Math.ceil(participantIds.length / matchSize);
+    var matchSize = 3; // Default to 1v1v1
     
     // Shuffle participants
     var shuffled = participantIds.slice();
@@ -2299,7 +2537,6 @@ function autoGenerateRounds(tournId) {
     for (var i = 0; i < shuffled.length; i += matchSize) {
         var matchParticipants = shuffled.slice(i, i + matchSize);
         if (matchParticipants.length < 2) {
-            // If odd number, add to last match
             if (round1.matches.length > 0) {
                 round1.matches[round1.matches.length - 1].participants = 
                     round1.matches[round1.matches.length - 1].participants.concat(matchParticipants);
@@ -2364,4 +2601,5 @@ window.renderEliminations = renderEliminations;
 window.renderWinner = renderWinner;
 window.initTournamentEvents = initTournamentEvents;
 window.autoGenerateRounds = autoGenerateRounds;
+window.getAvailableParticipantsForRound = getAvailableParticipantsForRound;
 window.tournamentState = tournamentState;
