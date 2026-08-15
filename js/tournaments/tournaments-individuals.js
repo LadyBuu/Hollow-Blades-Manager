@@ -328,6 +328,27 @@ function renderRounds(tourn) {
     });
     
     container.innerHTML = html;
+    
+    container.querySelectorAll('.view-round-matches').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            showRoundMatchesModal(tourn.id, roundIndex);
+        });
+    });
+    
+    container.querySelectorAll('.complete-round-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            completeRound(tourn.id, roundIndex);
+        });
+    });
+    
+    container.querySelectorAll('.delete-round-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            deleteRound(tourn.id, roundIndex);
+        });
+    });
 }
 
 /**
