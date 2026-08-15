@@ -346,6 +346,269 @@ function viewTournament(id) {
 }
 
 /**
+ * Populate elimination selector with characters from participants
+ */
+function populateEliminationSelector(tourn) {
+    var select = document.getElementById('elim-character-select');
+    if (!select) return;
+    
+    var alreadyEliminated = (tourn.eliminations || []).map(function(e) { return e.characterId; });
+    var startWeek = parseInt(tourn.startWeek) || 1;
+    
+    var chars = [];
+    
+    if (tourn.mode === 'individuals') {
+        var participants = tourn.participants || [];
+        participants.forEach(function(entry) {
+            var char = data.characters.find(function(c) { return String(c.id) === String(entry.characterId); });
+            if (char && !alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) {
+                if (!char.deceased) {
+                    var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
+                    var status = getCurrentStatus(char);
+                    chars.push({
+                        id: char.id,
+                        name: name + ' (' + status + ')'
+                    });
+                }
+            }
+        });
+    } else {
+        var teams = tourn.teams || [];
+        teams.forEach(function(entry) {
+            var team = data.teams.find(function(t) { return String(t.id) === String(entry.teamId); });
+            if (team && team.members) {
+                team.members.forEach(function(member) {
+                    var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
+                    if (char && !alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) {
+                        if (!char.deceased) {
+                            var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
+                            var status = getCurrentStatus(char);
+                            chars.push({
+                                id: char.id,
+                                name: name + ' (' + status + ')'
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    }
+    
+    // Also include characters with standalone eliminations
+    data.characters.forEach(function(char) {
+        if (char.deceased) return;
+        if (alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) return;
+        if (char.eliminations) {
+            char.eliminations.forEach(function(elim) {
+                if (elim.standalone) {
+                    var elimWeek = parseInt(elim.week);
+                    if (!isNaN(elimWeek) && elimWeek <= startWeek) {
+                        var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
+                        var status = getCurrentStatus(char);
+                        chars.push({
+                            id: char.id,
+                            name: name + ' (' + status + ') - standalone'
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    var seen = {};
+    var uniqueChars = chars.filter(function(c) {
+        if (seen[c.id]) return false;
+        seen[c.id] = true;
+        return true;
+    });
+    
+    uniqueChars.sort(function(a, b) {
+        return a.name.localeCompare(b.name);
+    });
+    
+    select.innerHTML = '<option value="">Select character...</option>';
+    if (uniqueChars.length === 0) {
+        select.innerHTML += '<option value="" disabled>No characters available for elimination</option>';
+    } else {
+        uniqueChars.forEach(function(char) {
+            var option = document.createElement('option');
+            option.value = char.id;
+            option.textContent = char.name;
+            if (char.name.includes('standalone')) {
+                option.style.color = 'var(--warning)';
+            }
+            select.appendChild(option);
+        });
+    }
+}
+
+/**
+ * Render eliminations
+ */
+function renderEliminations(tourn) {
+    var container = document.getElementById('elimination-list');
+    if (!tourn.eliminations || tourn.eliminations.length === 0) {
+        container.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations recorded</p>';
+        return;
+    }
+    
+    var html = '';
+    var sorted = tourn.eliminations.slice().sort(function(a, b) { return parseInt(a.week) - parseInt(b.week); });
+    sorted.forEach(function(elim, index) {
+        var char = data.characters.find(function(c) { return String(c.id) === String(elim.characterId); });
+        var charName = char ? [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+        var teamName = '';
+        if (elim.teamId) {
+            var team = data.teams.find(function(t) { return String(t.id) === String(elim.teamId); });
+            if (team) teamName = ' (' + team.name + ')';
+        }
+        var standaloneLabel = elim.standalone ? ' [Standalone]' : '';
+        var reasonLabel = elim.reason ? ' - ' + elim.reason : '';
+        var fromMatchLabel = elim.fromMatch ? ' (Match)' : '';
+        
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--danger-soft);border-radius:4px;margin-bottom:2px;border-left:3px solid ' + (elim.standalone ? 'var(--warning)' : 'var(--danger)') + ';">';
+        html += '<span style="font-size:0.75rem;"><strong>' + charName + '</strong>' + teamName + standaloneLabel + fromMatchLabel + ' - Week ' + elim.week + reasonLabel + '</span>';
+        html += '<button class="remove-elimination-btn small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 4px;" data-index="' + index + '">\u2715</button>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+    
+    container.querySelectorAll('.remove-elimination-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            removeElimination(tourn.id, parseInt(this.dataset.index));
+        });
+    });
+}
+
+/**
+ * Add elimination
+ */
+function addElimination() {
+    var modal = document.getElementById('tournament-detail-modal');
+    var tournId = modal.dataset.tournamentId;
+    var tourn = getTournament(tournId);
+    if (!tourn) return;
+    
+    var characterId = document.getElementById('elim-character-select').value;
+    var week = parseInt(document.getElementById('elim-week').value) || 1;
+    
+    if (!characterId) { alert('Please select a character to eliminate.'); return; }
+    
+    if (!tourn.eliminations) tourn.eliminations = [];
+    
+    if (tourn.eliminations.some(function(e) { return String(e.characterId) === String(characterId); })) {
+        alert('This character is already eliminated from this tournament.');
+        return;
+    }
+    
+    var teamId = null;
+    if (tourn.mode === 'teams') {
+        var teams = tourn.teams || [];
+        for (var i = 0; i < teams.length; i++) {
+            var team = data.teams.find(function(t) { return String(t.id) === String(teams[i].teamId); });
+            if (team && team.members) {
+                if (team.members.some(function(m) { return String(m.characterId) === String(characterId); })) {
+                    teamId = team.id;
+                    break;
+                }
+            }
+        }
+    }
+    
+    var char = data.characters.find(function(c) { return String(c.id) === String(characterId); });
+    var hasStandalone = false;
+    if (char && char.eliminations) {
+        char.eliminations.forEach(function(elim) {
+            if (elim.standalone) {
+                var elimWeek = parseInt(elim.week);
+                if (!isNaN(elimWeek) && elimWeek <= week) {
+                    hasStandalone = true;
+                }
+            }
+        });
+    }
+    
+    var isAlreadyEliminated = false;
+    data.tournaments.forEach(function(t) {
+        if (String(t.id) === String(tournId)) return;
+        if (t.eliminations) {
+            t.eliminations.forEach(function(elim) {
+                if (String(elim.characterId) === String(characterId)) {
+                    var elimWeek = parseInt(elim.week);
+                    if (!isNaN(elimWeek) && elimWeek <= week) {
+                        isAlreadyEliminated = true;
+                    }
+                }
+            });
+        }
+    });
+    
+    if (isAlreadyEliminated && !hasStandalone) {
+        alert('This character is already eliminated from another tournament.');
+        return;
+    }
+    
+    tourn.eliminations.push({
+        characterId: characterId,
+        week: week,
+        teamId: teamId,
+        standalone: false,
+        fromMatch: false,
+        reason: 'Eliminated from tournament'
+    });
+    
+    if (char) {
+        if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+        if (char.eliminatedWeeks.indexOf(week) === -1) {
+            char.eliminatedWeeks.push(week);
+        }
+        if (!char.eliminations) char.eliminations = [];
+        char.eliminations.push({
+            tournamentId: tournId,
+            week: week,
+            reason: 'Eliminated from tournament: ' + tourn.name,
+            standalone: false,
+            fromMatch: false
+        });
+    }
+    
+    var charName = char ? [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
+    if (typeof logActivity === 'function') {
+        logActivity('Eliminated ' + charName + ' from tournament: ' + tourn.name + ' (Week ' + week + ')');
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+/**
+ * Remove elimination
+ */
+function removeElimination(tournId, index) {
+    if (!confirm('Remove this elimination?')) return;
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.eliminations || !tourn.eliminations[index]) return;
+    
+    var elim = tourn.eliminations[index];
+    var char = data.characters.find(function(c) { return String(c.id) === String(elim.characterId); });
+    
+    if (char && char.eliminatedWeeks) {
+        var weekIdx = char.eliminatedWeeks.indexOf(parseInt(elim.week));
+        if (weekIdx !== -1) {
+            char.eliminatedWeeks.splice(weekIdx, 1);
+        }
+    }
+    
+    tourn.eliminations.splice(index, 1);
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Removed elimination from tournament: ' + tourn.name);
+    }
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+/**
  * Render winner display
  */
 function renderWinner(tourn) {
@@ -392,10 +655,7 @@ function initTournamentEvents() {
     
     var form = document.getElementById('tournament-form-inner');
     if (form) {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            saveTournament(e);
-        });
+        form.addEventListener('submit', saveTournament);
     }
     
     var closeDetailBtn = document.getElementById('close-tournament-detail');
@@ -535,7 +795,9 @@ function initTournamentEvents() {
 window.renderTournamentsView = renderTournamentsView;
 window.renderTournamentsList = renderTournamentsList;
 window.viewTournament = viewTournament;
-window.showTournamentForm = showTournamentForm;
-window.closeTournamentForm = closeTournamentForm;
-window.closeTournamentDetail = closeTournamentDetail;
 window.initTournamentEvents = initTournamentEvents;
+window.populateEliminationSelector = populateEliminationSelector;
+window.renderEliminations = renderEliminations;
+window.addElimination = addElimination;
+window.removeElimination = removeElimination;
+window.renderWinner = renderWinner;
