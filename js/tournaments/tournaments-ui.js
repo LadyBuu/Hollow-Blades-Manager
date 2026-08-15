@@ -630,6 +630,49 @@ function renderWinner(tourn) {
 }
 
 /**
+ * Delete a tournament - FIXED
+ */
+function deleteTournament(id) {
+    console.log('deleteTournament called with id:', id);
+    
+    if (!id) {
+        console.error('No tournament ID provided');
+        alert('Tournament ID not found.');
+        return;
+    }
+    
+    var tourn = getTournament(id);
+    if (!tourn) {
+        console.error('Tournament not found:', id);
+        alert('Tournament not found.');
+        return;
+    }
+    
+    if (!confirm('Delete "' + tourn.name + '" permanently?')) {
+        return;
+    }
+    
+    // Remove from data
+    data.tournaments = data.tournaments.filter(function(t) { return String(t.id) !== String(id); });
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Deleted tournament: ' + tourn.name);
+    }
+    
+    saveData().then(function() {
+        renderTournamentsList();
+        closeTournamentDetail();
+        if (typeof renderAll === 'function') {
+            renderAll();
+        }
+        alert('Tournament "' + tourn.name + '" deleted successfully.');
+    }).catch(function(err) {
+        console.error('Failed to save after deletion:', err);
+        alert('Failed to delete tournament. Please check console for details.');
+    });
+}
+
+/**
  * Initialize tournament events
  */
 function initTournamentEvents() {
@@ -801,3 +844,4 @@ window.renderEliminations = renderEliminations;
 window.addElimination = addElimination;
 window.removeElimination = removeElimination;
 window.renderWinner = renderWinner;
+window.deleteTournament = deleteTournament;
