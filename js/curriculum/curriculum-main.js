@@ -11,7 +11,7 @@ var selectedGradeStudentId = null;
 var classViewState = { currentWeek: 1, filterDiscipline: 'all' };
 var instructorCalendarState = { currentWeek: 1, selectedInstructorId: null, expandedGroups: {} };
 
-// Student schedule state (from student-schedule.js)
+// Student schedule state
 if (typeof studentScheduleState === 'undefined') {
     var studentScheduleState = { currentWeek: 1, selectedStudentId: null };
 }
@@ -60,34 +60,48 @@ function renderCurriculumView(container) {
     // Initialize tabs
     initCurriculumTabs();
     
-    // Render each section - check if functions exist
+    // Render each section
+    renderAllCurriculumSections();
+    
+    // Initialize events
+    initCurriculumEvents();
+}
+
+/**
+ * Render all curriculum sections
+ */
+function renderAllCurriculumSections() {
+    // Disciplines
     var disciplinesContent = document.getElementById('disciplines-content');
     if (disciplinesContent) {
         if (typeof renderDisciplinesView === 'function') {
             renderDisciplinesView(disciplinesContent);
         } else {
-            disciplinesContent.innerHTML = '<p class="empty-state">Disciplines module not loaded. Check that disciplines.js is included.</p>';
+            disciplinesContent.innerHTML = '<p class="empty-state">Disciplines module not loaded.</p>';
         }
     }
     
+    // Auto-Groups
     var groupsContent = document.getElementById('groups-content');
     if (groupsContent) {
         if (typeof renderAutoGroupsView === 'function') {
             renderAutoGroupsView(groupsContent);
         } else {
-            groupsContent.innerHTML = '<p class="empty-state">Auto-Groups module not loaded. Check that groups.js is included.</p>';
+            groupsContent.innerHTML = '<p class="empty-state">Auto-Groups module not loaded.</p>';
         }
     }
     
+    // Class View
     var classViewContent = document.getElementById('class-view-content');
     if (classViewContent) {
         if (typeof renderClassView === 'function') {
             renderClassView(classViewContent);
         } else {
-            classViewContent.innerHTML = '<p class="empty-state">Class View module not loaded. Check that class-view.js is included.</p>';
+            classViewContent.innerHTML = '<p class="empty-state">Class View module not loaded.</p>';
         }
     }
     
+    // Instructor Calendar
     var instructorCalendarContent = document.getElementById('instructor-calendar-content');
     if (instructorCalendarContent) {
         if (typeof renderInstructorCalendar === 'function') {
@@ -97,6 +111,7 @@ function renderCurriculumView(container) {
         }
     }
     
+    // Student Schedule
     var scheduleContent = document.getElementById('schedule-content');
     if (scheduleContent) {
         if (typeof renderStudentScheduleView === 'function') {
@@ -108,26 +123,25 @@ function renderCurriculumView(container) {
         }
     }
     
+    // Grades
     var gradesContent = document.getElementById('grades-content');
     if (gradesContent) {
         if (typeof renderGradesView === 'function') {
             renderGradesView(gradesContent);
         } else {
-            gradesContent.innerHTML = '<p class="empty-state">Grades module not loaded. Check that grades.js is included.</p>';
+            gradesContent.innerHTML = '<p class="empty-state">Grades module not loaded.</p>';
         }
     }
     
+    // Ranking
     var rankingContent = document.getElementById('ranking-content');
     if (rankingContent) {
         if (typeof renderRankingView === 'function') {
             renderRankingView(rankingContent);
         } else {
-            rankingContent.innerHTML = '<p class="empty-state">Ranking module not loaded. Check that ranking.js is included.</p>';
+            rankingContent.innerHTML = '<p class="empty-state">Ranking module not loaded.</p>';
         }
     }
-    
-    // Initialize events
-    initCurriculumEvents();
 }
 
 /**
@@ -191,46 +205,57 @@ function initCurriculumTabs() {
             }
             
             // Refresh content when switching tabs
-            if (tabName === 'disciplines') {
-                var content = document.getElementById('disciplines-content');
-                if (content && typeof renderDisciplinesView === 'function') {
-                    renderDisciplinesView(content);
-                }
-            } else if (tabName === 'groups') {
-                var content = document.getElementById('groups-content');
-                if (content && typeof renderAutoGroupsView === 'function') {
-                    renderAutoGroupsView(content);
-                }
-            } else if (tabName === 'class-view') {
-                var content = document.getElementById('class-view-content');
-                if (content && typeof renderClassView === 'function') {
-                    renderClassView(content);
-                }
-            } else if (tabName === 'instructor-calendar') {
-                var content = document.getElementById('instructor-calendar-content');
-                if (content && typeof renderInstructorCalendar === 'function') {
-                    renderInstructorCalendar(content);
-                }
-            } else if (tabName === 'schedule') {
-                var content = document.getElementById('schedule-content');
-                if (content && typeof renderStudentScheduleView === 'function') {
-                    renderStudentScheduleView(content);
-                } else if (content && typeof renderScheduleView === 'function') {
-                    renderScheduleView(content);
-                }
-            } else if (tabName === 'grades') {
-                var content = document.getElementById('grades-content');
-                if (content && typeof renderGradesView === 'function') {
-                    renderGradesView(content);
-                }
-            } else if (tabName === 'ranking') {
-                var content = document.getElementById('ranking-content');
-                if (content && typeof renderRankingView === 'function') {
-                    renderRankingView(content);
-                }
-            }
+            refreshTabContent(tabName);
         });
     });
+}
+
+/**
+ * Refresh tab content
+ */
+function refreshTabContent(tabName) {
+    if (tabName === 'disciplines') {
+        var content = document.getElementById('disciplines-content');
+        if (content && typeof renderDisciplinesView === 'function') {
+            renderDisciplinesView(content);
+        }
+    } else if (tabName === 'groups') {
+        var content = document.getElementById('groups-content');
+        if (content && typeof renderAutoGroupsView === 'function') {
+            renderAutoGroupsView(content);
+        }
+    } else if (tabName === 'class-view') {
+        var content = document.getElementById('class-view-content');
+        if (content && typeof renderClassView === 'function') {
+            renderClassView(content);
+        }
+    } else if (tabName === 'instructor-calendar') {
+        var content = document.getElementById('instructor-calendar-content');
+        if (content && typeof renderInstructorCalendar === 'function') {
+            renderInstructorCalendar(content);
+        } else {
+            content.innerHTML = '<p class="empty-state">Instructor Calendar module not loaded. Check that instructor-calendar.js is included.</p>';
+        }
+    } else if (tabName === 'schedule') {
+        var content = document.getElementById('schedule-content');
+        if (content && typeof renderStudentScheduleView === 'function') {
+            renderStudentScheduleView(content);
+        } else if (content && typeof renderScheduleView === 'function') {
+            renderScheduleView(content);
+        } else {
+            content.innerHTML = '<p class="empty-state">Schedule module not loaded. Check that student-schedule.js is included.</p>';
+        }
+    } else if (tabName === 'grades') {
+        var content = document.getElementById('grades-content');
+        if (content && typeof renderGradesView === 'function') {
+            renderGradesView(content);
+        }
+    } else if (tabName === 'ranking') {
+        var content = document.getElementById('ranking-content');
+        if (content && typeof renderRankingView === 'function') {
+            renderRankingView(content);
+        }
+    }
 }
 
 /**
@@ -255,6 +280,11 @@ function initCurriculumEvents() {
     // Instructor Calendar
     if (typeof initInstructorCalendarEvents === 'function') {
         initInstructorCalendarEvents();
+    }
+    
+    // Student Schedule - use the student-schedule init
+    if (typeof initStudentScheduleEvents === 'function') {
+        initStudentScheduleEvents();
     }
     
     // Grades
@@ -334,8 +364,10 @@ function getInstructorTemplatesForWeek(instructorId, week) {
 
 // Make functions globally available
 window.renderCurriculumView = renderCurriculumView;
+window.renderAllCurriculumSections = renderAllCurriculumSections;
 window.initCurriculumTabs = initCurriculumTabs;
 window.initCurriculumEvents = initCurriculumEvents;
+window.refreshTabContent = refreshTabContent;
 window.populateStudentSelector = populateStudentSelector;
 window.getInstructorNames = getInstructorNames;
 window.getAllInstructorTemplatesForWeek = getAllInstructorTemplatesForWeek;
