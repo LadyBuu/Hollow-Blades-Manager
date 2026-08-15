@@ -1,6 +1,5 @@
 /**
  * tournaments-core.js - Core Tournament Management
- * Complete rework with streamlined round-based system
  */
 
 var tournamentState = {
@@ -39,9 +38,10 @@ function createTournament(tournData) {
         academicYear: tournData.academicYear || '',
         matchType: tournData.matchType || '1v1',
         rounds: parseInt(tournData.rounds) || 1,
+        roundSetup: tournData.roundSetup || 'auto',
         status: 'active',
-        participants: [], // Array of { id: string, type: 'team' or 'character' }
-        roundsData: [], // Array of round objects
+        participants: [],
+        roundsData: [],
         currentRound: 0,
         eliminations: [],
         winner: null,
@@ -53,20 +53,47 @@ function createTournament(tournData) {
 }
 
 /**
- * Delete a tournament
+ * Delete a tournament - FIXED
  */
 function deleteTournament(id) {
-    if (!confirm('Delete this tournament permanently?')) return false;
+    console.log('deleteTournament called with id:', id);
+    
+    if (!id) {
+        console.error('No tournament ID provided');
+        alert('Tournament ID not found.');
+        return false;
+    }
+    
     var tourn = getTournament(id);
-    if (!tourn) return false;
+    if (!tourn) {
+        console.error('Tournament not found:', id);
+        alert('Tournament not found.');
+        return false;
+    }
+    
+    if (!confirm('Delete "' + tourn.name + '" permanently?')) {
+        return false;
+    }
     
     var index = data.tournaments.indexOf(tourn);
     if (index !== -1) {
         data.tournaments.splice(index, 1);
-        saveData().catch(function(err) { console.error('Failed to save:', err); });
+        
         if (typeof logActivity === 'function') {
             logActivity('Deleted tournament: ' + tourn.name);
         }
+        
+        saveData().then(function() {
+            renderTournamentsList();
+            closeTournamentDetail();
+            if (typeof renderAll === 'function') {
+                renderAll();
+            }
+            alert('Tournament "' + tourn.name + '" deleted successfully.');
+        }).catch(function(err) {
+            console.error('Failed to save after deletion:', err);
+            alert('Failed to delete tournament.');
+        });
         return true;
     }
     return false;
@@ -158,6 +185,54 @@ function getTournamentWinnerDisplay(tourn) {
     }
 }
 
+/**
+ * Get characters in a team
+ */
+function getTeamCharacters(teamId) {
+    var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
+    if (!team || !team.members) return [];
+    
+    var characters = [];
+    team.members.forEach(function(member) {
+        var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
+        if (char) {
+            characters.push(char);
+        }
+    });
+    return characters;
+}
+
+/**
+ * Get characters in a tournament (for team mode)
+ */
+function getTournamentCharacters(tourn) {
+    if (!tourn || tourn.mode !== 'teams') return [];
+    
+    var characters = [];
+    var participantTeams = [];
+    
+    // Get all team participants
+    if (tourn.participants) {
+        tourn.participants.forEach(function(p) {
+            if (p.type === 'team') {
+                participantTeams.push(p.id);
+            }
+        });
+    }
+    
+    // Get characters from those teams
+    participantTeams.forEach(function(teamId) {
+        var teamChars = getTeamCharacters(teamId);
+        teamChars.forEach(function(c) {
+            if (!characters.some(function(existing) { return String(existing.id) === String(c.id); })) {
+                characters.push(c);
+            }
+        });
+    });
+    
+    return characters;
+}
+
 // Make functions globally available
 window.getTournament = getTournament;
 window.getTournaments = getTournaments;
@@ -169,4 +244,6 @@ window.getMatchTypeDisplay = getMatchTypeDisplay;
 window.getMatchParticipantCount = getMatchParticipantCount;
 window.getTournamentStatusColor = getTournamentStatusColor;
 window.getTournamentWinnerDisplay = getTournamentWinnerDisplay;
+window.getTeamCharacters = getTeamCharacters;
+window.getTournamentCharacters = getTournamentCharacters;
 window.tournamentState = tournamentState;
