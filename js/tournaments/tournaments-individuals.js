@@ -620,13 +620,28 @@ function showAddMatchToRoundModal(tournId, roundIndex) {
     
     var html = '<div style="margin-bottom:12px;">';
     html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select participants for the new match. Available: ' + availableParticipants.length + '</p>';
+    
+    // Show available participants with their status
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">';
     availableParticipants.forEach(function(id) {
         var name = getParticipantNameById(id);
         var status = getParticipantTournamentStatus(tourn, id);
         var suffix = '';
-        if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
-        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);">' + name + suffix + '</span>';
+        var color = 'var(--text)';
+        if (status.hasCompletedMatch && status.isWinner) {
+            suffix = ' \u2605 WON';
+            color = 'var(--accent)';
+        } else if (status.hasCompletedMatch && status.isLoser) {
+            suffix = ' \u274C LOST';
+            color = 'var(--danger)';
+        } else if (status.hasCompletedMatch) {
+            suffix = ' \u2B06\uFE0F ADVANCED';
+            color = 'var(--warning)';
+        } else {
+            suffix = ' (no match yet)';
+            color = 'var(--text-dim)';
+        }
+        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);color:' + color + ';">' + name + suffix + '</span>';
     });
     html += '</div>';
     html += '</div>';
@@ -685,9 +700,22 @@ function showAddMatchToRoundModal(tournId, roundIndex) {
                 var name = getParticipantNameById(id);
                 var status = getParticipantTournamentStatus(tourn, id);
                 var suffix = '';
-                if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
+                var color = 'var(--accent)';
+                if (status.hasCompletedMatch && status.isWinner) {
+                    suffix = ' \u2605 WON';
+                    color = 'var(--accent)';
+                } else if (status.hasCompletedMatch && status.isLoser) {
+                    suffix = ' \u274C LOST';
+                    color = 'var(--danger)';
+                } else if (status.hasCompletedMatch) {
+                    suffix = ' \u2B06\uFE0F ADVANCED';
+                    color = 'var(--warning)';
+                } else {
+                    suffix = ' (no match yet)';
+                    color = 'var(--text-dim)';
+                }
                 html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
-                html += '<span style="background:var(--accent-soft);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--accent);">' + name + suffix + '</span>';
+                html += '<span style="background:var(--accent-soft);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--accent);color:' + color + ';">' + name + suffix + '</span>';
                 html += '<button class="small danger remove-selected-participant" data-index="' + index + '" style="padding:0 4px;font-size:0.6rem;">\u2715</button>';
                 html += '</div>';
             });
@@ -747,8 +775,21 @@ function showAddMatchToRoundModal(tournId, roundIndex) {
                 var name = getParticipantNameById(id);
                 var status = getParticipantTournamentStatus(tourn, id);
                 var suffix = '';
-                if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
-                selectHtml += '<option value="' + id + '">' + name + suffix + '</option>';
+                var color = '';
+                if (status.hasCompletedMatch && status.isWinner) {
+                    suffix = ' \u2605 WON';
+                    color = 'color:var(--accent);';
+                } else if (status.hasCompletedMatch && status.isLoser) {
+                    suffix = ' \u274C LOST';
+                    color = 'color:var(--danger);';
+                } else if (status.hasCompletedMatch) {
+                    suffix = ' \u2B06\uFE0F ADVANCED';
+                    color = 'color:var(--warning);';
+                } else {
+                    suffix = ' (no match yet)';
+                    color = 'color:var(--text-dim);';
+                }
+                selectHtml += '<option value="' + id + '" style="' + color + '">' + name + suffix + '</option>';
             });
             selectHtml += '</select>';
             selectHtml += '<button id="confirm-add-participant" class="primary small" style="padding:2px 8px;">Add</button>';
@@ -956,6 +997,8 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
     html += '<span style="color:var(--text-dim);font-size:0.8rem;">Available participants: <strong id="available-count">' + availableParticipants.length + '</strong></span>';
     html += '<span style="color:var(--text-dim);font-size:0.8rem;">Matches created: <strong id="created-count">0</strong></span>';
     html += '</div>';
+    
+    // Show available participants with their status
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;" id="available-participants-display">';
     if (availableParticipants.length === 0) {
         html += '<span style="color:var(--text-dim);font-size:0.7rem;">No participants available</span>';
@@ -964,8 +1007,21 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
             var name = getParticipantNameById(id);
             var status = getParticipantTournamentStatus(tourn, id);
             var suffix = '';
-            if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
-            html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);" data-id="' + id + '">' + name + suffix + '</span>';
+            var color = 'var(--text)';
+            if (status.hasCompletedMatch && status.isWinner) {
+                suffix = ' \u2605 WON';
+                color = 'var(--accent)';
+            } else if (status.hasCompletedMatch && status.isLoser) {
+                suffix = ' \u274C LOST';
+                color = 'var(--danger)';
+            } else if (status.hasCompletedMatch) {
+                suffix = ' \u2B06\uFE0F ADVANCED';
+                color = 'var(--warning)';
+            } else {
+                suffix = ' (no match yet)';
+                color = 'var(--text-dim)';
+            }
+            html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);color:' + color + ';" data-id="' + id + '">' + name + suffix + '</span>';
         });
     }
     html += '</div>';
@@ -1038,8 +1094,21 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
             var name = getParticipantNameById(id);
             var status = getParticipantTournamentStatus(tourn, id);
             var suffix = '';
-            if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
-            html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);" data-id="' + id + '">' + name + suffix + '</span>';
+            var color = 'var(--text)';
+            if (status.hasCompletedMatch && status.isWinner) {
+                suffix = ' \u2605 WON';
+                color = 'var(--accent)';
+            } else if (status.hasCompletedMatch && status.isLoser) {
+                suffix = ' \u274C LOST';
+                color = 'var(--danger)';
+            } else if (status.hasCompletedMatch) {
+                suffix = ' \u2B06\uFE0F ADVANCED';
+                color = 'var(--warning)';
+            } else {
+                suffix = ' (no match yet)';
+                color = 'var(--text-dim)';
+            }
+            html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);color:' + color + ';" data-id="' + id + '">' + name + suffix + '</span>';
         });
         availDisplay.innerHTML = html;
         
@@ -1058,9 +1127,22 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
                 var name = getParticipantNameById(id);
                 var status = getParticipantTournamentStatus(tourn, id);
                 var suffix = '';
-                if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
+                var color = 'var(--accent)';
+                if (status.hasCompletedMatch && status.isWinner) {
+                    suffix = ' \u2605 WON';
+                    color = 'var(--accent)';
+                } else if (status.hasCompletedMatch && status.isLoser) {
+                    suffix = ' \u274C LOST';
+                    color = 'var(--danger)';
+                } else if (status.hasCompletedMatch) {
+                    suffix = ' \u2B06\uFE0F ADVANCED';
+                    color = 'var(--warning)';
+                } else {
+                    suffix = ' (no match yet)';
+                    color = 'var(--text-dim)';
+                }
                 html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
-                html += '<span style="background:var(--accent-soft);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--accent);">' + name + suffix + '</span>';
+                html += '<span style="background:var(--accent-soft);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--accent);color:' + color + ';">' + name + suffix + '</span>';
                 html += '<button class="small danger remove-selected-participant" data-index="' + index + '" style="padding:0 4px;font-size:0.6rem;">\u2715</button>';
                 html += '</div>';
             });
@@ -1167,8 +1249,21 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
                 var name = getParticipantNameById(id);
                 var status = getParticipantTournamentStatus(tourn, id);
                 var suffix = '';
-                if (status.hasCompletedMatch && !status.isLoser) suffix = ' \u2B06\uFE0F';
-                selectHtml += '<option value="' + id + '">' + name + suffix + '</option>';
+                var color = '';
+                if (status.hasCompletedMatch && status.isWinner) {
+                    suffix = ' \u2605 WON';
+                    color = 'color:var(--accent);';
+                } else if (status.hasCompletedMatch && status.isLoser) {
+                    suffix = ' \u274C LOST';
+                    color = 'color:var(--danger);';
+                } else if (status.hasCompletedMatch) {
+                    suffix = ' \u2B06\uFE0F ADVANCED';
+                    color = 'color:var(--warning);';
+                } else {
+                    suffix = ' (no match yet)';
+                    color = 'color:var(--text-dim);';
+                }
+                selectHtml += '<option value="' + id + '" style="' + color + '">' + name + suffix + '</option>';
             });
             selectHtml += '</select>';
             selectHtml += '<button id="confirm-add-participant" class="primary small" style="padding:2px 8px;">Add</button>';
