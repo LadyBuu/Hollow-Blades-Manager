@@ -40,10 +40,10 @@ function createTournament(tournData) {
         rounds: parseInt(tournData.rounds) || 1,
         roundSetup: tournData.roundSetup || 'auto',
         status: 'active',
-        participants: [],
+        participants: [], // Array of { id: string, type: 'team' or 'character' }
         roundsData: [],
         currentRound: 0,
-        eliminations: [],
+        eliminations: [], // Array of { participantId, round, type }
         winner: null,
         winners: [],
         createdAt: new Date().toISOString()
@@ -53,20 +53,16 @@ function createTournament(tournData) {
 }
 
 /**
- * Delete a tournament - FIXED
+ * Delete a tournament
  */
 function deleteTournament(id) {
-    console.log('deleteTournament called with id:', id);
-    
     if (!id) {
-        console.error('No tournament ID provided');
         alert('Tournament ID not found.');
         return false;
     }
     
     var tourn = getTournament(id);
     if (!tourn) {
-        console.error('Tournament not found:', id);
         alert('Tournament not found.');
         return false;
     }
@@ -75,7 +71,7 @@ function deleteTournament(id) {
         return false;
     }
     
-    var index = data.tournaments.indexOf(tourn);
+    var index = data.tournaments.findIndex(function(t) { return String(t.id) === String(id); });
     if (index !== -1) {
         data.tournaments.splice(index, 1);
         
@@ -89,10 +85,8 @@ function deleteTournament(id) {
             if (typeof renderAll === 'function') {
                 renderAll();
             }
-            alert('Tournament "' + tourn.name + '" deleted successfully.');
         }).catch(function(err) {
             console.error('Failed to save after deletion:', err);
-            alert('Failed to delete tournament.');
         });
         return true;
     }
@@ -133,9 +127,9 @@ function getParticipantType(id) {
  */
 function getMatchTypeDisplay(type) {
     var map = {
-        '1v1': '1v1 (2 players)',
-        '1v1v1': '1v1v1 (3 players)',
-        '1v1v1v1': '1v1v1v1 (4 players)',
+        '1v1': '1v1 (2)',
+        '1v1v1': '1v1v1 (3)',
+        '1v1v1v1': '1v1v1v1 (4)',
         'ffa': 'Free-for-All'
     };
     return map[type] || type || '1v1';
@@ -195,7 +189,7 @@ function getTeamCharacters(teamId) {
     var characters = [];
     team.members.forEach(function(member) {
         var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
-        if (char) {
+        if (char && !char.deceased) {
             characters.push(char);
         }
     });
@@ -203,34 +197,45 @@ function getTeamCharacters(teamId) {
 }
 
 /**
- * Get characters in a tournament (for team mode)
+ * Get all characters from all participating teams in a tournament
  */
 function getTournamentCharacters(tourn) {
     if (!tourn || tourn.mode !== 'teams') return [];
+    if (!tourn.participants) return [];
     
-    var characters = [];
-    var participantTeams = [];
+    var allChars = [];
+    var seenIds = {};
     
-    // Get all team participants
-    if (tourn.participants) {
-        tourn.participants.forEach(function(p) {
-            if (p.type === 'team') {
-                participantTeams.push(p.id);
-            }
-        });
-    }
-    
-    // Get characters from those teams
-    participantTeams.forEach(function(teamId) {
-        var teamChars = getTeamCharacters(teamId);
-        teamChars.forEach(function(c) {
-            if (!characters.some(function(existing) { return String(existing.id) === String(c.id); })) {
-                characters.push(c);
-            }
-        });
+    tourn.participants.forEach(function(p) {
+        if (p.type === 'team') {
+            var teamChars = getTeamCharacters(p.id);
+            teamChars.forEach(function(c) {
+                if (!seenIds[c.id]) {
+                    seenIds[c.id] = true;
+                    allChars.push(c);
+                }
+            });
+        }
     });
     
-    return characters;
+    return allChars;
+}
+
+/**
+ * Get tournament participants with their names
+ */
+function getTournamentParticipants(tourn) {
+    if (!tourn || !tourn.participants) return [];
+    
+    var result = [];
+    tourn.participants.forEach(function(p) {
+        result.push({
+            id: p.id,
+            name: getParticipantNameById(p.id),
+            type: p.type
+        });
+    });
+    return result;
 }
 
 // Make functions globally available
@@ -246,4 +251,5 @@ window.getTournamentStatusColor = getTournamentStatusColor;
 window.getTournamentWinnerDisplay = getTournamentWinnerDisplay;
 window.getTeamCharacters = getTeamCharacters;
 window.getTournamentCharacters = getTournamentCharacters;
+window.getTournamentParticipants = getTournamentParticipants;
 window.tournamentState = tournamentState;
