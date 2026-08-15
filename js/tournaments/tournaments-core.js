@@ -176,6 +176,96 @@ function determineTournamentWinner(tourn) {
     }
 }
 
+/**
+ * Show tournament form for add or edit
+ */
+function showTournamentForm(editId) {
+    var modal = document.getElementById('tournament-form-modal');
+    var title = document.getElementById('tournament-form-title');
+    var form = document.getElementById('tournament-form-inner');
+    
+    modal.classList.remove('hidden');
+    
+    if (editId) {
+        title.textContent = 'Edit Tournament';
+        var tourn = getTournament(editId);
+        if (tourn) {
+            document.getElementById('tournament-name').value = tourn.name || '';
+            document.getElementById('tournament-mode').value = tourn.mode || 'teams';
+            document.getElementById('tournament-start-week').value = tourn.startWeek || '1';
+            document.getElementById('tournament-end-week').value = tourn.endWeek || '4';
+            document.getElementById('tournament-year').value = tourn.academicYear || '';
+            form.dataset.editId = editId;
+        }
+    } else {
+        title.textContent = 'New Tournament';
+        form.reset();
+        document.getElementById('tournament-mode').value = 'teams';
+        document.getElementById('tournament-start-week').value = '1';
+        document.getElementById('tournament-end-week').value = '4';
+        delete form.dataset.editId;
+    }
+}
+
+/**
+ * Save tournament from form
+ */
+function saveTournament(e) {
+    e.preventDefault();
+    var form = e.target;
+    var editId = form.dataset.editId;
+    
+    var tournData = {
+        name: document.getElementById('tournament-name').value.trim(),
+        mode: document.getElementById('tournament-mode').value || 'teams',
+        startWeek: document.getElementById('tournament-start-week').value || '1',
+        endWeek: document.getElementById('tournament-end-week').value || '4',
+        academicYear: document.getElementById('tournament-year').value.trim(),
+        status: 'active'
+    };
+    
+    if (!tournData.name) { alert('Tournament name is required.'); return; }
+    if (parseInt(tournData.startWeek) > parseInt(tournData.endWeek)) {
+        alert('Start week must be before end week.');
+        return;
+    }
+    
+    if (editId) {
+        var index = data.tournaments.findIndex(function(t) { return String(t.id) === String(editId); });
+        if (index !== -1) {
+            var existing = data.tournaments[index];
+            data.tournaments[index] = Object.assign({}, existing, tournData);
+            if (typeof logActivity === 'function') {
+                logActivity('Updated tournament: ' + tournData.name);
+            }
+        }
+    } else {
+        var newTourn = createTournament(tournData);
+        if (typeof logActivity === 'function') {
+            logActivity('Created tournament: ' + tournData.name + ' (' + tournData.mode + ')');
+        }
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    closeTournamentForm();
+    renderTournamentsList();
+}
+
+/**
+ * Close tournament form
+ */
+function closeTournamentForm() {
+    document.getElementById('tournament-form-modal').classList.add('hidden');
+}
+
+/**
+ * Close tournament detail
+ */
+function closeTournamentDetail() {
+    document.getElementById('tournament-detail-modal').classList.add('hidden');
+    tournamentState.currentTournamentId = null;
+}
+
 // Make functions globally available
 window.getTournament = getTournament;
 window.getTournaments = getTournaments;
@@ -187,4 +277,8 @@ window.getParticipantType = getParticipantType;
 window.getTournamentWinnerDisplay = getTournamentWinnerDisplay;
 window.getTournamentStatusColor = getTournamentStatusColor;
 window.determineTournamentWinner = determineTournamentWinner;
+window.showTournamentForm = showTournamentForm;
+window.saveTournament = saveTournament;
+window.closeTournamentForm = closeTournamentForm;
+window.closeTournamentDetail = closeTournamentDetail;
 window.tournamentState = tournamentState;
