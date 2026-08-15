@@ -185,8 +185,8 @@ function renderStudentScheduleView(container) {
         <div class="page-header">
             <h2>Student Schedule</h2>
             <div class="header-actions">
-                <button id="duplicate-schedule-btn" class="primary small">▣ Duplicate to Specific Week</button>
-                <button id="clear-schedule-btn" class="danger small">✕ Clear Week</button>
+                <button id="duplicate-schedule-btn" class="primary small">\u25A3 Duplicate to Specific Week</button>
+                <button id="clear-schedule-btn" class="danger small">\u2715 Clear Week</button>
             </div>
         </div>
 
@@ -194,13 +194,13 @@ function renderStudentScheduleView(container) {
             <div class="student-selector">
                 <label for="schedule-student">Student:</label>
                 <select id="schedule-student">
-                    <option value="">Select a student...</option>
+                    <option value="">Select a trainee...</option>
                 </select>
             </div>
             <div class="week-nav">
-                <button id="prev-schedule-week" class="small">← Prev</button>
+                <button id="prev-schedule-week" class="small">\u2190 Prev</button>
                 <span id="schedule-week-display" style="font-weight:600;min-width:80px;text-align:center;">Week 1</span>
-                <button id="next-schedule-week" class="small">Next →</button>
+                <button id="next-schedule-week" class="small">Next \u2192</button>
                 <button id="goto-schedule-week" class="small primary">Go to Week</button>
             </div>
         </div>
@@ -279,47 +279,44 @@ function renderStudentScheduleView(container) {
 }
 
 /**
- * Populate student selector with ALL characters - FIXED
+ * Populate student selector with TRAINEES only
  */
 function populateStudentSelector() {
     var select = document.getElementById('schedule-student');
     if (!select) return;
     
-    // Get ALL non-deceased characters (not just students)
-    var allChars = data.characters ? data.characters.filter(function(c) { return !c.deceased; }) : [];
+    // Get only trainees
+    var trainees = data.characters ? data.characters.filter(function(c) {
+        if (c.deceased) return false;
+        var status = getCurrentStatus(c).toLowerCase();
+        return status === 'trainee';
+    }) : [];
     
     // Sort by name
-    allChars.sort(function(a, b) {
+    trainees.sort(function(a, b) {
         var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         return nameA.localeCompare(nameB);
     });
     
-    select.innerHTML = '<option value="">Select a character...</option>';
+    select.innerHTML = '<option value="">Select a trainee...</option>';
     
-    if (allChars.length === 0) {
-        select.innerHTML += '<option value="" disabled>No characters found. Create a character first.</option>';
+    if (trainees.length === 0) {
+        select.innerHTML += '<option value="" disabled>No trainees found. Create a trainee character first.</option>';
         return;
     }
     
-    // Get students separately for labeling
-    var students = getStudents();
-    var studentIds = students.map(function(s) { return s.id; });
-    
-    allChars.forEach(function(c) {
+    trainees.forEach(function(c) {
         var name = [c.firstName, c.middleName, c.lastName].filter(function(n) { return n; }).join(' ');
         var option = document.createElement('option');
         option.value = c.id;
-        
         var status = getCurrentStatus(c);
-        var isStudent = studentIds.indexOf(c.id) !== -1;
-        var label = isStudent ? '📚 ' : '👤 ';
-        option.textContent = label + name + ' (' + status + ')';
+        option.textContent = name + ' (' + status + ')';
         select.appendChild(option);
     });
     
-    // Auto-select first character if available
-    if (select.options.length > 1) {
+    // Auto-select first trainee if available and no selection
+    if (select.options.length > 1 && !studentScheduleState.selectedStudentId) {
         select.selectedIndex = 1;
         studentScheduleState.selectedStudentId = select.value;
         renderStudentSchedule();
@@ -416,7 +413,7 @@ function renderStudentSchedule() {
         dayColumns.forEach(function(col) {
             var slots = col.querySelector('.day-slots');
             if (slots) {
-                slots.innerHTML = '<div class="empty-state" style="padding:20px;text-align:center;">Select a student</div>';
+                slots.innerHTML = '<div class="empty-state" style="padding:20px;text-align:center;">Select a trainee</div>';
             }
         });
         updateSidebarEmpty();
@@ -451,7 +448,7 @@ function renderStudentSchedule() {
             restMsg.className = 'empty-state';
             restMsg.style.padding = '20px';
             restMsg.style.textAlign = 'center';
-            restMsg.textContent = '🛑 Rest Day';
+            restMsg.textContent = '\uD83D\uDED1 Rest Day';
             slots.appendChild(restMsg);
             if (schedule[day]) {
                 delete schedule[day];
@@ -561,7 +558,7 @@ function renderStudentSchedule() {
                     slot.classList.add('empty');
                     var labelEl = document.createElement('span');
                     labelEl.className = 'slot-label';
-                    labelEl.textContent = '❓';
+                    labelEl.textContent = '?';
                     slot.appendChild(labelEl);
                     occupiedHours[hour] = true;
                 }
@@ -751,11 +748,11 @@ function updateScheduleSidebar() {
 function updateSidebarEmpty() {
     var overview = document.getElementById('schedule-overview');
     if (overview) {
-        overview.innerHTML = '<p class="empty-state">Select a student</p>';
+        overview.innerHTML = '<p class="empty-state">Select a trainee</p>';
     }
     var availContainer = document.getElementById('schedule-available');
     if (availContainer) {
-        availContainer.innerHTML = '<p class="empty-state">Select a student</p>';
+        availContainer.innerHTML = '<p class="empty-state">Select a trainee</p>';
     }
     var usedEl = document.getElementById('schedule-hours-used');
     var totalEl = document.getElementById('schedule-hours-total');
@@ -768,7 +765,7 @@ function updateSidebarEmpty() {
  */
 function showDuplicateModal() {
     if (!studentScheduleState.selectedStudentId) {
-        alert('Please select a student first.');
+        alert('Please select a trainee first.');
         return;
     }
     
@@ -833,7 +830,7 @@ function showDuplicateModal() {
  */
 function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
     if (!studentScheduleState.selectedStudentId) {
-        alert('Please select a student first.');
+        alert('Please select a trainee first.');
         return;
     }
     
@@ -917,7 +914,7 @@ function duplicateScheduleToWeek(sourceWeek, targetWeek, overwrite) {
  */
 function clearSchedule() {
     if (!studentScheduleState.selectedStudentId) {
-        alert('Please select a student first.');
+        alert('Please select a trainee first.');
         return;
     }
     
@@ -970,7 +967,7 @@ function clearSchedule() {
  */
 function saveRestDays() {
     if (!studentScheduleState.selectedStudentId) {
-        alert('Please select a student first.');
+        alert('Please select a trainee first.');
         return;
     }
     
@@ -1224,7 +1221,7 @@ function showScheduleClassDetails(studentId, disciplineId, week, day, hour) {
                 <div class="detail-row"><span class="label">Week:</span> <span>${week}</span></div>
                 
                 <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button type="button" id="remove-class-detail" class="danger small">✕ Remove from Schedule</button>
+                    <button type="button" id="remove-class-detail" class="danger small">\u2715 Remove from Schedule</button>
                     <button type="button" id="close-detail" class="secondary small">Close</button>
                 </div>
             </div>
