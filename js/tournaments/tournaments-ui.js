@@ -142,23 +142,6 @@ function renderTournamentsView(container) {
                 </div>
             </div>
         </div>
-
-        <!-- Eliminate Character Modal -->
-        <div id="eliminate-modal" class="modal hidden">
-            <div class="modal-content" style="max-width:450px;">
-                <div class="modal-header">
-                    <h3 id="eliminate-modal-title">Eliminate Character</h3>
-                    <button class="close-modal" id="close-eliminate-modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div id="eliminate-content"></div>
-                    <div class="form-actions" style="margin-top:16px;">
-                        <button type="button" id="cancel-eliminate" class="secondary">Cancel</button>
-                        <button type="button" id="confirm-eliminate" class="danger">Eliminate</button>
-                    </div>
-                </div>
-            </div>
-        </div>
     `;
 
     renderTournamentsList();
@@ -275,7 +258,6 @@ function saveTournament(e) {
     if (editId) {
         var index = data.tournaments.findIndex(function(t) { return String(t.id) === String(editId); });
         if (index !== -1) {
-            // Preserve existing data
             var existing = data.tournaments[index];
             data.tournaments[index] = Object.assign({}, existing, tournData);
             if (typeof logActivity === 'function') {
@@ -535,8 +517,9 @@ function renderParticipantsTab(tourn) {
                     }
                 });
             }
-            html += '<span style="background:var(--panel-alt);padding:4px 10px;border-radius:12px;font-size:0.75rem;border:1px solid ' + (isEliminated ? 'var(--danger)' : 'var(--border)') + ';">';
-            html += p.name + (isEliminated ? ' \u274C' : '');
+            var isWinner = tourn.winner && String(tourn.winner) === String(p.id);
+            html += '<span style="background:var(--panel-alt);padding:4px 10px;border-radius:12px;font-size:0.75rem;border:1px solid ' + (isWinner ? 'var(--accent)' : isEliminated ? 'var(--danger)' : 'var(--border)') + ';">';
+            html += p.name + (isWinner ? ' \u2605' : '') + (isEliminated ? ' \u274C' : '');
             html += ' <button class="remove-participant-btn small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;" data-id="' + p.id + '">\u2715</button>';
             html += '</span>';
         });
@@ -626,11 +609,6 @@ function renderRoundsTab(tourn) {
         if (!isCompleted && isManual) {
             html += '<button class="small primary add-match-btn" data-round="' + roundIndex + '">+ Match</button>';
         }
-        // Eliminate button - always show if there are participants
-        var hasParticipants = tourn.participants && tourn.participants.length > 0;
-        if (hasParticipants) {
-            html += '<button class="small danger eliminate-btn" data-round="' + roundIndex + '">\u274C</button>';
-        }
         if (!isCompleted) {
             html += '<button class="small primary complete-round-btn" data-round="' + roundIndex + '">Complete</button>';
         }
@@ -659,32 +637,39 @@ function renderRoundsTab(tourn) {
                     });
                 }
                 
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--bg);border-radius:4px;margin-bottom:4px;border-left:3px solid ' + statusColor + ';flex-wrap:wrap;gap:4px;">';
-                html += '<span style="font-size:0.7rem;word-break:break-word;max-width:100%;">M' + (matchIndex + 1) + ': <strong>' + participantNames.join(' vs ') + '</strong></span>';
-                html += '<div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 10px;background:var(--bg);border-radius:4px;margin-bottom:4px;border-left:3px solid ' + statusColor + ';flex-wrap:wrap;gap:4px;">';
+                html += '<div style="font-size:0.75rem;word-break:break-word;min-width:120px;flex:1;">';
+                html += '<strong>Match ' + (matchIndex + 1) + ':</strong> ' + participantNames.join(' vs ');
+                html += '</div>';
+                html += '<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;">';
+                
                 if (matchStatus !== 'completed') {
-                    // Winner buttons
+                    // Winner buttons - shown clearly
+                    html += '<span style="font-size:0.6rem;color:var(--accent);font-weight:600;margin-right:2px;">Winner:</span>';
                     participantIds.forEach(function(id) {
                         var name = getParticipantNameById(id);
                         var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
-                        html += '<button class="small set-winner-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="font-size:0.55rem;padding:1px 5px;' + 
-                            (isWinner ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + name.substring(0, 8) + 
+                        html += '<button class="small set-winner-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="font-size:0.6rem;padding:2px 8px;' + 
+                            (isWinner ? 'border-color:var(--accent);color:var(--accent);background:var(--accent-soft);' : '') + '">' + name + 
                             (isWinner ? ' \u2713' : '') + '</button>';
                     });
-                    // Loser buttons
+                    
+                    // Loser buttons - shown clearly
+                    html += '<span style="font-size:0.6rem;color:var(--danger);font-weight:600;margin-left:4px;margin-right:2px;">Loser:</span>';
                     participantIds.forEach(function(id) {
                         var name = getParticipantNameById(id);
                         var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
                         if (!isLoser) {
-                            html += '<button class="small set-loser-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="font-size:0.55rem;padding:1px 5px;' + 
-                                (isLoser ? 'border-color:var(--danger);color:var(--danger);' : '') + '">' + name.substring(0, 8) + 
+                            html += '<button class="small set-loser-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="font-size:0.6rem;padding:2px 8px;' + 
+                                (isLoser ? 'border-color:var(--danger);color:var(--danger);background:var(--danger-soft);' : '') + '">' + name + 
                                 (isLoser ? ' \u2715' : '') + '</button>';
                         }
                     });
-                    html += '<button class="small primary complete-match-btn" style="font-size:0.55rem;padding:1px 5px;" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Done</button>';
+                    
+                    html += '<button class="small primary complete-match-btn" style="font-size:0.6rem;padding:2px 8px;" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Complete</button>';
                 } else {
-                    html += '<span style="font-size:0.6rem;color:' + statusColor + ';">\u2713</span>';
-                    html += '<button class="small warning-btn reset-match-btn" style="font-size:0.55rem;padding:1px 5px;" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u21BB</button>';
+                    html += '<span style="font-size:0.7rem;color:' + statusColor + ';font-weight:600;">\u2713 Completed</span>';
+                    html += '<button class="small warning-btn reset-match-btn" style="font-size:0.6rem;padding:2px 8px;" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u21BB Reset</button>';
                 }
                 html += '</div>';
                 html += '</div>';
@@ -800,14 +785,6 @@ function attachRoundEvents(tourn) {
             tourn.roundsData.splice(roundIndex, 1);
             saveData().catch(function(err) { console.error('Failed to save:', err); });
             viewTournament(tourn.id);
-        });
-    });
-    
-    // Eliminate button
-    document.querySelectorAll('.eliminate-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var roundIndex = parseInt(this.dataset.round);
-            showEliminateModal(tourn.id, roundIndex);
         });
     });
 }
@@ -930,112 +907,6 @@ function showManualMatchModal(tournId, roundIndex) {
         modal.classList.add('hidden');
         saveData().catch(function(err) { console.error('Failed to save:', err); });
         viewTournament(tournId);
-    };
-}
-
-function showEliminateModal(tournId, roundIndex) {
-    var tourn = getTournament(tournId);
-    if (!tourn) return;
-    
-    var modal = document.getElementById('eliminate-modal');
-    document.getElementById('eliminate-modal-title').textContent = 'Eliminate Character';
-    
-    var content = document.getElementById('eliminate-content');
-    
-    // Get all characters from the tournament (for team mode, get from participating teams)
-    var allCharacters = [];
-    var alreadyEliminated = (tourn.eliminations || []).map(function(e) { return e.participantId; });
-    
-    if (tourn.mode === 'teams') {
-        // Get characters from all participating teams
-        var tournamentChars = getTournamentCharacters(tourn);
-        tournamentChars.forEach(function(c) {
-            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
-            var isEliminated = alreadyEliminated.some(function(id) { return String(id) === String(c.id); });
-            if (!isEliminated) {
-                allCharacters.push({ id: c.id, name: name + ' (' + getCurrentStatus(c) + ')' });
-            }
-        });
-    } else {
-        // Individual mode - get participants who are not eliminated
-        var participants = tourn.participants || [];
-        participants.forEach(function(p) {
-            var isEliminated = alreadyEliminated.some(function(id) { return String(id) === String(p.id); });
-            if (!isEliminated) {
-                var name = getParticipantNameById(p.id);
-                allCharacters.push({ id: p.id, name: name });
-            }
-        });
-    }
-    
-    allCharacters.sort(function(a, b) { return a.name.localeCompare(b.name); });
-    
-    if (allCharacters.length === 0) {
-        content.innerHTML = '<p class="empty-state">No characters available to eliminate.</p>';
-        document.getElementById('confirm-eliminate').style.display = 'none';
-        modal.classList.remove('hidden');
-        return;
-    }
-    
-    var html = '<div style="margin-bottom:12px;">';
-    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select a character to eliminate.</p>';
-    html += '<select id="eliminate-select" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:0.8rem;">';
-    html += '<option value="">Select character...</option>';
-    allCharacters.forEach(function(c) {
-        html += '<option value="' + c.id + '">' + c.name + '</option>';
-    });
-    html += '</select>';
-    html += '<div style="margin-top:8px;font-size:0.7rem;color:var(--text-dim);">';
-    html += 'Eliminated characters cannot participate in future rounds.';
-    html += '</div>';
-    html += '</div>';
-    
-    content.innerHTML = html;
-    document.getElementById('confirm-eliminate').style.display = 'inline-block';
-    
-    modal.dataset.tournId = tournId;
-    modal.dataset.roundIndex = roundIndex || 0;
-    modal.classList.remove('hidden');
-    
-    document.getElementById('close-eliminate-modal').onclick = function() { modal.classList.add('hidden'); };
-    document.getElementById('cancel-eliminate').onclick = function() { modal.classList.add('hidden'); };
-    modal.onclick = function(e) { if (e.target === this) modal.classList.add('hidden'); };
-    
-    document.getElementById('confirm-eliminate').onclick = function() {
-        var select = document.getElementById('eliminate-select');
-        var charId = select.value;
-        if (!charId) {
-            alert('Please select a character.');
-            return;
-        }
-        
-        var name = getParticipantNameById(charId);
-        if (!confirm('Eliminate "' + name + '" from the tournament?')) return;
-        
-        if (!tourn.eliminations) tourn.eliminations = [];
-        tourn.eliminations.push({
-            participantId: charId,
-            round: parseInt(modal.dataset.roundIndex) || 0,
-            type: 'manual'
-        });
-        
-        // Also mark the character as eliminated in their data
-        var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
-        if (char) {
-            if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
-            var weekNum = tourn.startWeek || 1;
-            if (char.eliminatedWeeks.indexOf(weekNum) === -1) {
-                char.eliminatedWeeks.push(weekNum);
-            }
-        }
-        
-        modal.classList.add('hidden');
-        saveData().catch(function(err) { console.error('Failed to save:', err); });
-        viewTournament(tournId);
-        
-        if (typeof logActivity === 'function') {
-            logActivity('Eliminated ' + name + ' from ' + tourn.name);
-        }
     };
 }
 
@@ -1304,16 +1175,67 @@ function renderEliminationsTab(tourn) {
     var container = document.getElementById('eliminations-content');
     if (!container) return;
     
-    var html = '<div style="margin-bottom:12px;">';
-    html += '<h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Eliminated</h4>';
+    var isTeams = tourn.mode === 'teams';
+    var html = '';
     
+    // Elimination form - DROPDOWN to eliminate individual characters
+    html += '<div style="margin-bottom:16px;padding:12px;background:var(--panel-alt);border-radius:6px;border:1px solid var(--border);">';
+    html += '<h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Eliminate Individual Character</h4>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+    html += '<select id="eliminate-char-select" style="flex:1;min-width:150px;padding:6px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;">';
+    html += '<option value="">Select character to eliminate...</option>';
+    
+    // Get all characters from the tournament
+    var allCharacters = [];
+    var alreadyEliminated = (tourn.eliminations || []).map(function(e) { return e.participantId; });
+    
+    if (isTeams) {
+        var tournamentChars = getTournamentCharacters(tourn);
+        tournamentChars.forEach(function(c) {
+            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
+            var isEliminated = alreadyEliminated.some(function(id) { return String(id) === String(c.id); });
+            if (!isEliminated) {
+                allCharacters.push({ id: c.id, name: name + ' (' + getCurrentStatus(c) + ')' });
+            }
+        });
+    } else {
+        var participants = tourn.participants || [];
+        participants.forEach(function(p) {
+            var isEliminated = alreadyEliminated.some(function(id) { return String(id) === String(p.id); });
+            if (!isEliminated) {
+                var name = getParticipantNameById(p.id);
+                allCharacters.push({ id: p.id, name: name });
+            }
+        });
+    }
+    
+    allCharacters.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    
+    if (allCharacters.length === 0) {
+        html += '<option value="" disabled>No characters available to eliminate</option>';
+    } else {
+        allCharacters.forEach(function(c) {
+            html += '<option value="' + c.id + '">' + c.name + '</option>';
+        });
+    }
+    
+    html += '</select>';
+    html += '<button id="eliminate-char-btn" class="danger small">Eliminate</button>';
+    html += '</div>';
+    html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">';
+    html += 'Eliminated characters cannot participate in future rounds.';
+    html += '</div>';
+    html += '</div>';
+    
+    // List of already eliminated
+    html += '<div><h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Already Eliminated</h4>';
     if (!tourn.eliminations || tourn.eliminations.length === 0) {
         html += '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations.</p>';
     } else {
         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
         tourn.eliminations.forEach(function(elim) {
             var name = getParticipantNameById(elim.participantId);
-            var typeLabel = elim.type === 'manual' ? ' (Manual)' : ' (Lost)';
+            var typeLabel = elim.type === 'manual' ? ' (Manual)' : ' (Lost Match)';
             html += '<span style="background:var(--danger-soft);padding:4px 10px;border-radius:12px;font-size:0.75rem;border:1px solid var(--danger);">';
             html += name + ' \u274C' + typeLabel;
             if (elim.round !== undefined && elim.round !== null) {
@@ -1327,6 +1249,43 @@ function renderEliminationsTab(tourn) {
     html += '</div>';
     
     container.innerHTML = html;
+    
+    // Event listeners
+    document.getElementById('eliminate-char-btn')?.addEventListener('click', function() {
+        var select = document.getElementById('eliminate-char-select');
+        var charId = select.value;
+        if (!charId) {
+            alert('Please select a character.');
+            return;
+        }
+        
+        var name = getParticipantNameById(charId);
+        if (!confirm('Eliminate "' + name + '" from the tournament?')) return;
+        
+        if (!tourn.eliminations) tourn.eliminations = [];
+        tourn.eliminations.push({
+            participantId: charId,
+            round: tourn.currentRound || 0,
+            type: 'manual'
+        });
+        
+        // Also mark the character as eliminated in their data
+        var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+        if (char) {
+            if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+            var weekNum = tourn.startWeek || 1;
+            if (char.eliminatedWeeks.indexOf(weekNum) === -1) {
+                char.eliminatedWeeks.push(weekNum);
+            }
+        }
+        
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+        viewTournament(tourn.id);
+        
+        if (typeof logActivity === 'function') {
+            logActivity('Eliminated ' + name + ' from ' + tourn.name);
+        }
+    });
     
     container.querySelectorAll('.remove-elimination-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -1369,7 +1328,6 @@ window.toggleMatchWinner = toggleMatchWinner;
 window.toggleMatchLoser = toggleMatchLoser;
 window.addManualRound = addManualRound;
 window.showManualMatchModal = showManualMatchModal;
-window.showEliminateModal = showEliminateModal;
 window.determineTournamentWinner = determineTournamentWinner;
 window.initTournamentEvents = initTournamentEvents;
 window.deleteTournament = deleteTournament;
