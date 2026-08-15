@@ -26,7 +26,29 @@ function getStudentsInClassSlot(week, day, hour) {
  * Get the instructor for a specific slot
  */
 function getSlotInstructor(disciplineId, week, day, hour) {
-    // Check instructor templates
+    // First, check classInstructors (actual assignments)
+    if (data.curriculum.classInstructors) {
+        for (var key in data.curriculum.classInstructors) {
+            var parts = key.split('_');
+            if (parts.length === 4) {
+                var w = parseInt(parts[1]);
+                var d = parseInt(parts[2]);
+                var h = parseInt(parts[3]);
+                if (w === week && d === day && h === hour) {
+                    var studentId = parts[0];
+                    var schedule = getStudentSchedule(studentId, week);
+                    if (schedule[day] && schedule[day][hour]) {
+                        var discId = schedule[day][hour];
+                        if (String(discId) === String(disciplineId)) {
+                            return data.curriculum.classInstructors[key];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Fallback: check instructor templates
     if (data.curriculum.instructorTemplates) {
         for (var instructorId in data.curriculum.instructorTemplates) {
             var templateKey = instructorId + '_' + week;
@@ -99,41 +121,31 @@ function isStudentInAutoGroup(studentId, disciplineId) {
 }
 
 /**
- * Get all slots for a group (from instructor templates)
- * This scans all instructor templates to find slots for this discipline
+ * Get the instructor name for a group
  */
-function getSlotsForGroup(disciplineId, instructorId) {
-    var slots = [];
-    if (!data.curriculum.instructorTemplates) return slots;
-    
-    // Check all weeks for this instructor
-    for (var weekKey in data.curriculum.instructorTemplates) {
-        var parts = weekKey.split('_');
-        if (parts[0] === instructorId) {
-            var weekNum = parseInt(parts[1]);
-            if (!isNaN(weekNum)) {
-                var template = data.curriculum.instructorTemplates[weekKey];
-                for (var slotKey in template) {
-                    var slotData = template[slotKey];
-                    if (String(slotData.disciplineId) === String(disciplineId)) {
-                        var slotParts = slotKey.split('_');
-                        var day = parseInt(slotParts[0]);
-                        var hour = parseInt(slotParts[1]);
-                        slots.push({
-                            week: weekNum,
-                            day: day,
-                            hour: hour,
-                            duration: slotData.duration || 1,
-                            label: slotData.label || '',
-                            groupLabel: slotData.groupLabel || ''
-                        });
-                    }
-                }
+function getGroupInstructor(group) {
+    // Try to find instructor from the first slot
+    if (group.slots && group.slots.length > 0) {
+        var slot = group.slots[0];
+        var instructorId = getSlotInstructor(group.disciplineId, slot.week, slot.day, slot.hour);
+        if (instructorId) {
+            var instructor = data.characters.find(function(c) { return String(c.id) === String(instructorId); });
+            if (instructor) {
+                return instructor;
             }
         }
     }
     
-    return slots;
+    // If no instructor found from slots, try to find from the discipline
+    var discipline = getDiscipline(group.disciplineId);
+    if (discipline && discipline.instructorIds && discipline.instructorIds.length > 0) {
+        var instructor = data.characters.find(function(c) { return String(c.id) === String(discipline.instructorIds[0]); });
+        if (instructor) {
+            return instructor;
+        }
+    }
+    
+    return null;
 }
 
 /**
@@ -143,18 +155,7 @@ function updateGroupDisplayName(group) {
     var discipline = getDiscipline(group.disciplineId);
     var disciplineName = discipline ? discipline.name : 'Unknown';
     
-    var instructor = data.characters.find(function(c) { 
-        // Find instructor from the first slot if available
-        if (group.slots && group.slots.length > 0) {
-            var slot = group.slots[0];
-            var instructorId = getSlotInstructor(group.disciplineId, slot.week, slot.day, slot.hour);
-            if (instructorId) {
-                return String(c.id) === String(instructorId);
-            }
-        }
-        return false;
-    });
-    
+    var instructor = getGroupInstructor(group);
     var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
     var shortInstructor = instructorName;
     if (instructor) {
@@ -184,8 +185,6 @@ function updateGroupDisplayName(group) {
  * Add a slot to a group and update display name
  */
 function addSlotToGroup(group, week, day, hour, duration, label) {
-    var slotKey = week + '_' + day + '_' + hour;
-    
     // Check if slot already exists
     var exists = false;
     for (var i = 0; i < group.slots.length; i++) {
@@ -264,13 +263,11 @@ function getOrCreateGroupForStudent(disciplineId, studentId, week, day, hour, in
     // First check if a group with these exact students exists
     if (allGroups[newKey]) {
         var group = allGroups[newKey];
-        // Add this slot to the group
         addSlotToGroup(group, week, day, hour);
         return group;
     }
     
     // Check if a group exists with a subset of these students
-    // (Student is joining an existing group)
     for (var key in allGroups) {
         var group = allGroups[key];
         if (group.disciplineId === disciplineId) {
@@ -283,8 +280,6 @@ function getOrCreateGroupForStudent(disciplineId, studentId, week, day, hour, in
                 }
             }
             if (isSubset && existingStudents.length > 0) {
-                // Student is joining this group
-                // Add the new student to the group
                 if (group.students.indexOf(studentId) === -1) {
                     group.students.push(studentId);
                     group.students.sort();
@@ -302,52 +297,18 @@ function getOrCreateGroupForStudent(disciplineId, studentId, week, day, hour, in
 }
 
 /**
- * Add a class to a student's schedule
- */
-function addClassToStudent(studentId, disciplineId, week, day, hour, duration, instructorId) {
-    var schedule = getStudentSchedule(studentId, week);
-    var dur = duration || 1;
-    
-    // Check for conflicts
-    for (var h = hour; h < hour + dur && h <= 23; h++) {
-        if (schedule[day] && schedule[day][h]) {
-            var conflictId = schedule[day][h];
-            var conflictDisc = getDiscipline(conflictId);
-            return {
-                success: false,
-                message: 'Student has a conflict at ' + h + ':00' + (conflictDisc ? ' (' + conflictDisc.name + ')' : '')
-            };
-        }
-    }
-    
-    // Add the class
-    for (var h = hour; h < hour + dur && h <= 23; h++) {
-        if (!schedule[day]) schedule[day] = {};
-        schedule[day][h] = disciplineId;
-        if (instructorId) {
-            setClassInstructor(studentId, week, day, h, instructorId);
-        }
-        if (h === hour) {
-            setClassDuration(studentId, week, day, h, dur);
-        }
-        // Set group label on the class
-        setClassGroupLabel(studentId, week, day, h, 'auto-group');
-    }
-    
-    return { success: true, message: 'Class added successfully.' };
-}
-
-/**
  * Rebuild groups from existing schedules
  */
 function rebuildGroupsFromSchedules() {
+    if (!data.curriculum.autoGroups) {
+        data.curriculum.autoGroups = {};
+    }
+    
     // Clear existing auto-groups
     data.curriculum.autoGroups = {};
     
     var students = getStudents();
-    var groupsMap = {};
     
-    // For each student, check their schedule
     students.forEach(function(student) {
         var studentId = student.id;
         var schedule = data.curriculum.schedules[studentId];
@@ -375,11 +336,7 @@ function rebuildGroupsFromSchedules() {
                     var studentsInSlot = getStudentsInClassSlot(weekNum, dayNum, hourNum);
                     
                     // Create or get group for these students
-                    var group = getOrCreateGroupForStudent(disciplineId, studentId, weekNum, dayNum, hourNum, instructorId);
-                    
-                    // Store the group key for this student+discipline
-                    var key = studentId + '_' + disciplineId;
-                    groupsMap[key] = group.id;
+                    getOrCreateGroupForStudent(disciplineId, studentId, weekNum, dayNum, hourNum, instructorId);
                 }
             }
         }
@@ -422,7 +379,7 @@ function renderAutoGroups() {
     var container = document.getElementById('auto-groups-container');
     if (!container) return;
     
-    // Rebuild groups from existing schedules first
+    // Rebuild groups from existing schedules
     rebuildGroupsFromSchedules();
     
     var allGroups = getAllAutoGroups();
@@ -437,7 +394,6 @@ function renderAutoGroups() {
     
     var html = '<div style="display:flex;flex-direction:column;gap:12px;">';
     
-    // Sort groups by display name
     groupKeys.sort(function(a, b) {
         return (allGroups[a].displayName || a).localeCompare(allGroups[b].displayName || b);
     });
@@ -445,17 +401,9 @@ function renderAutoGroups() {
     groupKeys.forEach(function(key) {
         var group = allGroups[key];
         var discipline = getDiscipline(group.disciplineId);
-        var instructor = data.characters.find(function(c) { 
-            // Find instructor from the first slot
-            if (group.slots && group.slots.length > 0) {
-                var slot = group.slots[0];
-                var instructorId = getSlotInstructor(group.disciplineId, slot.week, slot.day, slot.hour);
-                if (instructorId) {
-                    return String(c.id) === String(instructorId);
-                }
-            }
-            return false;
-        });
+        
+        // Get instructor name using the improved function
+        var instructor = getGroupInstructor(group);
         var instructorName = instructor ? [instructor.firstName, instructor.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
         
         var studentCount = group.students ? group.students.length : 0;
@@ -466,7 +414,8 @@ function renderAutoGroups() {
         html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
         html += '<div style="cursor:pointer;" onclick="window.toggleAutoGroup(\'' + key + '\')">';
         html += '<strong style="color:var(--accent);">' + (group.displayName || (discipline ? discipline.name : 'Unknown')) + '</strong>';
-        html += ' <span style="color:var(--text-dim);font-size:0.75rem;">(' + studentCount + ' students, ' + slotCount + ' slots)</span>';
+        html += ' <span style="color:var(--text-dim);font-size:0.75rem;">(Instructor: ' + instructorName + ')</span>';
+        html += ' <span style="color:var(--text-dim);font-size:0.7rem;">(' + studentCount + ' students, ' + slotCount + ' slots)</span>';
         html += '</div>';
         html += '<div style="display:flex;align-items:center;gap:8px;">';
         html += '<span style="font-size:0.7rem;color:var(--text-dim);cursor:pointer;" onclick="window.toggleAutoGroup(\'' + key + '\')">' + (isExpanded ? '▼' : '▶') + '</span>';
@@ -476,7 +425,6 @@ function renderAutoGroups() {
         if (isExpanded) {
             html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-soft);">';
             
-            // Show slots
             if (group.slots && group.slots.length > 0) {
                 html += '<div style="margin-bottom:8px;">';
                 html += '<span style="font-size:0.7rem;color:var(--text-dim);">Class Times:</span><br>';
@@ -494,7 +442,6 @@ function renderAutoGroups() {
                 html += '</div>';
             }
             
-            // List students in this group
             if (group.students && group.students.length > 0) {
                 html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
                 html += '<span style="font-size:0.7rem;color:var(--text-dim);">Students:</span> ';
@@ -518,7 +465,6 @@ function renderAutoGroups() {
     html += '</div>';
     container.innerHTML = html;
     
-    // Event listeners for remove buttons
     container.querySelectorAll('.remove-from-auto-group-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var key = this.dataset.key;
@@ -535,7 +481,6 @@ function renderAutoGroups() {
                 group.students.splice(idx, 1);
             }
             
-            // Remove the student from all slots in this group
             if (group.slots) {
                 group.slots.forEach(function(slot) {
                     var schedule = getStudentSchedule(studentId, slot.week);
@@ -551,15 +496,13 @@ function renderAutoGroups() {
                 });
             }
             
-            // If group is empty, keep it (might get students later)
-            
             saveData().then(function() {
                 if (typeof logActivity === 'function') {
                     logActivity('Removed student from auto-group: ' + group.displayName);
                 }
                 renderAutoGroups();
-                if (typeof renderSchedule === 'function') {
-                    renderSchedule();
+                if (typeof renderStudentSchedule === 'function') {
+                    renderStudentSchedule();
                 }
                 alert('Student removed from group and all their classes for this discipline.');
             }).catch(function(err) {
@@ -614,7 +557,7 @@ window.isStudentInAutoGroup = isStudentInAutoGroup;
 window.getOrCreateGroupForStudent = getOrCreateGroupForStudent;
 window.getStudentsInClassSlot = getStudentsInClassSlot;
 window.getSlotInstructor = getSlotInstructor;
-window.getSlotsForGroup = getSlotsForGroup;
+window.getGroupInstructor = getGroupInstructor;
 window.addSlotToGroup = addSlotToGroup;
 window.updateGroupDisplayName = updateGroupDisplayName;
 window.rebuildGroupsFromSchedules = rebuildGroupsFromSchedules;
