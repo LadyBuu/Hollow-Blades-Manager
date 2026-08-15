@@ -309,8 +309,8 @@ function renderTournamentCharacters(tourn) {
 
 /**
  * Get available participants for a round
- * Excludes eliminated players and players already in this round
- * Also excludes players who have already completed matches (they should advance automatically)
+ * Excludes eliminated players (losers) and players already in this round
+ * Winners and non-winners (who didn't lose) advance and are available
  */
 function getAvailableParticipantsForRound(tourn, roundNumber) {
     var availableParticipants = [];
@@ -318,7 +318,7 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
     
     if (!tourn.participants) return availableParticipants;
     
-    // Track eliminated character IDs
+    // Track eliminated character IDs (losers from previous rounds)
     var eliminatedIds = [];
     if (tourn.eliminations) {
         tourn.eliminations.forEach(function(elim) {
@@ -338,8 +338,7 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
         }
     });
     
-    // Track participants already used in previous rounds
-    var completedMatchIds = [];
+    // Check previous rounds to see who lost (they are eliminated)
     if (tourn.rounds) {
         tourn.rounds.forEach(function(r) {
             if (r.matches) {
@@ -351,10 +350,6 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
                                 if (eliminatedIds.indexOf(id) === -1) {
                                     eliminatedIds.push(id);
                                 }
-                            } else if (m.status === 'completed') {
-                                // They completed a match and didn't lose - they should advance
-                                // So they are NOT available for new matches (they should be in next round)
-                                completedMatchIds.push(id);
                             }
                         });
                     }
@@ -367,13 +362,8 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
     tourn.participants.forEach(function(p) {
         var charId = p.characterId;
         
-        // Skip if eliminated
+        // Skip if eliminated (this includes losers)
         if (eliminatedIds.some(function(id) { return String(id) === String(charId); })) {
-            return;
-        }
-        
-        // Skip if they already completed a match (they should advance)
-        if (completedMatchIds.some(function(id) { return String(id) === String(charId); })) {
             return;
         }
         
@@ -921,75 +911,60 @@ function showAddMatchToRoundModal(tournId, roundIndex) {
 }
 
 /**
- * Add a round to the tournament - FIXED with console logs
+ * Add a round to the tournament
  */
 function addRound() {
-    console.log('addRound called');
-    
     var modal = document.getElementById('tournament-detail-modal');
     if (!modal) {
-        console.error('Tournament detail modal not found');
         alert('Please open a tournament first.');
         return;
     }
     
     var tournId = modal.dataset.tournamentId;
-    console.log('tournId:', tournId);
     if (!tournId) {
-        console.error('No tournament ID found in modal');
         alert('Tournament not found. Please refresh and try again.');
         return;
     }
     
     var tourn = getTournament(tournId);
-    console.log('tourn:', tourn);
     if (!tourn) {
-        console.error('Tournament not found for ID:', tournId);
         alert('Tournament not found. Please refresh and try again.');
         return;
     }
     
     if (tourn.mode !== 'individuals') {
-        console.log('Tournament mode is:', tourn.mode);
         alert('Rounds are only available for individual tournaments.');
         return;
     }
     
     if (!tourn.participants || tourn.participants.length < 2) {
-        console.log('Participants:', tourn.participants);
         alert('Need at least 2 participants to create a round.');
         return;
     }
     
     if (!tourn.rounds) tourn.rounds = [];
     var roundNumber = tourn.rounds.length + 1;
-    console.log('Round number:', roundNumber);
     
     var availableParticipants = getAvailableParticipantsForRound(tourn, roundNumber);
-    console.log('Available participants:', availableParticipants);
     
     if (availableParticipants.length < 2) {
         alert('Not enough available participants for a new round. Need at least 2 participants who are not eliminated.');
         return;
     }
     
-    // Show the match creator modal
     showRoundMatchCreator(tournId, roundNumber, availableParticipants);
 }
 
 /**
- * Show round match creator - FIXED
+ * Show round match creator
  */
 function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
-    console.log('showRoundMatchCreator called with tournId:', tournId, 'roundNumber:', roundNumber);
-    
     var modal = document.getElementById('match-detail-modal');
     if (!modal) {
         alert('Modal not found. Please refresh.');
         return;
     }
     
-    // Get the tournament object - THIS WAS THE ISSUE
     var tourn = getTournament(tournId);
     if (!tourn) {
         alert('Tournament not found.');
@@ -1383,7 +1358,6 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
     
     if (saveBtn) {
         saveBtn.onclick = function() {
-            // Use the tourn variable we already have
             if (!tourn) {
                 alert('Tournament not found.');
                 return;
@@ -1622,6 +1596,14 @@ function completeMatch(tournId, roundIndex, matchIndex) {
     if (allParticipants.length === 2 && match.winnerIds.length !== 1) {
         alert('For 1v1 matches, exactly 1 winner must be selected.');
         return;
+    }
+    
+    // For 1v1, ensure exactly 1 loser
+    if (allParticipants.length === 2) {
+        if (!match.loserIds || match.loserIds.length !== 1) {
+            alert('For 1v1 matches, exactly 1 loser must be selected.');
+            return;
+        }
     }
     
     match.status = 'completed';
@@ -2027,4 +2009,3 @@ window.completeMatch = completeMatch;
 window.showRoundMatchesModal = showRoundMatchesModal;
 window.resetMatch = resetMatch;
 window.autoGenerateRounds = autoGenerateRounds;
-
