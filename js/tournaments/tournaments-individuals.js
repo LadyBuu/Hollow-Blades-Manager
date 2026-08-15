@@ -1191,3 +1191,22 @@ function autoGenerateRounds(tournId) {
     
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
+}
+
+// Make functions globally available
+window.populateCharacterSelector = populateCharacterSelector;
+window.addCharacterToTournament = addCharacterToTournament;
+window.removeCharacterFromTournament = removeCharacterFromTournament;
+window.renderTournamentCharacters = renderTournamentCharacters;
+window.getAvailableParticipantsForRound = getAvailableParticipantsForRound;
+window.renderRounds = renderRounds;
+window.addRound = addRound;
+window.showRoundMatchCreator = showRoundMatchCreator;
+window.completeRound = completeRound;
+window.deleteRound = deleteRound;
+window.deleteMatch = deleteMatch;
+window.toggleMatchWinner = toggleMatchWinner;
+window.toggleMatchLoser = toggleMatchLoser;
+window.completeMatch = completeMatch;
+window.showRoundMatchesModal = showRoundMatchesModal;
+window.autoGenerateRounds = autoGenerateRounds;
