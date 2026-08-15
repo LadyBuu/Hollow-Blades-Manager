@@ -1985,7 +1985,9 @@ function autoGenerateRounds(tournId) {
     viewTournament(tournId);
 }
 
-// Make functions globally available
+// ============================================================
+// EXPOSE ALL FUNCTIONS GLOBALLY
+// ============================================================
 window.populateCharacterSelector = populateCharacterSelector;
 window.isCharacterEliminatedByWeek = isCharacterEliminatedByWeek;
 window.addCharacterToTournament = addCharacterToTournament;
