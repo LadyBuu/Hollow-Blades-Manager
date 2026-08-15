@@ -141,7 +141,7 @@
                         </div>
                     </div>
 
-                    <!-- ELIMINATION SECTION -->
+                    <!-- TOURNAMENT ELIMINATION SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
                         <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">Tournament Eliminations</label>
                         <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Eliminations are separate from death. A character can be eliminated from a tournament but still alive.</p>
@@ -155,7 +155,30 @@
                                 <button type="button" class="small danger remove-elimination">✕</button>
                             </div>
                         </div>
-                        <button type="button" id="add-elimination-btn" class="small" style="margin-top:8px;">+ Add Elimination</button>
+                        <button type="button" id="add-elimination-btn" class="small" style="margin-top:8px;">+ Add Tournament Elimination</button>
+                    </div>
+
+                    <!-- STANDALONE ELIMINATION SECTION -->
+                    <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;border-left:3px solid var(--warning);">
+                        <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">Standalone Elimination (Dropout / Injury / etc.)</label>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Eliminate a character directly without tournament association. This will mark them as eliminated from the specified week onward.</p>
+                        
+                        <input type="hidden" id="standalone-char-id" />
+                        
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--panel-alt);padding:10px;border-radius:6px;border:1px solid var(--border);">
+                            <label style="font-size:0.7rem;color:var(--text-dim);">Week:</label>
+                            <input type="number" id="standalone-elim-week" min="1" max="52" value="1" style="width:70px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;" />
+                            <label style="font-size:0.7rem;color:var(--text-dim);">Reason:</label>
+                            <input type="text" id="standalone-elim-reason" placeholder="e.g., Dropped out, Injured, Left" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;" />
+                            <button type="button" id="add-standalone-elim-btn" class="small warning-btn">+ Apply Standalone Elimination</button>
+                        </div>
+                        
+                        <div style="margin-top:10px;">
+                            <label style="font-size:0.75rem;color:var(--text-dim);">Existing Standalone Eliminations:</label>
+                            <div id="standalone-eliminations-container" style="margin-top:4px;">
+                                <p class="empty-state" style="padding:6px;font-size:0.75rem;">No standalone eliminations recorded.</p>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="form-group full-width">
