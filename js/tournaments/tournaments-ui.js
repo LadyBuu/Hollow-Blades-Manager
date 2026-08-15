@@ -1,11 +1,7 @@
 /**
  * tournaments-ui.js - Tournament UI Rendering
- * Main view rendering and event handling
  */
 
-/**
- * Render the tournaments view
- */
 function renderTournamentsView(container) {
     container.innerHTML = `
         <div class="page-header">
@@ -43,8 +39,34 @@ function renderTournamentsView(container) {
                         <div class="form-group">
                             <label>Mode *</label>
                             <select id="tournament-mode" required>
-                                <option value="teams">Teams (Academic Teams)</option>
-                                <option value="individuals">Individuals (1v1 / Multiplayer)</option>
+                                <option value="teams">Teams</option>
+                                <option value="individuals">Individuals</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Match Type *</label>
+                            <select id="tournament-match-type" required>
+                                <option value="1v1">1v1 (2 players/teams)</option>
+                                <option value="1v1v1">1v1v1 (3 players/teams)</option>
+                                <option value="1v1v1v1">1v1v1v1 (4 players/teams)</option>
+                                <option value="ffa">Free-for-All (8 max)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Number of Rounds *</label>
+                            <select id="tournament-rounds" required>
+                                <option value="1">1 Round</option>
+                                <option value="2">2 Rounds</option>
+                                <option value="3">3 Rounds</option>
+                                <option value="4">4 Rounds</option>
+                                <option value="5">5 Rounds</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Round Setup</label>
+                            <select id="tournament-round-setup" required>
+                                <option value="auto">Auto-Generate Rounds</option>
+                                <option value="manual">Manual Setup</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -77,122 +99,49 @@ function renderTournamentsView(container) {
                 </div>
                 <div class="modal-body">
                     <div id="tournament-info" style="margin-bottom:12px;"></div>
-                    <div id="tournament-mode-switcher" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                        <button id="switch-teams-mode" class="small primary">Teams Mode</button>
-                        <button id="switch-individuals-mode" class="small">Individuals Mode</button>
-                    </div>
                     
-                    <!-- TEAM SELECTION SECTION -->
-                    <div id="team-selection-section" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);">
-                        <h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Select Teams</h4>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                            <select id="tournament-team-select" style="flex:1;min-width:150px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
-                                <option value="">Select a team...</option>
-                            </select>
-                            <button id="add-team-to-tournament" class="primary small">Add Team</button>
-                            <button id="refresh-teams-btn" class="secondary small">Refresh</button>
+                    <div class="tab-container" style="margin-top:12px;">
+                        <div class="tab-nav">
+                            <button class="tab-btn active" data-tab="overview">Overview</button>
+                            <button class="tab-btn" data-tab="participants">Participants</button>
+                            <button class="tab-btn" data-tab="rounds">Rounds</button>
+                            <button class="tab-btn" data-tab="eliminations">Eliminations</button>
                         </div>
-                        <div style="margin-top:4px;font-size:0.7rem;color:var(--text-dim);">
-                            Only academic teams active in the tournament's week range are shown.
-                        </div>
-                        <div id="tournament-teams-list" style="margin-top:8px;"></div>
-                    </div>
-
-                    <!-- INDIVIDUAL PARTICIPANTS SECTION -->
-                    <div id="individual-section" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);display:none;">
-                        <h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Individual Participants</h4>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-                            <select id="tournament-char-select" style="flex:1;min-width:150px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
-                                <option value="">Select character...</option>
-                            </select>
-                            <button id="add-char-to-tournament" class="primary small">Add Participant</button>
-                            <button id="refresh-chars-btn" class="secondary small">Refresh</button>
-                        </div>
-                        <div style="margin-top:4px;font-size:0.7rem;color:var(--text-dim);">
-                            Available characters (not eliminated or deceased in this week).
-                        </div>
-                        <div id="tournament-characters-list" style="margin-top:8px;"></div>
-                    </div>
-
-                    <!-- INDIVIDUAL ROUNDS SECTION -->
-                    <div id="rounds-section" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border);display:none;">
-                        <h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Rounds & Matches</h4>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
-                            <button id="add-round-btn" class="primary small">+ Add Round</button>
-                            <button id="auto-generate-rounds-btn" class="small info-btn">Auto-Generate Rounds</button>
-                            <span style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;" id="rounds-status">No rounds created</span>
-                        </div>
-                        <div id="rounds-container">
-                            <p class="empty-state" style="padding:8px;font-size:0.8rem;">No rounds created. Add a round to start the tournament.</p>
-                        </div>
-                    </div>
-
-                    <!-- MATCHES SECTION (Legacy - kept for teams mode) -->
-                    <div id="matches-section" style="margin-bottom:16px;display:none;">
-                        <h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Matches</h4>
-                        <div id="match-controls" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
-                            <div id="match-selectors">
-                                <select class="match-participant" style="padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;min-width:100px;">
-                                    <option value="">Select...</option>
-                                </select>
-                                <span style="color:var(--text-dim);font-size:0.7rem;">vs</span>
-                                <select class="match-participant" style="padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;min-width:100px;">
-                                    <option value="">Select...</option>
-                                </select>
+                        <div class="tab-content">
+                            <!-- Overview Tab -->
+                            <div id="tab-overview" class="tab-panel active">
+                                <div id="overview-content"></div>
                             </div>
-                            <button id="add-match-btn" class="primary small">Add Match</button>
-                        </div>
-                        <div id="matches-list">
-                            <p class="empty-state" style="padding:8px;font-size:0.8rem;">No matches created</p>
-                        </div>
-                    </div>
-
-                    <!-- ELIMINATIONS SECTION -->
-                    <div id="elimination-section" style="margin-bottom:16px;">
-                        <h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Eliminations</h4>
-                        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
-                            <label style="font-size:0.7rem;color:var(--text-dim);">Week:</label>
-                            <input type="number" id="elim-week" min="1" max="52" value="1" style="width:60px;padding:4px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;">
-                            <select id="elim-character-select" style="flex:1;min-width:120px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
-                                <option value="">Select character...</option>
-                            </select>
-                            <button id="add-elimination-btn" class="danger small">Eliminate</button>
-                            <button id="remove-elimination-btn" class="secondary small">Remove Selected</button>
-                        </div>
-                        <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:4px;">
-                            Eliminated characters cannot participate in future matches or be added to new teams.
-                        </div>
-                        <div id="elimination-list">
-                            <p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations recorded</p>
-                        </div>
-                    </div>
-
-                    <!-- Tournament Winner Display -->
-                    <div id="winner-section" style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--accent);">
-                        <h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Tournament Winner</h4>
-                        <div id="winner-display" style="font-weight:600;color:var(--accent);font-size:1.1rem;">
-                            Not determined yet
-                        </div>
-                        <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">
-                            Winner is determined by the last match result. Set a match winner below.
+                            <!-- Participants Tab -->
+                            <div id="tab-participants" class="tab-panel">
+                                <div id="participants-content"></div>
+                            </div>
+                            <!-- Rounds Tab -->
+                            <div id="tab-rounds" class="tab-panel">
+                                <div id="rounds-content"></div>
+                            </div>
+                            <!-- Eliminations Tab -->
+                            <div id="tab-eliminations" class="tab-panel">
+                                <div id="eliminations-content"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Match Detail/Edit Modal -->
-        <div id="match-detail-modal" class="modal hidden">
-            <div class="modal-content" style="max-width:550px;">
+        <!-- Manual Match Modal -->
+        <div id="manual-match-modal" class="modal hidden">
+            <div class="modal-content" style="max-width:500px;">
                 <div class="modal-header">
-                    <h3 id="match-detail-title">Match Details</h3>
-                    <button class="close-modal" id="close-match-detail">&times;</button>
+                    <h3 id="manual-match-title">Create Match</h3>
+                    <button class="close-modal" id="close-manual-match">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div id="match-detail-content"></div>
+                    <div id="manual-match-content"></div>
                     <div class="form-actions" style="margin-top:16px;">
-                        <button type="button" id="save-match-detail" class="primary">Save Results</button>
-                        <button type="button" id="cancel-match-detail" class="secondary">Cancel</button>
+                        <button type="button" id="cancel-manual-match" class="secondary">Cancel</button>
+                        <button type="button" id="save-manual-match" class="primary">Create Match</button>
                     </div>
                 </div>
             </div>
@@ -203,30 +152,20 @@ function renderTournamentsView(container) {
     initTournamentEvents();
 }
 
-/**
- * Render tournaments list
- */
 function renderTournamentsList() {
     var container = document.getElementById('tournaments-container');
     if (!container) return;
     
     var tournaments = getTournaments();
     if (tournaments.length === 0) {
-        container.innerHTML = '<p class="empty-state">No tournaments created yet. Create your first tournament!</p>';
+        container.innerHTML = '<p class="empty-state">No tournaments created yet.</p>';
         return;
     }
     
     var html = '';
     tournaments.forEach(function(tourn) {
-        var participantCount = 0;
-        var modeLabel = 'Teams';
-        if (tourn.mode === 'individuals') {
-            modeLabel = 'Individuals';
-            participantCount = tourn.participants ? tourn.participants.length : 0;
-        } else {
-            participantCount = tourn.teams ? tourn.teams.length : 0;
-        }
-        
+        var modeLabel = tourn.mode === 'individuals' ? 'Individuals' : 'Teams';
+        var participantCount = tourn.participants ? tourn.participants.length : 0;
         var statusColor = getTournamentStatusColor(tourn.status);
         var weekDisplay = 'Wk ' + (tourn.startWeek || '?') + ' - Wk ' + (tourn.endWeek || '?');
         var winnerDisplay = '';
@@ -234,16 +173,14 @@ function renderTournamentsList() {
         if (winnerName) {
             winnerDisplay = ' \u2605 ' + winnerName;
         }
-        
-        var roundCount = tourn.rounds ? tourn.rounds.length : 0;
-        var roundsDisplay = tourn.mode === 'individuals' ? ' | ' + roundCount + ' rounds' : '';
+        var matchTypeDisplay = getMatchTypeDisplay(tourn.matchType);
         
         html += '<div class="list-item tourn-item" data-id="' + tourn.id + '">' +
             '<span><strong>' + tourn.name + '</strong>' + winnerDisplay + '</span>' +
             '<span style="font-size:0.75rem;">' + weekDisplay + '</span>' +
-            '<span style="font-size:0.75rem;">' + modeLabel + roundsDisplay + '</span>' +
+            '<span style="font-size:0.75rem;">' + modeLabel + ' | ' + matchTypeDisplay + '</span>' +
             '<span>' + participantCount + '</span>' +
-            '<span style="color:' + statusColor + ';font-size:0.75rem;font-weight:600;">' + (tourn.status || 'draft') + '</span>' +
+            '<span style="color:' + statusColor + ';font-size:0.75rem;font-weight:600;">' + (tourn.status || 'active') + '</span>' +
             '<span class="actions">' +
                 '<button class="small view-tournament" data-id="' + tourn.id + '">View</button>' +
                 '<button class="small edit-tournament" data-id="' + tourn.id + '">Edit</button>' +
@@ -264,16 +201,98 @@ function renderTournamentsList() {
     });
 }
 
-/**
- * View tournament details
- */
+function showTournamentForm(editId) {
+    var modal = document.getElementById('tournament-form-modal');
+    var title = document.getElementById('tournament-form-title');
+    var form = document.getElementById('tournament-form-inner');
+    
+    modal.classList.remove('hidden');
+    
+    if (editId) {
+        title.textContent = 'Edit Tournament';
+        var tourn = getTournament(editId);
+        if (tourn) {
+            document.getElementById('tournament-name').value = tourn.name || '';
+            document.getElementById('tournament-mode').value = tourn.mode || 'teams';
+            document.getElementById('tournament-match-type').value = tourn.matchType || '1v1';
+            document.getElementById('tournament-rounds').value = tourn.rounds || 1;
+            document.getElementById('tournament-round-setup').value = tourn.roundSetup || 'auto';
+            document.getElementById('tournament-start-week').value = tourn.startWeek || 1;
+            document.getElementById('tournament-end-week').value = tourn.endWeek || 4;
+            document.getElementById('tournament-year').value = tourn.academicYear || '';
+            form.dataset.editId = editId;
+        }
+    } else {
+        title.textContent = 'New Tournament';
+        form.reset();
+        document.getElementById('tournament-mode').value = 'teams';
+        document.getElementById('tournament-match-type').value = '1v1';
+        document.getElementById('tournament-rounds').value = '1';
+        document.getElementById('tournament-round-setup').value = 'auto';
+        document.getElementById('tournament-start-week').value = '1';
+        document.getElementById('tournament-end-week').value = '4';
+        delete form.dataset.editId;
+    }
+}
+
+function saveTournament(e) {
+    e.preventDefault();
+    var form = e.target;
+    var editId = form.dataset.editId;
+    
+    var tournData = {
+        name: document.getElementById('tournament-name').value.trim(),
+        mode: document.getElementById('tournament-mode').value,
+        matchType: document.getElementById('tournament-match-type').value,
+        rounds: parseInt(document.getElementById('tournament-rounds').value) || 1,
+        roundSetup: document.getElementById('tournament-round-setup').value || 'auto',
+        startWeek: parseInt(document.getElementById('tournament-start-week').value) || 1,
+        endWeek: parseInt(document.getElementById('tournament-end-week').value) || 4,
+        academicYear: document.getElementById('tournament-year').value.trim(),
+        status: 'active'
+    };
+    
+    if (!tournData.name) { alert('Tournament name is required.'); return; }
+    if (tournData.startWeek > tournData.endWeek) {
+        alert('Start week must be before end week.');
+        return;
+    }
+    
+    if (editId) {
+        var index = data.tournaments.findIndex(function(t) { return String(t.id) === String(editId); });
+        if (index !== -1) {
+            var existing = data.tournaments[index];
+            data.tournaments[index] = Object.assign({}, existing, tournData);
+            if (typeof logActivity === 'function') {
+                logActivity('Updated tournament: ' + tournData.name);
+            }
+        }
+    } else {
+        var newTourn = createTournament(tournData);
+        if (typeof logActivity === 'function') {
+            logActivity('Created tournament: ' + tournData.name);
+        }
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    closeTournamentForm();
+    renderTournamentsList();
+}
+
+function closeTournamentForm() {
+    document.getElementById('tournament-form-modal').classList.add('hidden');
+}
+
+function closeTournamentDetail() {
+    document.getElementById('tournament-detail-modal').classList.add('hidden');
+    tournamentState.currentTournamentId = null;
+}
+
 function viewTournament(id) {
     var tourn = getTournament(id);
     if (!tourn) return;
     
     tournamentState.currentTournamentId = id;
-    tournamentState.currentMode = tourn.mode || 'teams';
-    
     var modal = document.getElementById('tournament-detail-modal');
     document.getElementById('detail-tournament-name').textContent = tourn.name;
     
@@ -287,577 +306,921 @@ function viewTournament(id) {
     
     var statusColor = getTournamentStatusColor(tourn.status);
     var modeLabel = tourn.mode === 'individuals' ? 'Individuals' : 'Teams';
-    var participantCount = tourn.mode === 'individuals' ? (tourn.participants ? tourn.participants.length : 0) : (tourn.teams ? tourn.teams.length : 0);
-    var roundCount = tourn.rounds ? tourn.rounds.length : 0;
+    var matchTypeDisplay = getMatchTypeDisplay(tourn.matchType);
+    var participantCount = tourn.participants ? tourn.participants.length : 0;
+    var roundSetup = tourn.roundSetup === 'manual' ? 'Manual' : 'Auto';
     
     info.innerHTML = 
         '<span style="color:var(--text-dim);font-size:0.8rem;">Mode: <strong>' + modeLabel + '</strong> | ' +
+        'Match: <strong>' + matchTypeDisplay + '</strong> | ' +
         'Weeks ' + tourn.startWeek + ' - ' + tourn.endWeek + 
         (tourn.academicYear ? ' | ' + tourn.academicYear : '') + 
+        ' | Rounds: <strong>' + tourn.rounds + '</strong> (' + roundSetup + ')' +
         ' | Status: <span style="color:' + statusColor + ';font-weight:600;">' + (tourn.status || 'active') + '</span>' +
         ' | Participants: ' + participantCount +
-        (tourn.mode === 'individuals' ? ' | Rounds: ' + roundCount : '') +
         winnerDisplay + '</span>';
     
-    // Update mode switcher buttons
-    var teamsBtn = document.getElementById('switch-teams-mode');
-    var indBtn = document.getElementById('switch-individuals-mode');
-    if (tourn.mode === 'individuals') {
-        teamsBtn.className = 'small';
-        indBtn.className = 'small primary';
-    } else {
-        teamsBtn.className = 'small primary';
-        indBtn.className = 'small';
-    }
+    // Render tabs
+    renderOverviewTab(tourn);
+    renderParticipantsTab(tourn);
+    renderRoundsTab(tourn);
+    renderEliminationsTab(tourn);
     
-    // Show/hide sections based on mode
-    var teamSection = document.getElementById('team-selection-section');
-    var individualSection = document.getElementById('individual-section');
-    var roundsSection = document.getElementById('rounds-section');
-    var matchesSection = document.getElementById('matches-section');
-    
-    if (tourn.mode === 'individuals') {
-        teamSection.style.display = 'none';
-        individualSection.style.display = 'block';
-        roundsSection.style.display = 'block';
-        matchesSection.style.display = 'none';
-    } else {
-        teamSection.style.display = 'block';
-        individualSection.style.display = 'none';
-        roundsSection.style.display = 'none';
-        matchesSection.style.display = 'block';
-    }
-    
-    // Populate selectors
-    populateTeamSelector(tourn);
-    populateCharacterSelector(tourn);
-    populateEliminationSelector(tourn);
-    
-    // Render sections
-    renderTournamentTeams(tourn);
-    renderTournamentCharacters(tourn);
-    renderRounds(tourn);
-    renderTeamMatches(tourn);
-    renderEliminations(tourn);
-    renderWinner(tourn);
+    // Tab switching
+    initDetailTabs(tourn);
     
     modal.dataset.tournamentId = id;
     modal.classList.remove('hidden');
 }
 
-/**
- * Populate elimination selector with characters from participants
- */
-function populateEliminationSelector(tourn) {
-    var select = document.getElementById('elim-character-select');
-    if (!select) return;
+function initDetailTabs(tourn) {
+    var tabs = document.querySelectorAll('#tournament-detail-modal .tab-btn');
+    var panels = {
+        overview: document.getElementById('tab-overview'),
+        participants: document.getElementById('tab-participants'),
+        rounds: document.getElementById('tab-rounds'),
+        eliminations: document.getElementById('tab-eliminations')
+    };
     
-    var alreadyEliminated = (tourn.eliminations || []).map(function(e) { return e.characterId; });
-    var startWeek = parseInt(tourn.startWeek) || 1;
+    // Hide all panels
+    for (var key in panels) {
+        if (panels[key]) {
+            panels[key].style.display = 'none';
+            panels[key].classList.remove('active');
+        }
+    }
     
-    var chars = [];
+    // Show active panel
+    var activeTab = document.querySelector('#tournament-detail-modal .tab-btn.active');
+    if (activeTab) {
+        var tabName = activeTab.dataset.tab;
+        if (panels[tabName]) {
+            panels[tabName].style.display = 'block';
+            panels[tabName].classList.add('active');
+        }
+    } else if (panels.overview) {
+        panels.overview.style.display = 'block';
+        panels.overview.classList.add('active');
+    }
     
-    if (tourn.mode === 'individuals') {
-        var participants = tourn.participants || [];
-        participants.forEach(function(entry) {
-            var char = data.characters.find(function(c) { return String(c.id) === String(entry.characterId); });
-            if (char && !alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) {
-                if (!char.deceased) {
-                    var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
-                    var status = getCurrentStatus(char);
-                    chars.push({
-                        id: char.id,
-                        name: name + ' (' + status + ')'
-                    });
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            this.classList.add('active');
+            
+            var tabName = this.dataset.tab;
+            for (var key in panels) {
+                if (panels[key]) {
+                    panels[key].style.display = 'none';
+                    panels[key].classList.remove('active');
                 }
             }
+            if (panels[tabName]) {
+                panels[tabName].style.display = 'block';
+                panels[tabName].classList.add('active');
+            }
+            
+            // Refresh tab content
+            if (tabName === 'overview') renderOverviewTab(tourn);
+            else if (tabName === 'participants') renderParticipantsTab(tourn);
+            else if (tabName === 'rounds') renderRoundsTab(tourn);
+            else if (tabName === 'eliminations') renderEliminationsTab(tourn);
         });
-    } else {
-        var teams = tourn.teams || [];
-        teams.forEach(function(entry) {
-            var team = data.teams.find(function(t) { return String(t.id) === String(entry.teamId); });
-            if (team && team.members) {
-                team.members.forEach(function(member) {
-                    var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
-                    if (char && !alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) {
-                        if (!char.deceased) {
-                            var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
-                            var status = getCurrentStatus(char);
-                            chars.push({
-                                id: char.id,
-                                name: name + ' (' + status + ')'
-                            });
-                        }
-                    }
+    });
+}
+
+function renderOverviewTab(tourn) {
+    var container = document.getElementById('overview-content');
+    if (!container) return;
+    
+    var participantCount = tourn.participants ? tourn.participants.length : 0;
+    var totalMatches = 0;
+    var completedMatches = 0;
+    var eliminatedCount = tourn.eliminations ? tourn.eliminations.length : 0;
+    
+    if (tourn.roundsData) {
+        tourn.roundsData.forEach(function(round) {
+            if (round.matches) {
+                totalMatches += round.matches.length;
+                round.matches.forEach(function(m) {
+                    if (m.status === 'completed') completedMatches++;
                 });
             }
         });
     }
     
-    // Also include characters with standalone eliminations
-    data.characters.forEach(function(char) {
-        if (char.deceased) return;
-        if (alreadyEliminated.some(function(id) { return String(id) === String(char.id); })) return;
-        if (char.eliminations) {
-            char.eliminations.forEach(function(elim) {
-                if (elim.standalone) {
-                    var elimWeek = parseInt(elim.week);
-                    if (!isNaN(elimWeek) && elimWeek <= startWeek) {
-                        var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
-                        var status = getCurrentStatus(char);
-                        chars.push({
-                            id: char.id,
-                            name: name + ' (' + status + ') - standalone'
-                        });
+    var currentRound = tourn.currentRound || 0;
+    var totalRounds = tourn.rounds || 1;
+    var progress = totalMatches > 0 ? Math.round((completedMatches / totalMatches) * 100) : 0;
+    
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px;">';
+    html += '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Participants</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--accent);">' + participantCount + '</span></div>';
+    html += '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Matches</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--text);">' + completedMatches + '/' + totalMatches + '</span></div>';
+    html += '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Progress</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--info);">' + progress + '%</span></div>';
+    html += '<div style="background:var(--bg);padding:12px;border-radius:6px;"><span style="color:var(--text-dim);">Eliminated</span><br><span style="font-size:1.8rem;font-weight:700;color:var(--danger);">' + eliminatedCount + '</span></div>';
+    html += '</div>';
+    
+    html += '<div style="background:var(--bg);padding:12px;border-radius:6px;margin-bottom:12px;">';
+    html += '<span style="color:var(--text-dim);">Current Round: </span>';
+    html += '<span style="font-weight:600;color:var(--accent);">' + (currentRound + 1) + '/' + totalRounds + '</span>';
+    html += '</div>';
+    
+    if (tourn.winner) {
+        var winnerName = getParticipantNameById(tourn.winner);
+        html += '<div style="background:var(--accent-soft);padding:12px;border-radius:6px;border:1px solid var(--accent);">';
+        html += '<span style="color:var(--accent);font-weight:600;">\u2605 Winner: </span>';
+        html += '<span style="font-weight:600;">' + winnerName + '</span>';
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+function renderParticipantsTab(tourn) {
+    var container = document.getElementById('participants-content');
+    if (!container) return;
+    
+    var isTeams = tourn.mode === 'teams';
+    var matchCount = getMatchParticipantCount(tourn.matchType);
+    
+    // Get available participants
+    var available = [];
+    var activeParticipants = [];
+    
+    if (isTeams) {
+        var allTeams = data.teams.filter(function(t) {
+            if (t.status === 'deleted' || t.status === 'inactive') return false;
+            if (t.type !== 'academic') return false;
+            var start = parseInt(t.startPeriod);
+            var end = parseInt(t.endPeriod);
+            if (isNaN(start)) return true;
+            return start <= tourn.endWeek && (isNaN(end) || end >= tourn.startWeek);
+        });
+        
+        var existingIds = (tourn.participants || []).map(function(p) { return p.id; });
+        
+        allTeams.forEach(function(team) {
+            var inTourn = existingIds.some(function(id) { return String(id) === String(team.id); });
+            if (inTourn) {
+                activeParticipants.push({ id: team.id, name: team.name, type: 'team' });
+            } else {
+                available.push({ id: team.id, name: team.name, type: 'team' });
+            }
+        });
+    } else {
+        // Individuals - only trainees
+        var startWeek = tourn.startWeek || 1;
+        var allChars = data.characters.filter(function(c) {
+            if (c.deceased) return false;
+            var status = getCurrentStatus(c).toLowerCase();
+            return status === 'trainee';
+        });
+        
+        var existingIds = (tourn.participants || []).map(function(p) { return p.id; });
+        
+        allChars.forEach(function(c) {
+            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
+            var inTourn = existingIds.some(function(id) { return String(id) === String(c.id); });
+            if (inTourn) {
+                activeParticipants.push({ id: c.id, name: name, type: 'character' });
+            } else {
+                available.push({ id: c.id, name: name, type: 'character' });
+            }
+        });
+    }
+    
+    var html = '<div style="margin-bottom:12px;">';
+    html += '<h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Add Participants</h4>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+    html += '<select id="add-participant-select" style="flex:1;min-width:150px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">';
+    html += '<option value="">Select ' + (isTeams ? 'team' : 'trainee') + '...</option>';
+    available.forEach(function(p) {
+        html += '<option value="' + p.id + '">' + p.name + '</option>';
+    });
+    html += '</select>';
+    html += '<button id="add-participant-btn" class="primary small">Add</button>';
+    html += '</div>';
+    html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">';
+    html += 'Need at least ' + matchCount + ' participants. Total: ' + (activeParticipants.length + available.length) + ' available.';
+    html += '</div>';
+    html += '</div>';
+    
+    html += '<div><h4 style="color:var(--accent);font-size:0.9rem;margin-bottom:8px;">Current Participants (' + activeParticipants.length + ')</h4>';
+    if (activeParticipants.length === 0) {
+        html += '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No participants added yet.</p>';
+    } else {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+        activeParticipants.forEach(function(p) {
+            var isEliminated = false;
+            if (tourn.eliminations) {
+                tourn.eliminations.forEach(function(elim) {
+                    if (String(elim.participantId) === String(p.id)) {
+                        isEliminated = true;
                     }
+                });
+            }
+            html += '<span style="background:var(--panel-alt);padding:4px 10px;border-radius:12px;font-size:0.75rem;border:1px solid ' + (isEliminated ? 'var(--danger)' : 'var(--border)') + ';">';
+            html += p.name + (isEliminated ? ' \u274C' : '');
+            html += ' <button class="remove-participant-btn small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;" data-id="' + p.id + '">\u2715</button>';
+            html += '</span>';
+        });
+        html += '</div>';
+    }
+    html += '</div>';
+    
+    container.innerHTML = html;
+    
+    // Event listeners
+    container.querySelector('#add-participant-btn')?.addEventListener('click', function() {
+        var select = document.getElementById('add-participant-select');
+        var id = select.value;
+        if (!id) { alert('Please select a participant.'); return; }
+        
+        if (!tourn.participants) tourn.participants = [];
+        if (tourn.participants.some(function(p) { return String(p.id) === String(id); })) {
+            alert('Already added.');
+            return;
+        }
+        
+        tourn.participants.push({ id: id, type: isTeams ? 'team' : 'character' });
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+        viewTournament(tourn.id);
+    });
+    
+    container.querySelectorAll('.remove-participant-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var id = this.dataset.id;
+            if (!confirm('Remove this participant?')) return;
+            tourn.participants = tourn.participants.filter(function(p) { return String(p.id) !== String(id); });
+            saveData().catch(function(err) { console.error('Failed to save:', err); });
+            viewTournament(tourn.id);
+        });
+    });
+}
+
+function renderRoundsTab(tourn) {
+    var container = document.getElementById('rounds-content');
+    if (!container) return;
+    
+    var isManual = tourn.roundSetup === 'manual';
+    
+    var html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">';
+    if (isManual) {
+        html += '<button id="add-manual-round-btn" class="primary small">+ Add Manual Round</button>';
+        html += '<button id="add-manual-match-btn" class="primary small">+ Add Match to Current Round</button>';
+    } else {
+        html += '<button id="create-rounds-btn" class="primary small">Generate Rounds</button>';
+    }
+    html += '<button id="reset-rounds-btn" class="danger small">Reset All Rounds</button>';
+    html += '<span style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">Rounds: ' + (tourn.roundsData ? tourn.roundsData.length : 0) + '/' + (tourn.rounds || 1) + '</span>';
+    html += '</div>';
+    
+    if (!tourn.roundsData || tourn.roundsData.length === 0) {
+        html += '<p class="empty-state">No rounds created. Click "' + (isManual ? 'Add Manual Round' : 'Generate Rounds') + '" to start.</p>';
+        container.innerHTML = html;
+        attachRoundEvents(tourn);
+        return;
+    }
+    
+    var roundLabels = ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    var dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    tourn.roundsData.forEach(function(round, roundIndex) {
+        var roundLabel = roundLabels[roundIndex + 1] || (roundIndex + 1);
+        var isCompleted = round.status === 'completed';
+        var matchCount = round.matches ? round.matches.length : 0;
+        var isCurrent = tourn.currentRound === roundIndex;
+        
+        html += '<div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">';
+        html += '<div><strong style="color:' + (isCurrent ? 'var(--accent)' : 'var(--text)') + ';">Round ' + roundLabel + '</strong> ' + (isCurrent ? ' \u25B6' : '') + ' <span style="color:var(--text-dim);font-size:0.75rem;">(' + matchCount + ' matches)</span>';
+        html += ' <span style="font-size:0.7rem;padding:2px 8px;border-radius:10px;background:' + 
+            (isCompleted ? 'var(--info-soft);color:var(--info);' : 
+             isCurrent ? 'var(--warning-soft);color:var(--warning);' :
+             'var(--bg);color:var(--text-dim);') + '">' + 
+            (isCompleted ? '\u2713 Completed' : isCurrent ? '\u23F3 In Progress' : '\u23F8 Pending') + '</span>';
+        html += '</div>';
+        html += '<div style="display:flex;gap:4px;">';
+        if (!isCompleted && isManual) {
+            html += '<button class="small primary add-match-btn" data-round="' + roundIndex + '">+ Match</button>';
+        }
+        if (!isCompleted) {
+            html += '<button class="small primary complete-round-btn" data-round="' + roundIndex + '">Complete Round</button>';
+        }
+        html += '<button class="small danger delete-round-btn" data-round="' + roundIndex + '">\u2715</button>';
+        html += '</div>';
+        html += '</div>';
+        
+        if (round.matches && round.matches.length > 0) {
+            html += '<div style="padding-left:8px;border-left:2px solid var(--border-soft);">';
+            round.matches.forEach(function(match, matchIndex) {
+                var matchStatus = match.status || 'pending';
+                var statusColor = matchStatus === 'completed' ? 'var(--accent)' : 'var(--text-dim)';
+                
+                var participantNames = [];
+                var participantIds = [];
+                if (match.participants) {
+                    match.participants.forEach(function(id) {
+                        var name = getParticipantNameById(id);
+                        var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
+                        var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
+                        var label = name;
+                        if (isWinner) label += ' \uD83C\uDFC6';
+                        else if (isLoser) label += ' \u274C';
+                        participantNames.push(label);
+                        participantIds.push(id);
+                    });
                 }
+                
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--bg);border-radius:4px;margin-bottom:4px;border-left:3px solid ' + statusColor + ';flex-wrap:wrap;gap:4px;">';
+                html += '<span style="font-size:0.75rem;">Match ' + (matchIndex + 1) + ': <strong>' + participantNames.join(' vs ') + '</strong></span>';
+                html += '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+                if (matchStatus !== 'completed') {
+                    // Winner selectors
+                    html += '<span style="font-size:0.6rem;color:var(--text-dim);">Winner:</span>';
+                    participantIds.forEach(function(id) {
+                        var name = getParticipantNameById(id);
+                        var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
+                        html += '<button class="small set-winner-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="' + 
+                            (isWinner ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + name + 
+                            (isWinner ? ' \u2713' : '') + '</button>';
+                    });
+                    // Loser selectors
+                    html += '<span style="font-size:0.6rem;color:var(--text-dim);">Loser:</span>';
+                    participantIds.forEach(function(id) {
+                        var name = getParticipantNameById(id);
+                        var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
+                        if (!isLoser) {
+                            html += '<button class="small set-loser-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="' + 
+                                (isLoser ? 'border-color:var(--danger);color:var(--danger);' : '') + '">' + name + 
+                                (isLoser ? ' \u2715' : '') + '</button>';
+                        }
+                    });
+                    html += '<button class="small primary complete-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Complete</button>';
+                } else {
+                    html += '<span style="font-size:0.7rem;color:' + statusColor + ';">Completed</span>';
+                    html += '<button class="small warning-btn reset-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u21BB Reset</button>';
+                }
+                html += '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    });
+    
+    container.innerHTML = html;
+    attachRoundEvents(tourn);
+}
+
+function attachRoundEvents(tourn) {
+    var isManual = tourn.roundSetup === 'manual';
+    
+    document.getElementById('create-rounds-btn')?.addEventListener('click', function() {
+        generateRounds(tourn.id);
+    });
+    
+    document.getElementById('add-manual-round-btn')?.addEventListener('click', function() {
+        addManualRound(tourn.id);
+    });
+    
+    document.getElementById('add-manual-match-btn')?.addEventListener('click', function() {
+        showManualMatchModal(tourn.id, tourn.roundsData ? tourn.roundsData.length - 1 : 0);
+    });
+    
+    document.getElementById('reset-rounds-btn')?.addEventListener('click', function() {
+        if (!confirm('Reset all rounds? This will remove all match data.')) return;
+        tourn.roundsData = [];
+        tourn.currentRound = 0;
+        tourn.winner = null;
+        tourn.winners = [];
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+        viewTournament(tourn.id);
+    });
+    
+    document.querySelectorAll('.add-match-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            showManualMatchModal(tourn.id, roundIndex);
+        });
+    });
+    
+    document.querySelectorAll('.set-winner-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            var matchIndex = parseInt(this.dataset.match);
+            var participantId = this.dataset.participant;
+            toggleMatchWinner(tourn.id, roundIndex, matchIndex, participantId);
+        });
+    });
+    
+    document.querySelectorAll('.set-loser-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            var matchIndex = parseInt(this.dataset.match);
+            var participantId = this.dataset.participant;
+            toggleMatchLoser(tourn.id, roundIndex, matchIndex, participantId);
+        });
+    });
+    
+    document.querySelectorAll('.complete-match-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            var matchIndex = parseInt(this.dataset.match);
+            completeMatch(tourn.id, roundIndex, matchIndex);
+        });
+    });
+    
+    document.querySelectorAll('.reset-match-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            var matchIndex = parseInt(this.dataset.match);
+            resetMatch(tourn.id, roundIndex, matchIndex);
+        });
+    });
+    
+    document.querySelectorAll('.complete-round-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            completeRound(tourn.id, roundIndex);
+        });
+    });
+    
+    document.querySelectorAll('.delete-round-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            if (!confirm('Delete this round?')) return;
+            tourn.roundsData.splice(roundIndex, 1);
+            saveData().catch(function(err) { console.error('Failed to save:', err); });
+            viewTournament(tourn.id);
+        });
+    });
+}
+
+function addManualRound(tournId) {
+    var tourn = getTournament(tournId);
+    if (!tourn) return;
+    
+    if (!tourn.roundsData) tourn.roundsData = [];
+    var roundNumber = tourn.roundsData.length;
+    
+    if (roundNumber >= tourn.rounds) {
+        alert('Maximum rounds reached (' + tourn.rounds + ').');
+        return;
+    }
+    
+    tourn.roundsData.push({
+        roundNumber: roundNumber,
+        status: 'pending',
+        matches: []
+    });
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function showManualMatchModal(tournId, roundIndex) {
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.roundsData || !tourn.roundsData[roundIndex]) {
+        alert('Round not found.');
+        return;
+    }
+    
+    var round = tourn.roundsData[roundIndex];
+    var isTeams = tourn.mode === 'teams';
+    var matchCount = getMatchParticipantCount(tourn.matchType);
+    
+    // Get available participants (not eliminated, not already in this round)
+    var eliminatedIds = (tourn.eliminations || []).map(function(e) { return e.participantId; });
+    var usedInRound = [];
+    if (round.matches) {
+        round.matches.forEach(function(m) {
+            if (m.participants) {
+                m.participants.forEach(function(id) {
+                    usedInRound.push(id);
+                });
+            }
+        });
+    }
+    
+    var available = [];
+    if (tourn.participants) {
+        tourn.participants.forEach(function(p) {
+            if (eliminatedIds.indexOf(p.id) === -1 && usedInRound.indexOf(p.id) === -1) {
+                var name = getParticipantNameById(p.id);
+                available.push({ id: p.id, name: name });
+            }
+        });
+    }
+    
+    if (available.length < 2) {
+        alert('Not enough available participants for a match. Need at least 2 non-eliminated participants not already in this round.');
+        return;
+    }
+    
+    var modal = document.getElementById('manual-match-modal');
+    document.getElementById('manual-match-title').textContent = 'Add Match - Round ' + (roundIndex + 1);
+    
+    var content = document.getElementById('manual-match-content');
+    var html = '<div style="margin-bottom:12px;">';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select ' + matchCount + ' participants for this match.</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">';
+    available.forEach(function(p) {
+        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);">' + p.name + '</span>';
+    });
+    html += '</div>';
+    html += '</div>';
+    
+    html += '<div id="manual-match-selection" style="margin-bottom:12px;">';
+    for (var i = 0; i < matchCount; i++) {
+        html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
+        html += '<select class="manual-participant-select" data-index="' + i + '" style="flex:1;padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.7rem;">';
+        html += '<option value="">Select participant...</option>';
+        available.forEach(function(p) {
+            html += '<option value="' + p.id + '">' + p.name + '</option>';
+        });
+        html += '</select>';
+        html += '</div>';
+    }
+    html += '</div>';
+    
+    content.innerHTML = html;
+    modal.dataset.tournId = tournId;
+    modal.dataset.roundIndex = roundIndex;
+    modal.classList.remove('hidden');
+    
+    document.getElementById('close-manual-match').onclick = function() { modal.classList.add('hidden'); };
+    document.getElementById('cancel-manual-match').onclick = function() { modal.classList.add('hidden'); };
+    modal.onclick = function(e) { if (e.target === this) modal.classList.add('hidden'); };
+    
+    document.getElementById('save-manual-match').onclick = function() {
+        var selects = document.querySelectorAll('.manual-participant-select');
+        var participantIds = [];
+        selects.forEach(function(sel) {
+            if (sel.value) participantIds.push(sel.value);
+        });
+        
+        if (participantIds.length < 2) {
+            alert('Please select at least 2 participants.');
+            return;
+        }
+        
+        var round = tourn.roundsData[roundIndex];
+        if (!round.matches) round.matches = [];
+        
+        round.matches.push({
+            participants: participantIds,
+            winnerIds: [],
+            loserIds: [],
+            status: 'pending'
+        });
+        
+        modal.classList.add('hidden');
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+        viewTournament(tournId);
+    };
+}
+
+function toggleMatchWinner(tournId, roundIndex, matchIndex, participantId) {
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.roundsData || !tourn.roundsData[roundIndex]) return;
+    
+    var round = tourn.roundsData[roundIndex];
+    var match = round.matches[matchIndex];
+    if (!match) return;
+    
+    if (!match.winnerIds) match.winnerIds = [];
+    
+    var idx = match.winnerIds.indexOf(participantId);
+    if (idx !== -1) {
+        match.winnerIds.splice(idx, 1);
+    } else {
+        if (match.loserIds && match.loserIds.indexOf(participantId) !== -1) {
+            alert('This participant is marked as a loser. Remove loser status first.');
+            return;
+        }
+        match.winnerIds.push(participantId);
+    }
+    
+    match.status = 'in_progress';
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function toggleMatchLoser(tournId, roundIndex, matchIndex, participantId) {
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.roundsData || !tourn.roundsData[roundIndex]) return;
+    
+    var round = tourn.roundsData[roundIndex];
+    var match = round.matches[matchIndex];
+    if (!match) return;
+    
+    if (!match.loserIds) match.loserIds = [];
+    
+    var idx = match.loserIds.indexOf(participantId);
+    if (idx !== -1) {
+        match.loserIds.splice(idx, 1);
+    } else {
+        if (match.winnerIds && match.winnerIds.indexOf(participantId) !== -1) {
+            alert('This participant is marked as a winner. Remove winner status first.');
+            return;
+        }
+        match.loserIds.push(participantId);
+    }
+    
+    match.status = 'in_progress';
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function completeMatch(tournId, roundIndex, matchIndex) {
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.roundsData || !tourn.roundsData[roundIndex]) return;
+    
+    var round = tourn.roundsData[roundIndex];
+    var match = round.matches[matchIndex];
+    if (!match) return;
+    
+    var hasWinner = match.winnerIds && match.winnerIds.length > 0;
+    if (!hasWinner) {
+        alert('Please select at least one winner.');
+        return;
+    }
+    
+    // For 1v1, ensure exactly 1 winner and 1 loser
+    if (match.participants && match.participants.length === 2) {
+        if (match.winnerIds.length !== 1) {
+            alert('For 1v1 matches, exactly 1 winner must be selected.');
+            return;
+        }
+        if (!match.loserIds || match.loserIds.length !== 1) {
+            alert('For 1v1 matches, exactly 1 loser must be selected.');
+            return;
+        }
+    }
+    
+    match.status = 'completed';
+    
+    // Add losers to eliminations
+    if (match.loserIds) {
+        match.loserIds.forEach(function(loserId) {
+            if (!tourn.eliminations) tourn.eliminations = [];
+            if (!tourn.eliminations.some(function(e) { return String(e.participantId) === String(loserId); })) {
+                tourn.eliminations.push({
+                    participantId: loserId,
+                    round: roundIndex,
+                    type: match.participants && match.participants.length === 2 ? 'lost' : 'eliminated'
+                });
+            }
+        });
+    }
+    
+    // Auto-advance non-winners (for multiplayer matches)
+    if (match.participants && match.participants.length > 2) {
+        match.participants.forEach(function(id) {
+            var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
+            var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
+            if (!isWinner && !isLoser) {
+                // This participant advances without winning
+                // They stay in the tournament
+            }
+        });
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function resetMatch(tournId, roundIndex, matchIndex) {
+    if (!confirm('Reset this match?')) return;
+    
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.roundsData || !tourn.roundsData[roundIndex]) return;
+    
+    var round = tourn.roundsData[roundIndex];
+    var match = round.matches[matchIndex];
+    if (!match) return;
+    
+    // Remove eliminations for losers
+    if (match.loserIds) {
+        match.loserIds.forEach(function(loserId) {
+            if (tourn.eliminations) {
+                tourn.eliminations = tourn.eliminations.filter(function(e) { 
+                    return String(e.participantId) !== String(loserId); 
+                });
+            }
+        });
+    }
+    
+    match.winnerIds = [];
+    match.loserIds = [];
+    match.status = 'pending';
+    round.status = 'pending';
+    tourn.status = 'active';
+    tourn.winner = null;
+    tourn.winners = [];
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function completeRound(tournId, roundIndex) {
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.roundsData || !tourn.roundsData[roundIndex]) return;
+    
+    var round = tourn.roundsData[roundIndex];
+    var allCompleted = round.matches.every(function(m) { return m.status === 'completed'; });
+    
+    if (!allCompleted) {
+        alert('All matches in this round must be completed first.');
+        return;
+    }
+    
+    round.status = 'completed';
+    tourn.currentRound = roundIndex + 1;
+    
+    // Check if all rounds are complete
+    var allRoundsComplete = tourn.roundsData.every(function(r) { return r.status === 'completed'; });
+    if (allRoundsComplete) {
+        tourn.status = 'completed';
+        determineTournamentWinner(tourn);
+    }
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function determineTournamentWinner(tourn) {
+    var lastRound = tourn.roundsData[tourn.roundsData.length - 1];
+    if (!lastRound || lastRound.status !== 'completed') return;
+    
+    var winners = [];
+    lastRound.matches.forEach(function(match) {
+        if (match.winnerIds) {
+            match.winnerIds.forEach(function(wid) {
+                winners.push(wid);
             });
         }
     });
     
-    var seen = {};
-    var uniqueChars = chars.filter(function(c) {
-        if (seen[c.id]) return false;
-        seen[c.id] = true;
-        return true;
-    });
-    
-    uniqueChars.sort(function(a, b) {
-        return a.name.localeCompare(b.name);
-    });
-    
-    select.innerHTML = '<option value="">Select character...</option>';
-    if (uniqueChars.length === 0) {
-        select.innerHTML += '<option value="" disabled>No characters available for elimination</option>';
-    } else {
-        uniqueChars.forEach(function(char) {
-            var option = document.createElement('option');
-            option.value = char.id;
-            option.textContent = char.name;
-            if (char.name.includes('standalone')) {
-                option.style.color = 'var(--warning)';
-            }
-            select.appendChild(option);
-        });
+    if (winners.length === 1) {
+        tourn.winner = winners[0];
+        if (typeof logActivity === 'function') {
+            var winnerName = getParticipantNameById(winners[0]);
+            logActivity('Tournament ' + tourn.name + ' completed! Winner: ' + winnerName);
+        }
+    } else if (winners.length > 1) {
+        tourn.winner = winners[0];
+        tourn.winners = winners;
+        if (typeof logActivity === 'function') {
+            var names = winners.map(function(w) { return getParticipantNameById(w); });
+            logActivity('Tournament ' + tourn.name + ' completed! Winners: ' + names.join(', '));
+        }
     }
 }
 
-/**
- * Render eliminations
- */
-function renderEliminations(tourn) {
-    var container = document.getElementById('elimination-list');
-    if (!tourn.eliminations || tourn.eliminations.length === 0) {
-        container.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations recorded</p>';
+function generateRounds(tournId) {
+    var tourn = getTournament(tournId);
+    if (!tourn) return;
+    
+    if (!tourn.participants || tourn.participants.length < 2) {
+        alert('Need at least 2 participants.');
         return;
     }
     
-    var html = '';
-    var sorted = tourn.eliminations.slice().sort(function(a, b) { return parseInt(a.week) - parseInt(b.week); });
-    sorted.forEach(function(elim, index) {
-        var char = data.characters.find(function(c) { return String(c.id) === String(elim.characterId); });
-        var charName = char ? [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-        var teamName = '';
-        if (elim.teamId) {
-            var team = data.teams.find(function(t) { return String(t.id) === String(elim.teamId); });
-            if (team) teamName = ' (' + team.name + ')';
+    // Clear existing rounds
+    tourn.roundsData = [];
+    tourn.eliminations = [];
+    tourn.winner = null;
+    tourn.winners = [];
+    
+    var matchCount = getMatchParticipantCount(tourn.matchType);
+    var totalRounds = tourn.rounds || 1;
+    var participants = tourn.participants.map(function(p) { return p.id; });
+    
+    for (var round = 0; round < totalRounds; round++) {
+        var roundParticipants = [];
+        if (round === 0) {
+            roundParticipants = participants.slice();
+        } else {
+            // Get non-eliminated participants
+            var eliminatedIds = (tourn.eliminations || []).map(function(e) { return e.participantId; });
+            roundParticipants = participants.filter(function(id) {
+                return eliminatedIds.indexOf(id) === -1;
+            });
         }
-        var standaloneLabel = elim.standalone ? ' [Standalone]' : '';
-        var reasonLabel = elim.reason ? ' - ' + elim.reason : '';
-        var fromMatchLabel = elim.fromMatch ? ' (Match)' : '';
         
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--danger-soft);border-radius:4px;margin-bottom:2px;border-left:3px solid ' + (elim.standalone ? 'var(--warning)' : 'var(--danger)') + ';">';
-        html += '<span style="font-size:0.75rem;"><strong>' + charName + '</strong>' + teamName + standaloneLabel + fromMatchLabel + ' - Week ' + elim.week + reasonLabel + '</span>';
-        html += '<button class="remove-elimination-btn small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 4px;" data-index="' + index + '">\u2715</button>';
+        if (roundParticipants.length < 2) break;
+        
+        // Shuffle
+        for (var i = roundParticipants.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var temp = roundParticipants[i];
+            roundParticipants[i] = roundParticipants[j];
+            roundParticipants[j] = temp;
+        }
+        
+        var roundMatches = [];
+        for (var i = 0; i < roundParticipants.length; i += matchCount) {
+            var matchParticipants = roundParticipants.slice(i, i + matchCount);
+            if (matchParticipants.length < 2) {
+                if (roundMatches.length > 0) {
+                    roundMatches[roundMatches.length - 1].participants = 
+                        roundMatches[roundMatches.length - 1].participants.concat(matchParticipants);
+                }
+                continue;
+            }
+            roundMatches.push({
+                participants: matchParticipants,
+                winnerIds: [],
+                loserIds: [],
+                status: 'pending'
+            });
+        }
+        
+        tourn.roundsData.push({
+            roundNumber: round,
+            status: 'pending',
+            matches: roundMatches
+        });
+    }
+    
+    tourn.currentRound = 0;
+    tourn.status = 'active';
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    viewTournament(tournId);
+}
+
+function renderEliminationsTab(tourn) {
+    var container = document.getElementById('eliminations-content');
+    if (!container) return;
+    
+    var html = '<div style="margin-bottom:12px;">';
+    html += '<h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Eliminated Participants</h4>';
+    
+    if (!tourn.eliminations || tourn.eliminations.length === 0) {
+        html += '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations recorded.</p>';
+    } else {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+        tourn.eliminations.forEach(function(elim) {
+            var name = getParticipantNameById(elim.participantId);
+            html += '<span style="background:var(--danger-soft);padding:4px 10px;border-radius:12px;font-size:0.75rem;border:1px solid var(--danger);">';
+            html += name + ' \u274C';
+            if (elim.round !== undefined && elim.round !== null) {
+                html += ' (Round ' + (elim.round + 1) + ')';
+            }
+            html += ' <button class="remove-elimination-btn small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;" data-id="' + elim.participantId + '">\u2715</button>';
+            html += '</span>';
+        });
         html += '</div>';
-    });
+    }
+    html += '</div>';
+    
     container.innerHTML = html;
     
     container.querySelectorAll('.remove-elimination-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            removeElimination(tourn.id, parseInt(this.dataset.index));
+            var id = this.dataset.id;
+            if (!confirm('Remove this elimination?')) return;
+            tourn.eliminations = tourn.eliminations.filter(function(e) { return String(e.participantId) !== String(id); });
+            saveData().catch(function(err) { console.error('Failed to save:', err); });
+            viewTournament(tourn.id);
         });
     });
 }
 
-/**
- * Add elimination
- */
-function addElimination() {
-    var modal = document.getElementById('tournament-detail-modal');
-    var tournId = modal.dataset.tournamentId;
-    var tourn = getTournament(tournId);
-    if (!tourn) return;
-    
-    var characterId = document.getElementById('elim-character-select').value;
-    var week = parseInt(document.getElementById('elim-week').value) || 1;
-    
-    if (!characterId) { alert('Please select a character to eliminate.'); return; }
-    
-    if (!tourn.eliminations) tourn.eliminations = [];
-    
-    if (tourn.eliminations.some(function(e) { return String(e.characterId) === String(characterId); })) {
-        alert('This character is already eliminated from this tournament.');
-        return;
-    }
-    
-    var teamId = null;
-    if (tourn.mode === 'teams') {
-        var teams = tourn.teams || [];
-        for (var i = 0; i < teams.length; i++) {
-            var team = data.teams.find(function(t) { return String(t.id) === String(teams[i].teamId); });
-            if (team && team.members) {
-                if (team.members.some(function(m) { return String(m.characterId) === String(characterId); })) {
-                    teamId = team.id;
-                    break;
-                }
-            }
-        }
-    }
-    
-    var char = data.characters.find(function(c) { return String(c.id) === String(characterId); });
-    var hasStandalone = false;
-    if (char && char.eliminations) {
-        char.eliminations.forEach(function(elim) {
-            if (elim.standalone) {
-                var elimWeek = parseInt(elim.week);
-                if (!isNaN(elimWeek) && elimWeek <= week) {
-                    hasStandalone = true;
-                }
-            }
-        });
-    }
-    
-    var isAlreadyEliminated = false;
-    data.tournaments.forEach(function(t) {
-        if (String(t.id) === String(tournId)) return;
-        if (t.eliminations) {
-            t.eliminations.forEach(function(elim) {
-                if (String(elim.characterId) === String(characterId)) {
-                    var elimWeek = parseInt(elim.week);
-                    if (!isNaN(elimWeek) && elimWeek <= week) {
-                        isAlreadyEliminated = true;
-                    }
-                }
-            });
-        }
-    });
-    
-    if (isAlreadyEliminated && !hasStandalone) {
-        alert('This character is already eliminated from another tournament.');
-        return;
-    }
-    
-    tourn.eliminations.push({
-        characterId: characterId,
-        week: week,
-        teamId: teamId,
-        standalone: false,
-        fromMatch: false,
-        reason: 'Eliminated from tournament'
-    });
-    
-    if (char) {
-        if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
-        if (char.eliminatedWeeks.indexOf(week) === -1) {
-            char.eliminatedWeeks.push(week);
-        }
-        if (!char.eliminations) char.eliminations = [];
-        char.eliminations.push({
-            tournamentId: tournId,
-            week: week,
-            reason: 'Eliminated from tournament: ' + tourn.name,
-            standalone: false,
-            fromMatch: false
-        });
-    }
-    
-    var charName = char ? [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
-    if (typeof logActivity === 'function') {
-        logActivity('Eliminated ' + charName + ' from tournament: ' + tourn.name + ' (Week ' + week + ')');
-    }
-    
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    viewTournament(tournId);
-}
-
-/**
- * Remove elimination
- */
-function removeElimination(tournId, index) {
-    if (!confirm('Remove this elimination?')) return;
-    var tourn = getTournament(tournId);
-    if (!tourn || !tourn.eliminations || !tourn.eliminations[index]) return;
-    
-    var elim = tourn.eliminations[index];
-    var char = data.characters.find(function(c) { return String(c.id) === String(elim.characterId); });
-    
-    if (char && char.eliminatedWeeks) {
-        var weekIdx = char.eliminatedWeeks.indexOf(parseInt(elim.week));
-        if (weekIdx !== -1) {
-            char.eliminatedWeeks.splice(weekIdx, 1);
-        }
-    }
-    
-    tourn.eliminations.splice(index, 1);
-    
-    if (typeof logActivity === 'function') {
-        logActivity('Removed elimination from tournament: ' + tourn.name);
-    }
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    viewTournament(tournId);
-}
-
-/**
- * Render winner display
- */
-function renderWinner(tourn) {
-    var container = document.getElementById('winner-display');
-    var winnerName = getTournamentWinnerDisplay(tourn);
-    if (winnerName) {
-        container.innerHTML = '\u2605 ' + winnerName;
-        container.style.color = 'var(--accent)';
-        container.style.fontWeight = '600';
-        container.style.fontSize = '1.1rem';
-        container.style.display = 'block';
-    } else {
-        container.innerHTML = 'Not determined yet';
-        container.style.color = 'var(--text-dim)';
-        container.style.fontWeight = 'normal';
-        container.style.fontSize = '1rem';
-        container.style.display = 'block';
-    }
-}
-
-/**
- * Delete a tournament
- */
-function deleteTournament(id) {
-    console.log('deleteTournament called with id:', id);
-    
-    if (!id) {
-        console.error('No tournament ID provided');
-        alert('Tournament ID not found.');
-        return;
-    }
-    
-    var tourn = getTournament(id);
-    if (!tourn) {
-        console.error('Tournament not found:', id);
-        alert('Tournament not found.');
-        return;
-    }
-    
-    if (!confirm('Delete "' + tourn.name + '" permanently?')) {
-        return;
-    }
-    
-    // Remove from data
-    data.tournaments = data.tournaments.filter(function(t) { return String(t.id) !== String(id); });
-    
-    if (typeof logActivity === 'function') {
-        logActivity('Deleted tournament: ' + tourn.name);
-    }
-    
-    saveData().then(function() {
-        renderTournamentsList();
-        closeTournamentDetail();
-        if (typeof renderAll === 'function') {
-            renderAll();
-        }
-        alert('Tournament "' + tourn.name + '" deleted successfully.');
-    }).catch(function(err) {
-        console.error('Failed to save after deletion:', err);
-        alert('Failed to delete tournament. Please check console for details.');
-    });
-}
-
-/**
- * Initialize tournament events
- */
 function initTournamentEvents() {
-    var addBtn = document.getElementById('add-tournament-btn');
-    if (addBtn) {
-        addBtn.addEventListener('click', function() { showTournamentForm(); });
-    }
-    
-    var closeFormBtn = document.getElementById('close-tournament-form');
-    if (closeFormBtn) {
-        closeFormBtn.addEventListener('click', closeTournamentForm);
-    }
-    var cancelFormBtn = document.getElementById('cancel-tournament-form');
-    if (cancelFormBtn) {
-        cancelFormBtn.addEventListener('click', closeTournamentForm);
-    }
-    var formModal = document.getElementById('tournament-form-modal');
-    if (formModal) {
-        formModal.addEventListener('click', function(e) {
-            if (e.target === this) closeTournamentForm();
-        });
-    }
-    
-    var form = document.getElementById('tournament-form-inner');
-    if (form) {
-        form.addEventListener('submit', saveTournament);
-    }
-    
-    var closeDetailBtn = document.getElementById('close-tournament-detail');
-    if (closeDetailBtn) {
-        closeDetailBtn.addEventListener('click', closeTournamentDetail);
-    }
-    var detailModal = document.getElementById('tournament-detail-modal');
-    if (detailModal) {
-        detailModal.addEventListener('click', function(e) {
-            if (e.target === this) closeTournamentDetail();
-        });
-    }
-    
-    var teamsModeBtn = document.getElementById('switch-teams-mode');
-    var indModeBtn = document.getElementById('switch-individuals-mode');
-    if (teamsModeBtn) {
-        teamsModeBtn.addEventListener('click', function() {
-            var modal = document.getElementById('tournament-detail-modal');
-            var tournId = modal.dataset.tournamentId;
-            var tourn = getTournament(tournId);
-            if (tourn) {
-                tourn.mode = 'teams';
-                viewTournament(tournId);
-            }
-        });
-    }
-    if (indModeBtn) {
-        indModeBtn.addEventListener('click', function() {
-            var modal = document.getElementById('tournament-detail-modal');
-            var tournId = modal.dataset.tournamentId;
-            var tourn = getTournament(tournId);
-            if (tourn) {
-                tourn.mode = 'individuals';
-                viewTournament(tournId);
-            }
-        });
-    }
-    
-    // FIXED: Add Round button
-    var addRoundBtn = document.getElementById('add-round-btn');
-    if (addRoundBtn) {
-        // Remove any existing listeners by cloning
-        var newAddRoundBtn = addRoundBtn.cloneNode(true);
-        addRoundBtn.parentNode.replaceChild(newAddRoundBtn, addRoundBtn);
-        newAddRoundBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            console.log('Add Round button clicked');
-            // Call addRound from tournaments-individuals.js
-            if (typeof window.addRound === 'function') {
-                window.addRound();
-            } else if (typeof addRound === 'function') {
-                addRound();
-            } else {
-                alert('Add Round function not available. Please refresh the page.');
-                console.error('addRound function not found');
-            }
-        });
-    }
-    
-    var autoGenBtn = document.getElementById('auto-generate-rounds-btn');
-    if (autoGenBtn) {
-        autoGenBtn.addEventListener('click', function() {
-            var modal = document.getElementById('tournament-detail-modal');
-            var tournId = modal.dataset.tournamentId;
-            var tourn = getTournament(tournId);
-            if (tourn) {
-                autoGenerateRounds(tournId);
-            }
-        });
-    }
-    
-    var addTeamBtn = document.getElementById('add-team-to-tournament');
-    if (addTeamBtn) {
-        addTeamBtn.addEventListener('click', addTeamToTournament);
-    }
-    
-    var addCharBtn = document.getElementById('add-char-to-tournament');
-    if (addCharBtn) {
-        addCharBtn.addEventListener('click', addCharacterToTournament);
-    }
-    
-    var refreshBtn = document.getElementById('refresh-teams-btn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-            var modal = document.getElementById('tournament-detail-modal');
-            var tournId = modal.dataset.tournamentId;
-            var tourn = getTournament(tournId);
-            if (tourn) {
-                populateTeamSelector(tourn);
-                populateEliminationSelector(tourn);
-            }
-        });
-    }
-    var refreshCharsBtn = document.getElementById('refresh-chars-btn');
-    if (refreshCharsBtn) {
-        refreshCharsBtn.addEventListener('click', function() {
-            var modal = document.getElementById('tournament-detail-modal');
-            var tournId = modal.dataset.tournamentId;
-            var tourn = getTournament(tournId);
-            if (tourn) {
-                populateCharacterSelector(tourn);
-                populateEliminationSelector(tourn);
-            }
-        });
-    }
-    
-    var addMatchBtn = document.getElementById('add-match-btn');
-    if (addMatchBtn) {
-        addMatchBtn.addEventListener('click', addTeamMatch);
-    }
-    
-    var addElimBtn = document.getElementById('add-elimination-btn');
-    if (addElimBtn) {
-        addElimBtn.addEventListener('click', addElimination);
-    }
-    
-    var removeElimBtn = document.getElementById('remove-elimination-btn');
-    if (removeElimBtn) {
-        removeElimBtn.addEventListener('click', function() {
-            var modal = document.getElementById('tournament-detail-modal');
-            var tournId = modal.dataset.tournamentId;
-            var tourn = getTournament(tournId);
-            if (!tourn || !tourn.eliminations) return;
-            
-            var select = document.getElementById('elim-character-select');
-            var selectedValue = select.value;
-            if (!selectedValue) { alert('Please select a character to remove from eliminations.'); return; }
-            if (!confirm('Remove this character from eliminations?')) return;
-            
-            var index = tourn.eliminations.findIndex(function(e) { return String(e.characterId) === String(selectedValue); });
-            if (index === -1) { alert('Character not found in eliminations.'); return; }
-            
-            removeElimination(tournId, index);
-        });
-    }
-    
-    // Match detail modal events
-    var closeMatchDetail = document.getElementById('close-match-detail');
-    if (closeMatchDetail) {
-        closeMatchDetail.addEventListener('click', function() {
-            document.getElementById('match-detail-modal').classList.add('hidden');
-        });
-    }
-    var cancelMatchDetail = document.getElementById('cancel-match-detail');
-    if (cancelMatchDetail) {
-        cancelMatchDetail.addEventListener('click', function() {
-            document.getElementById('match-detail-modal').classList.add('hidden');
-        });
-    }
+    document.getElementById('add-tournament-btn')?.addEventListener('click', function() { showTournamentForm(); });
+    document.getElementById('close-tournament-form')?.addEventListener('click', closeTournamentForm);
+    document.getElementById('cancel-tournament-form')?.addEventListener('click', closeTournamentForm);
+    document.getElementById('tournament-form-modal')?.addEventListener('click', function(e) {
+        if (e.target === this) closeTournamentForm();
+    });
+    document.getElementById('tournament-form-inner')?.addEventListener('submit', saveTournament);
+    document.getElementById('close-tournament-detail')?.addEventListener('click', closeTournamentDetail);
+    document.getElementById('tournament-detail-modal')?.addEventListener('click', function(e) {
+        if (e.target === this) closeTournamentDetail();
+    });
 }
 
 // Make functions globally available
 window.renderTournamentsView = renderTournamentsView;
 window.renderTournamentsList = renderTournamentsList;
+window.showTournamentForm = showTournamentForm;
+window.saveTournament = saveTournament;
+window.closeTournamentForm = closeTournamentForm;
+window.closeTournamentDetail = closeTournamentDetail;
 window.viewTournament = viewTournament;
+window.generateRounds = generateRounds;
+window.completeRound = completeRound;
+window.completeMatch = completeMatch;
+window.resetMatch = resetMatch;
+window.toggleMatchWinner = toggleMatchWinner;
+window.toggleMatchLoser = toggleMatchLoser;
+window.addManualRound = addManualRound;
+window.showManualMatchModal = showManualMatchModal;
+window.determineTournamentWinner = determineTournamentWinner;
 window.initTournamentEvents = initTournamentEvents;
-window.populateEliminationSelector = populateEliminationSelector;
-window.renderEliminations = renderEliminations;
-window.addElimination = addElimination;
-window.removeElimination = removeElimination;
-window.renderWinner = renderWinner;
 window.deleteTournament = deleteTournament;
