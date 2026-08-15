@@ -921,59 +921,78 @@ function showAddMatchToRoundModal(tournId, roundIndex) {
 }
 
 /**
- * Add a round to the tournament
+ * Add a round to the tournament - FIXED with console logs
  */
 function addRound() {
     console.log('addRound called');
     
     var modal = document.getElementById('tournament-detail-modal');
     if (!modal) {
+        console.error('Tournament detail modal not found');
         alert('Please open a tournament first.');
         return;
     }
     
     var tournId = modal.dataset.tournamentId;
+    console.log('tournId:', tournId);
     if (!tournId) {
+        console.error('No tournament ID found in modal');
         alert('Tournament not found. Please refresh and try again.');
         return;
     }
     
     var tourn = getTournament(tournId);
+    console.log('tourn:', tourn);
     if (!tourn) {
+        console.error('Tournament not found for ID:', tournId);
         alert('Tournament not found. Please refresh and try again.');
         return;
     }
     
     if (tourn.mode !== 'individuals') {
+        console.log('Tournament mode is:', tourn.mode);
         alert('Rounds are only available for individual tournaments.');
         return;
     }
     
     if (!tourn.participants || tourn.participants.length < 2) {
+        console.log('Participants:', tourn.participants);
         alert('Need at least 2 participants to create a round.');
         return;
     }
     
     if (!tourn.rounds) tourn.rounds = [];
     var roundNumber = tourn.rounds.length + 1;
+    console.log('Round number:', roundNumber);
     
     var availableParticipants = getAvailableParticipantsForRound(tourn, roundNumber);
+    console.log('Available participants:', availableParticipants);
     
     if (availableParticipants.length < 2) {
         alert('Not enough available participants for a new round. Need at least 2 participants who are not eliminated.');
         return;
     }
     
+    // Show the match creator modal
     showRoundMatchCreator(tournId, roundNumber, availableParticipants);
 }
 
 /**
- * Show round match creator
+ * Show round match creator - FIXED
  */
 function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
+    console.log('showRoundMatchCreator called with tournId:', tournId, 'roundNumber:', roundNumber);
+    
     var modal = document.getElementById('match-detail-modal');
     if (!modal) {
         alert('Modal not found. Please refresh.');
+        return;
+    }
+    
+    // Get the tournament object - THIS WAS THE ISSUE
+    var tourn = getTournament(tournId);
+    if (!tourn) {
+        alert('Tournament not found.');
         return;
     }
     
@@ -1364,7 +1383,7 @@ function showRoundMatchCreator(tournId, roundNumber, availableParticipants) {
     
     if (saveBtn) {
         saveBtn.onclick = function() {
-            var tourn = getTournament(tournId);
+            // Use the tourn variable we already have
             if (!tourn) {
                 alert('Tournament not found.');
                 return;
@@ -2008,3 +2027,4 @@ window.completeMatch = completeMatch;
 window.showRoundMatchesModal = showRoundMatchesModal;
 window.resetMatch = resetMatch;
 window.autoGenerateRounds = autoGenerateRounds;
+
