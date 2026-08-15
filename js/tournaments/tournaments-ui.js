@@ -1,6 +1,5 @@
 /**
  * tournaments-ui.js - Tournament UI Rendering
- * Complete rework with manual rounds, alphabetical dropdowns, individual eliminations
  */
 
 function renderTournamentsView(container) {
@@ -47,10 +46,10 @@ function renderTournamentsView(container) {
                         <div class="form-group">
                             <label>Match Type *</label>
                             <select id="tournament-match-type" required>
-                                <option value="1v1">1v1 (2 players/teams)</option>
-                                <option value="1v1v1">1v1v1 (3 players/teams)</option>
-                                <option value="1v1v1v1">1v1v1v1 (4 players/teams)</option>
-                                <option value="ffa">Free-for-All (8 max)</option>
+                                <option value="1v1">1v1 (2)</option>
+                                <option value="1v1v1">1v1v1 (3)</option>
+                                <option value="1v1v1v1">1v1v1v1 (4)</option>
+                                <option value="ffa">Free-for-All</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -66,7 +65,7 @@ function renderTournamentsView(container) {
                         <div class="form-group">
                             <label>Round Setup *</label>
                             <select id="tournament-round-setup" required>
-                                <option value="auto">Auto-Generate Rounds</option>
+                                <option value="auto">Auto-Generate</option>
                                 <option value="manual">Manual Setup</option>
                             </select>
                         </div>
@@ -146,7 +145,7 @@ function renderTournamentsView(container) {
 
         <!-- Eliminate Character Modal -->
         <div id="eliminate-modal" class="modal hidden">
-            <div class="modal-content" style="max-width:400px;">
+            <div class="modal-content" style="max-width:450px;">
                 <div class="modal-header">
                     <h3 id="eliminate-modal-title">Eliminate Character</h3>
                     <button class="close-modal" id="close-eliminate-modal">&times;</button>
@@ -193,7 +192,7 @@ function renderTournamentsList() {
         html += '<div class="list-item tourn-item" data-id="' + tourn.id + '">' +
             '<span><strong>' + tourn.name + '</strong>' + winnerDisplay + '</span>' +
             '<span style="font-size:0.75rem;">' + weekDisplay + '</span>' +
-            '<span style="font-size:0.75rem;">' + modeLabel + ' | ' + matchTypeDisplay + setupLabel + '</span>' +
+            '<span style="font-size:0.75rem;">' + modeLabel + ' ' + matchTypeDisplay + setupLabel + '</span>' +
             '<span>' + participantCount + '</span>' +
             '<span style="color:' + statusColor + ';font-size:0.75rem;font-weight:600;">' + (tourn.status || 'active') + '</span>' +
             '<span class="actions">' +
@@ -206,20 +205,13 @@ function renderTournamentsList() {
     container.innerHTML = html;
     
     container.querySelectorAll('.view-tournament').forEach(function(btn) {
-        btn.addEventListener('click', function() { 
-            var id = this.dataset.id;
-            viewTournament(id); 
-        });
+        btn.addEventListener('click', function() { viewTournament(btn.dataset.id); });
     });
     container.querySelectorAll('.edit-tournament').forEach(function(btn) {
-        btn.addEventListener('click', function() { 
-            showTournamentForm(this.dataset.id); 
-        });
+        btn.addEventListener('click', function() { showTournamentForm(btn.dataset.id); });
     });
     container.querySelectorAll('.delete-tournament').forEach(function(btn) {
-        btn.addEventListener('click', function() { 
-            deleteTournament(this.dataset.id); 
-        });
+        btn.addEventListener('click', function() { deleteTournament(btn.dataset.id); });
     });
 }
 
@@ -283,16 +275,9 @@ function saveTournament(e) {
     if (editId) {
         var index = data.tournaments.findIndex(function(t) { return String(t.id) === String(editId); });
         if (index !== -1) {
+            // Preserve existing data
             var existing = data.tournaments[index];
-            // Preserve roundsData if it exists
-            var roundsData = existing.roundsData || [];
-            var participants = existing.participants || [];
-            var eliminations = existing.eliminations || [];
-            data.tournaments[index] = Object.assign({}, existing, tournData, {
-                roundsData: roundsData,
-                participants: participants,
-                eliminations: eliminations
-            });
+            data.tournaments[index] = Object.assign({}, existing, tournData);
             if (typeof logActivity === 'function') {
                 logActivity('Updated tournament: ' + tournData.name);
             }
@@ -300,7 +285,7 @@ function saveTournament(e) {
     } else {
         var newTourn = createTournament(tournData);
         if (typeof logActivity === 'function') {
-            logActivity('Created tournament: ' + tournData.name + ' (' + tournData.roundSetup + ' rounds)');
+            logActivity('Created tournament: ' + tournData.name);
         }
     }
     
@@ -481,10 +466,7 @@ function renderParticipantsTab(tourn) {
             return start <= tourn.endWeek && (isNaN(end) || end >= tourn.startWeek);
         });
         
-        // Sort alphabetically
-        allTeams.sort(function(a, b) {
-            return a.name.localeCompare(b.name);
-        });
+        allTeams.sort(function(a, b) { return a.name.localeCompare(b.name); });
         
         var existingIds = (tourn.participants || []).map(function(p) { return p.id; });
         
@@ -497,8 +479,7 @@ function renderParticipantsTab(tourn) {
             }
         });
     } else {
-        // Individuals - only trainees, alphabetical
-        var startWeek = tourn.startWeek || 1;
+        // Individuals - only trainees
         var allChars = data.characters.filter(function(c) {
             if (c.deceased) return false;
             var status = getCurrentStatus(c).toLowerCase();
@@ -603,26 +584,24 @@ function renderRoundsTab(tourn) {
     
     if (isManual) {
         html += '<button id="add-manual-round-btn" class="primary small">+ Add Manual Round</button>';
-        var lastRoundIndex = tourn.roundsData ? tourn.roundsData.length - 1 : 0;
         if (tourn.roundsData && tourn.roundsData.length > 0) {
-            html += '<button id="add-manual-match-btn" class="primary small">+ Add Match to Current Round</button>';
+            html += '<button id="add-manual-match-btn" class="primary small">+ Add Match</button>';
         }
     } else {
         html += '<button id="create-rounds-btn" class="primary small">Generate Rounds</button>';
     }
-    html += '<button id="reset-rounds-btn" class="danger small">Reset All Rounds</button>';
+    html += '<button id="reset-rounds-btn" class="danger small">Reset All</button>';
     html += '<span style="font-size:0.7rem;color:var(--text-dim);margin-left:8px;">Rounds: ' + (tourn.roundsData ? tourn.roundsData.length : 0) + '/' + (tourn.rounds || 1) + '</span>';
     html += '</div>';
     
-    // Show the mode indicator
+    // Show mode indicator
     html += '<div style="background:var(--bg);padding:8px 12px;border-radius:6px;margin-bottom:12px;border:1px solid var(--border-soft);">';
-    html += '<span style="color:var(--text-dim);font-size:0.75rem;">Setup Mode: </span>';
+    html += '<span style="color:var(--text-dim);font-size:0.75rem;">Setup: </span>';
     html += '<span style="font-weight:600;color:' + (isManual ? 'var(--warning)' : 'var(--info)') + ';">' + (isManual ? '\u2692 Manual' : '\u26A0 Auto') + '</span>';
-    html += ' <span style="color:var(--text-dim);font-size:0.7rem;">' + (isManual ? '(Add rounds and matches manually)' : '(Auto-generated rounds)') + '</span>';
     html += '</div>';
     
     if (!tourn.roundsData || tourn.roundsData.length === 0) {
-        html += '<p class="empty-state">No rounds created. Click "' + (isManual ? 'Add Manual Round' : 'Generate Rounds') + '" to start.</p>';
+        html += '<p class="empty-state">No rounds. Click "' + (isManual ? 'Add Manual Round' : 'Generate Rounds') + '".</p>';
         container.innerHTML = html;
         attachRoundEvents(tourn);
         return;
@@ -641,19 +620,19 @@ function renderRoundsTab(tourn) {
             (isCompleted ? 'var(--info-soft);color:var(--info);' : 
              isCurrent ? 'var(--warning-soft);color:var(--warning);' :
              'var(--bg);color:var(--text-dim);') + '">' + 
-            (isCompleted ? '\u2713 Completed' : isCurrent ? '\u23F3 In Progress' : '\u23F8 Pending') + '</span>';
+            (isCompleted ? '\u2713 Done' : isCurrent ? '\u23F3 Active' : '\u23F8 Pending') + '</span>';
         html += '</div>';
         html += '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
         if (!isCompleted && isManual) {
             html += '<button class="small primary add-match-btn" data-round="' + roundIndex + '">+ Match</button>';
         }
-        if (!isCompleted) {
-            html += '<button class="small primary complete-round-btn" data-round="' + roundIndex + '">Complete Round</button>';
-        }
-        // Always show eliminate button if there are participants
+        // Eliminate button - always show if there are participants
         var hasParticipants = tourn.participants && tourn.participants.length > 0;
         if (hasParticipants) {
-            html += '<button class="small danger eliminate-char-btn" data-round="' + roundIndex + '">\u274C Eliminate</button>';
+            html += '<button class="small danger eliminate-btn" data-round="' + roundIndex + '">\u274C</button>';
+        }
+        if (!isCompleted) {
+            html += '<button class="small primary complete-round-btn" data-round="' + roundIndex + '">Complete</button>';
         }
         html += '<button class="small danger delete-round-btn" data-round="' + roundIndex + '">\u2715</button>';
         html += '</div>';
@@ -681,31 +660,31 @@ function renderRoundsTab(tourn) {
                 }
                 
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--bg);border-radius:4px;margin-bottom:4px;border-left:3px solid ' + statusColor + ';flex-wrap:wrap;gap:4px;">';
-                html += '<span style="font-size:0.75rem;">Match ' + (matchIndex + 1) + ': <strong>' + participantNames.join(' vs ') + '</strong></span>';
-                html += '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
+                html += '<span style="font-size:0.7rem;word-break:break-word;max-width:100%;">M' + (matchIndex + 1) + ': <strong>' + participantNames.join(' vs ') + '</strong></span>';
+                html += '<div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center;">';
                 if (matchStatus !== 'completed') {
-                    html += '<span style="font-size:0.6rem;color:var(--text-dim);">Winner:</span>';
+                    // Winner buttons
                     participantIds.forEach(function(id) {
                         var name = getParticipantNameById(id);
                         var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
-                        html += '<button class="small set-winner-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="' + 
-                            (isWinner ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + name + 
+                        html += '<button class="small set-winner-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="font-size:0.55rem;padding:1px 5px;' + 
+                            (isWinner ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + name.substring(0, 8) + 
                             (isWinner ? ' \u2713' : '') + '</button>';
                     });
-                    html += '<span style="font-size:0.6rem;color:var(--text-dim);">Loser:</span>';
+                    // Loser buttons
                     participantIds.forEach(function(id) {
                         var name = getParticipantNameById(id);
                         var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
                         if (!isLoser) {
-                            html += '<button class="small set-loser-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="' + 
-                                (isLoser ? 'border-color:var(--danger);color:var(--danger);' : '') + '">' + name + 
+                            html += '<button class="small set-loser-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="font-size:0.55rem;padding:1px 5px;' + 
+                                (isLoser ? 'border-color:var(--danger);color:var(--danger);' : '') + '">' + name.substring(0, 8) + 
                                 (isLoser ? ' \u2715' : '') + '</button>';
                         }
                     });
-                    html += '<button class="small primary complete-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Complete</button>';
+                    html += '<button class="small primary complete-match-btn" style="font-size:0.55rem;padding:1px 5px;" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Done</button>';
                 } else {
-                    html += '<span style="font-size:0.7rem;color:' + statusColor + ';">Completed</span>';
-                    html += '<button class="small warning-btn reset-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u21BB Reset</button>';
+                    html += '<span style="font-size:0.6rem;color:' + statusColor + ';">\u2713</span>';
+                    html += '<button class="small warning-btn reset-match-btn" style="font-size:0.55rem;padding:1px 5px;" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u21BB</button>';
                 }
                 html += '</div>';
                 html += '</div>';
@@ -723,20 +702,23 @@ function renderRoundsTab(tourn) {
 function attachRoundEvents(tourn) {
     var isManual = tourn.roundSetup === 'manual';
     
+    // Generate rounds (auto mode)
     document.getElementById('create-rounds-btn')?.addEventListener('click', function() {
         if (tourn.roundSetup === 'auto') {
             generateRounds(tourn.id);
         } else {
-            alert('This tournament is set to Manual mode. Use "Add Manual Round" instead.');
+            alert('This tournament is in Manual mode. Use "Add Manual Round".');
         }
     });
     
+    // Add manual round
     document.getElementById('add-manual-round-btn')?.addEventListener('click', function() {
         addManualRound(tourn.id);
     });
     
+    // Add match to current round
     document.getElementById('add-manual-match-btn')?.addEventListener('click', function() {
-        var lastRound = tourn.roundsData ? tourn.roundsData.length - 1 : 0;
+        var lastRound = tourn.roundsData ? tourn.roundsData.length - 1 : -1;
         if (lastRound < 0) {
             alert('Please add a round first.');
             return;
@@ -744,8 +726,9 @@ function attachRoundEvents(tourn) {
         showManualMatchModal(tourn.id, lastRound);
     });
     
+    // Reset all rounds
     document.getElementById('reset-rounds-btn')?.addEventListener('click', function() {
-        if (!confirm('Reset all rounds? This will remove all match data.')) return;
+        if (!confirm('Reset all rounds?')) return;
         tourn.roundsData = [];
         tourn.currentRound = 0;
         tourn.winner = null;
@@ -755,6 +738,7 @@ function attachRoundEvents(tourn) {
         viewTournament(tourn.id);
     });
     
+    // Add match to specific round
     document.querySelectorAll('.add-match-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -762,6 +746,7 @@ function attachRoundEvents(tourn) {
         });
     });
     
+    // Set winner
     document.querySelectorAll('.set-winner-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -771,6 +756,7 @@ function attachRoundEvents(tourn) {
         });
     });
     
+    // Set loser
     document.querySelectorAll('.set-loser-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -780,6 +766,7 @@ function attachRoundEvents(tourn) {
         });
     });
     
+    // Complete match
     document.querySelectorAll('.complete-match-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -788,6 +775,7 @@ function attachRoundEvents(tourn) {
         });
     });
     
+    // Reset match
     document.querySelectorAll('.reset-match-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -796,6 +784,7 @@ function attachRoundEvents(tourn) {
         });
     });
     
+    // Complete round
     document.querySelectorAll('.complete-round-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -803,6 +792,7 @@ function attachRoundEvents(tourn) {
         });
     });
     
+    // Delete round
     document.querySelectorAll('.delete-round-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -813,7 +803,8 @@ function attachRoundEvents(tourn) {
         });
     });
     
-    document.querySelectorAll('.eliminate-char-btn').forEach(function(btn) {
+    // Eliminate button
+    document.querySelectorAll('.eliminate-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
             showEliminateModal(tourn.id, roundIndex);
@@ -829,7 +820,7 @@ function addManualRound(tournId) {
     var roundNumber = tourn.roundsData.length;
     
     if (roundNumber >= tourn.rounds) {
-        alert('Maximum rounds reached (' + tourn.rounds + ').');
+        alert('Max rounds reached (' + tourn.rounds + ').');
         return;
     }
     
@@ -853,7 +844,6 @@ function showManualMatchModal(tournId, roundIndex) {
     }
     
     var round = tourn.roundsData[roundIndex];
-    var isTeams = tourn.mode === 'teams';
     var matchCount = getMatchParticipantCount(tourn.matchType);
     
     // Get available participants (not eliminated, not already in this round)
@@ -879,13 +869,10 @@ function showManualMatchModal(tournId, roundIndex) {
         });
     }
     
-    // Sort alphabetically
-    available.sort(function(a, b) {
-        return a.name.localeCompare(b.name);
-    });
+    available.sort(function(a, b) { return a.name.localeCompare(b.name); });
     
     if (available.length < 2) {
-        alert('Not enough available participants for a match. Need at least 2 non-eliminated participants not already in this round.');
+        alert('Not enough available participants. Need at least 2.');
         return;
     }
     
@@ -894,25 +881,19 @@ function showManualMatchModal(tournId, roundIndex) {
     
     var content = document.getElementById('manual-match-content');
     var html = '<div style="margin-bottom:12px;">';
-    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select ' + matchCount + ' participants for this match.</p>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">';
-    available.forEach(function(p) {
-        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);">' + p.name + '</span>';
-    });
-    html += '</div>';
-    html += '</div>';
-    
-    html += '<div id="manual-match-selection" style="margin-bottom:12px;">';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select ' + matchCount + ' participants.</p>';
+    html += '<div id="manual-match-selection">';
     for (var i = 0; i < matchCount; i++) {
         html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
         html += '<select class="manual-participant-select" data-index="' + i + '" style="flex:1;padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.7rem;">';
-        html += '<option value="">Select participant...</option>';
+        html += '<option value="">Select...</option>';
         available.forEach(function(p) {
             html += '<option value="' + p.id + '">' + p.name + '</option>';
         });
         html += '</select>';
         html += '</div>';
     }
+    html += '</div>';
     html += '</div>';
     
     content.innerHTML = html;
@@ -956,17 +937,16 @@ function showEliminateModal(tournId, roundIndex) {
     var tourn = getTournament(tournId);
     if (!tourn) return;
     
-    var isTeams = tourn.mode === 'teams';
     var modal = document.getElementById('eliminate-modal');
-    document.getElementById('eliminate-modal-title').textContent = 'Eliminate Character - Round ' + (roundIndex + 1);
+    document.getElementById('eliminate-modal-title').textContent = 'Eliminate Character';
     
     var content = document.getElementById('eliminate-content');
     
-    // Get all characters from the tournament
+    // Get all characters from the tournament (for team mode, get from participating teams)
     var allCharacters = [];
     var alreadyEliminated = (tourn.eliminations || []).map(function(e) { return e.participantId; });
     
-    if (isTeams) {
+    if (tourn.mode === 'teams') {
         // Get characters from all participating teams
         var tournamentChars = getTournamentCharacters(tourn);
         tournamentChars.forEach(function(c) {
@@ -988,10 +968,7 @@ function showEliminateModal(tournId, roundIndex) {
         });
     }
     
-    // Sort alphabetically
-    allCharacters.sort(function(a, b) {
-        return a.name.localeCompare(b.name);
-    });
+    allCharacters.sort(function(a, b) { return a.name.localeCompare(b.name); });
     
     if (allCharacters.length === 0) {
         content.innerHTML = '<p class="empty-state">No characters available to eliminate.</p>';
@@ -1001,17 +978,15 @@ function showEliminateModal(tournId, roundIndex) {
     }
     
     var html = '<div style="margin-bottom:12px;">';
-    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select a character to eliminate from the tournament.</p>';
-    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
-    html += '<select id="eliminate-select" style="flex:1;min-width:150px;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select a character to eliminate.</p>';
+    html += '<select id="eliminate-select" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;font-size:0.8rem;">';
     html += '<option value="">Select character...</option>';
     allCharacters.forEach(function(c) {
         html += '<option value="' + c.id + '">' + c.name + '</option>';
     });
     html += '</select>';
-    html += '</div>';
     html += '<div style="margin-top:8px;font-size:0.7rem;color:var(--text-dim);">';
-    html += 'Eliminating a character will remove them from the tournament. They will not be able to participate in future rounds.';
+    html += 'Eliminated characters cannot participate in future rounds.';
     html += '</div>';
     html += '</div>';
     
@@ -1019,7 +994,7 @@ function showEliminateModal(tournId, roundIndex) {
     document.getElementById('confirm-eliminate').style.display = 'inline-block';
     
     modal.dataset.tournId = tournId;
-    modal.dataset.roundIndex = roundIndex;
+    modal.dataset.roundIndex = roundIndex || 0;
     modal.classList.remove('hidden');
     
     document.getElementById('close-eliminate-modal').onclick = function() { modal.classList.add('hidden'); };
@@ -1030,7 +1005,7 @@ function showEliminateModal(tournId, roundIndex) {
         var select = document.getElementById('eliminate-select');
         var charId = select.value;
         if (!charId) {
-            alert('Please select a character to eliminate.');
+            alert('Please select a character.');
             return;
         }
         
@@ -1059,7 +1034,7 @@ function showEliminateModal(tournId, roundIndex) {
         viewTournament(tournId);
         
         if (typeof logActivity === 'function') {
-            logActivity('Eliminated ' + name + ' from tournament: ' + tourn.name);
+            logActivity('Eliminated ' + name + ' from ' + tourn.name);
         }
     };
 }
@@ -1079,7 +1054,7 @@ function toggleMatchWinner(tournId, roundIndex, matchIndex, participantId) {
         match.winnerIds.splice(idx, 1);
     } else {
         if (match.loserIds && match.loserIds.indexOf(participantId) !== -1) {
-            alert('This participant is marked as a loser. Remove loser status first.');
+            alert('This participant is marked as a loser.');
             return;
         }
         match.winnerIds.push(participantId);
@@ -1105,7 +1080,7 @@ function toggleMatchLoser(tournId, roundIndex, matchIndex, participantId) {
         match.loserIds.splice(idx, 1);
     } else {
         if (match.winnerIds && match.winnerIds.indexOf(participantId) !== -1) {
-            alert('This participant is marked as a winner. Remove winner status first.');
+            alert('This participant is marked as a winner.');
             return;
         }
         match.loserIds.push(participantId);
@@ -1133,11 +1108,11 @@ function completeMatch(tournId, roundIndex, matchIndex) {
     // For 1v1, ensure exactly 1 winner and 1 loser
     if (match.participants && match.participants.length === 2) {
         if (match.winnerIds.length !== 1) {
-            alert('For 1v1 matches, exactly 1 winner must be selected.');
+            alert('1v1 needs exactly 1 winner.');
             return;
         }
         if (!match.loserIds || match.loserIds.length !== 1) {
-            alert('For 1v1 matches, exactly 1 loser must be selected.');
+            alert('1v1 needs exactly 1 loser.');
             return;
         }
     }
@@ -1203,7 +1178,7 @@ function completeRound(tournId, roundIndex) {
     var allCompleted = round.matches.every(function(m) { return m.status === 'completed'; });
     
     if (!allCompleted) {
-        alert('All matches in this round must be completed first.');
+        alert('All matches must be completed first.');
         return;
     }
     
@@ -1237,14 +1212,14 @@ function determineTournamentWinner(tourn) {
         tourn.winner = winners[0];
         if (typeof logActivity === 'function') {
             var winnerName = getParticipantNameById(winners[0]);
-            logActivity('Tournament ' + tourn.name + ' completed! Winner: ' + winnerName);
+            logActivity('Tournament winner: ' + winnerName);
         }
     } else if (winners.length > 1) {
         tourn.winner = winners[0];
         tourn.winners = winners;
         if (typeof logActivity === 'function') {
             var names = winners.map(function(w) { return getParticipantNameById(w); });
-            logActivity('Tournament ' + tourn.name + ' completed! Winners: ' + names.join(', '));
+            logActivity('Tournament winners: ' + names.join(', '));
         }
     }
 }
@@ -1254,7 +1229,7 @@ function generateRounds(tournId) {
     if (!tourn) return;
     
     if (tourn.roundSetup === 'manual') {
-        alert('This tournament is set to Manual mode. Use "Add Manual Round" instead.');
+        alert('This tournament is in Manual mode.');
         return;
     }
     
@@ -1285,6 +1260,7 @@ function generateRounds(tournId) {
         
         if (roundParticipants.length < 2) break;
         
+        // Shuffle
         for (var i = roundParticipants.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
             var temp = roundParticipants[i];
@@ -1329,21 +1305,19 @@ function renderEliminationsTab(tourn) {
     if (!container) return;
     
     var html = '<div style="margin-bottom:12px;">';
-    html += '<h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Eliminated Participants</h4>';
+    html += '<h4 style="color:var(--danger);font-size:0.9rem;margin-bottom:8px;">Eliminated</h4>';
     
     if (!tourn.eliminations || tourn.eliminations.length === 0) {
-        html += '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations recorded.</p>';
+        html += '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No eliminations.</p>';
     } else {
         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
         tourn.eliminations.forEach(function(elim) {
             var name = getParticipantNameById(elim.participantId);
-            var typeLabel = '';
-            if (elim.type === 'manual') typeLabel = ' (Manual)';
-            else if (elim.type === 'lost') typeLabel = ' (Lost Match)';
+            var typeLabel = elim.type === 'manual' ? ' (Manual)' : ' (Lost)';
             html += '<span style="background:var(--danger-soft);padding:4px 10px;border-radius:12px;font-size:0.75rem;border:1px solid var(--danger);">';
             html += name + ' \u274C' + typeLabel;
             if (elim.round !== undefined && elim.round !== null) {
-                html += ' (Round ' + (elim.round + 1) + ')';
+                html += ' R' + (elim.round + 1);
             }
             html += ' <button class="remove-elimination-btn small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;" data-id="' + elim.participantId + '">\u2715</button>';
             html += '</span>';
