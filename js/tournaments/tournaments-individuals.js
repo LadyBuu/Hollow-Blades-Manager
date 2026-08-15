@@ -5,11 +5,8 @@
 
 /**
  * Populate character selector for individual mode
- * Shows ALL participants with their status:
- * - Available (not in tournament) - shown first
- * - Active participants (in tournament, no match yet) - shown next
- * - Participants who completed matches (winners/losers) - shown at bottom with indicators
- * Civilians are excluded
+ * ONLY shows TRAINEES
+ * Clear distinction: Available (never participated) vs Already in tournament
  */
 function populateCharacterSelector(tourn) {
     var select = document.getElementById('tournament-char-select');
@@ -18,40 +15,68 @@ function populateCharacterSelector(tourn) {
     var startWeek = parseInt(tourn.startWeek) || 1;
     var existingIds = (tourn.participants || []).map(function(p) { return p.characterId; });
     
-    // Get all non-civilian characters that are available (not in tournament yet)
-    var available = data.characters.filter(function(c) {
+    // Get ALL trainees (regardless of tournament participation)
+    var allTrainees = data.characters.filter(function(c) {
         if (c.deceased) return false;
-        if (existingIds.some(function(id) { return String(id) === String(c.id); })) return false;
         if (isCharacterEliminatedByWeek(c, startWeek)) return false;
         var status = getCurrentStatus(c).toLowerCase();
-        // Exclude civilians
-        return status !== 'civilian' && status !== '';
+        return status === 'trainee';
     });
     
-    // Get active participants (already in tournament, not eliminated, no match completed yet)
-    var activeParticipants = [];
-    var completedParticipants = [];
+    // Sort by name
+    allTrainees.sort(function(a, b) {
+        var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
     
-    if (tourn.participants) {
-        tourn.participants.forEach(function(p) {
-            var c = data.characters.find(function(ch) { return String(ch.id) === String(p.characterId); });
-            if (!c || c.deceased) return;
+    // Separate: NOT in tournament yet vs Already in tournament
+    var notInTournament = [];
+    var inTournament = [];
+    
+    allTrainees.forEach(function(c) {
+        var inTourn = existingIds.some(function(id) { return String(id) === String(c.id); });
+        if (inTourn) {
+            inTournament.push(c);
+        } else {
+            notInTournament.push(c);
+        }
+    });
+    
+    select.innerHTML = '<option value="">Select character...</option>';
+    
+    if (allTrainees.length === 0) {
+        select.innerHTML += '<option value="" disabled>No trainees available</option>';
+        return;
+    }
+    
+    // SECTION 1: Trainees NOT in tournament yet (NEVER participated)
+    if (notInTournament.length > 0) {
+        notInTournament.forEach(function(c) {
+            var option = document.createElement('option');
+            option.value = c.id;
+            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
+            option.textContent = name + ' (trainee)';
+            select.appendChild(option);
+        });
+        
+        // Add separator if there are participants already in tournament
+        if (inTournament.length > 0) {
+            var sep = document.createElement('option');
+            sep.disabled = true;
+            sep.textContent = '── Already in tournament ──';
+            select.appendChild(sep);
+        }
+    }
+    
+    // SECTION 2: Trainees already in tournament (have participated or will participate)
+    if (inTournament.length > 0) {
+        inTournament.forEach(function(c) {
+            var option = document.createElement('option');
+            option.value = c.id;
+            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
             
-            // Check if eliminated from this tournament
-            var isEliminated = false;
-            if (tourn.eliminations) {
-                tourn.eliminations.forEach(function(elim) {
-                    if (String(elim.characterId) === String(c.id)) {
-                        var elimWeek = parseInt(elim.week);
-                        if (!isNaN(elimWeek) && elimWeek <= startWeek) {
-                            isEliminated = true;
-                        }
-                    }
-                });
-            }
-            if (isEliminated) return;
-            
-            // Check if they have completed any match
+            // Check if they've completed a match
             var hasCompletedMatch = false;
             var isWinner = false;
             var isLoser = false;
@@ -74,113 +99,25 @@ function populateCharacterSelector(tourn) {
                 });
             }
             
-            if (hasCompletedMatch) {
-                completedParticipants.push({
-                    character: c,
-                    isWinner: isWinner,
-                    isLoser: isLoser
-                });
-            } else {
-                activeParticipants.push(c);
-            }
-        });
-    }
-    
-    // Sort all groups by name
-    available.sort(function(a, b) {
-        var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
-    
-    activeParticipants.sort(function(a, b) {
-        var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
-    
-    completedParticipants.sort(function(a, b) {
-        var nameA = [a.character.firstName, a.character.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.character.firstName, b.character.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
-    
-    select.innerHTML = '<option value="">Select character...</option>';
-    
-    var totalAvailable = available.length + activeParticipants.length + completedParticipants.length;
-    
-    if (totalAvailable === 0) {
-        select.innerHTML += '<option value="" disabled>No available characters</option>';
-        return;
-    }
-    
-    // Section 1: Available (not in tournament)
-    if (available.length > 0) {
-        available.forEach(function(c) {
-            var option = document.createElement('option');
-            option.value = c.id;
-            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
-            var status = getCurrentStatus(c);
-            option.textContent = name + ' (' + status + ')';
-            select.appendChild(option);
-        });
-        
-        // Add separator
-        var sep1 = document.createElement('option');
-        sep1.disabled = true;
-        sep1.textContent = '── In tournament (no match yet) ──';
-        select.appendChild(sep1);
-    }
-    
-    // Section 2: Active participants (in tournament, no completed match)
-    if (activeParticipants.length > 0) {
-        activeParticipants.forEach(function(c) {
-            var option = document.createElement('option');
-            option.value = c.id;
-            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
-            var status = getCurrentStatus(c);
-            option.textContent = name + ' (' + status + ')';
-            option.style.color = 'var(--text-dim)';
-            select.appendChild(option);
-        });
-        
-        // Add separator if there are completed participants
-        if (completedParticipants.length > 0) {
-            var sep2 = document.createElement('option');
-            sep2.disabled = true;
-            sep2.textContent = '── Completed matches ──';
-            select.appendChild(sep2);
-        }
-    }
-    
-    // Section 3: Completed participants (have finished a match)
-    if (completedParticipants.length > 0) {
-        completedParticipants.forEach(function(item) {
-            var c = item.character;
-            var option = document.createElement('option');
-            option.value = c.id;
-            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
-            var status = getCurrentStatus(c);
             var suffix = '';
-            if (item.isWinner) {
+            if (isLoser) {
+                suffix = ' \u274C Loser';
+                option.style.color = 'var(--danger)';
+                option.disabled = true;
+            } else if (isWinner) {
                 suffix = ' \u2605 Winner';
                 option.style.color = 'var(--accent)';
-            } else if (item.isLoser) {
-                suffix = ' \u274C Loser (eliminated)';
-                option.style.color = 'var(--danger)';
-                option.disabled = true; // Losers cannot be selected again
-            } else {
+            } else if (hasCompletedMatch) {
                 suffix = ' \u2B06\uFE0F Advanced';
                 option.style.color = 'var(--warning)';
+            } else {
+                suffix = ' (pending match)';
+                option.style.color = 'var(--text-dim)';
             }
-            option.textContent = name + ' (' + status + ')' + suffix;
+            
+            option.textContent = name + ' (trainee)' + suffix;
             select.appendChild(option);
         });
-    }
-    
-    // If there are only active participants with no separator needed
-    if (activeParticipants.length > 0 && completedParticipants.length === 0) {
-        // No separator needed, but we already added one above
     }
 }
 
@@ -374,7 +311,6 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
     });
     
     // Track participants already used in previous rounds
-    var usedInPreviousRounds = [];
     var completedMatchIds = [];
     if (tourn.rounds) {
         tourn.rounds.forEach(function(r) {
@@ -455,8 +391,15 @@ function getParticipantTournamentStatus(tourn, charId) {
         hasCompletedMatch: false,
         isWinner: false,
         isLoser: false,
-        hasAdvanced: false
+        hasAdvanced: false,
+        inTournament: false
     };
+    
+    // Check if in tournament
+    if (tourn.participants) {
+        status.inTournament = tourn.participants.some(function(p) { return String(p.characterId) === String(charId); });
+    }
+    if (!status.inTournament) return status;
     
     // Check elimination
     if (tourn.eliminations) {
