@@ -5,6 +5,8 @@
 
 /**
  * Populate character selector for individual mode
+ * Shows available participants first, then active participants at bottom
+ * Eliminated participants are excluded
  */
 function populateCharacterSelector(tourn) {
     var select = document.getElementById('tournament-char-select');
@@ -13,16 +15,12 @@ function populateCharacterSelector(tourn) {
     var startWeek = parseInt(tourn.startWeek) || 1;
     var existingIds = (tourn.participants || []).map(function(p) { return p.characterId; });
     
+    // Get all characters that are available (not in tournament yet)
     var available = data.characters.filter(function(c) {
         if (c.deceased) return false;
         if (existingIds.some(function(id) { return String(id) === String(c.id); })) return false;
-        if (c.eliminatedWeeks && c.eliminatedWeeks.length > 0) {
-            for (var i = 0; i < c.eliminatedWeeks.length; i++) {
-                if (parseInt(c.eliminatedWeeks[i]) <= startWeek) {
-                    return false;
-                }
-            }
-        }
+        // Check if eliminated (from any tournament or standalone)
+        if (isCharacterEliminatedByWeek(c, startWeek)) return false;
         var status = getCurrentStatus(c).toLowerCase();
         return status !== 'civilian' && status !== '';
     });
@@ -30,28 +28,63 @@ function populateCharacterSelector(tourn) {
     var civilians = data.characters.filter(function(c) {
         if (c.deceased) return false;
         if (existingIds.some(function(id) { return String(id) === String(c.id); })) return false;
-        if (c.eliminatedWeeks && c.eliminatedWeeks.length > 0) {
-            for (var i = 0; i < c.eliminatedWeeks.length; i++) {
-                if (parseInt(c.eliminatedWeeks[i]) <= startWeek) {
-                    return false;
-                }
-            }
-        }
+        if (isCharacterEliminatedByWeek(c, startWeek)) return false;
         var status = getCurrentStatus(c).toLowerCase();
         return status === 'civilian' || status === '';
     });
     
-    var allChars = available.concat(civilians);
-    allChars.sort(function(a, b) {
+    // Get active participants (already in tournament)
+    var activeParticipants = [];
+    if (tourn.participants) {
+        tourn.participants.forEach(function(p) {
+            var c = data.characters.find(function(ch) { return String(ch.id) === String(p.characterId); });
+            if (c && !c.deceased) {
+                // Check if eliminated from this tournament
+                var isEliminated = false;
+                if (tourn.eliminations) {
+                    tourn.eliminations.forEach(function(elim) {
+                        if (String(elim.characterId) === String(c.id)) {
+                            var elimWeek = parseInt(elim.week);
+                            if (!isNaN(elimWeek) && elimWeek <= startWeek) {
+                                isEliminated = true;
+                            }
+                        }
+                    });
+                }
+                if (!isEliminated) {
+                    activeParticipants.push(c);
+                }
+            }
+        });
+    }
+    
+    // Sort all groups
+    available.sort(function(a, b) {
+        var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    civilians.sort(function(a, b) {
+        var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    activeParticipants.sort(function(a, b) {
         var nameA = [a.firstName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         var nameB = [b.firstName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         return nameA.localeCompare(nameB);
     });
     
     select.innerHTML = '<option value="">Select character...</option>';
-    if (allChars.length === 0) {
+    
+    // Add available characters first
+    var allChars = available.concat(civilians);
+    if (allChars.length === 0 && activeParticipants.length === 0) {
         select.innerHTML += '<option value="" disabled>No available characters</option>';
     } else {
+        // Add available (not in tournament)
         allChars.forEach(function(c) {
             var option = document.createElement('option');
             option.value = c.id;
@@ -60,7 +93,59 @@ function populateCharacterSelector(tourn) {
             option.textContent = name + ' (' + status + ')';
             select.appendChild(option);
         });
+        
+        // Add separator if there are active participants
+        if (allChars.length > 0 && activeParticipants.length > 0) {
+            var separator = document.createElement('option');
+            separator.disabled = true;
+            separator.textContent = '── Already in tournament ──';
+            select.appendChild(separator);
+        }
+        
+        // Add active participants at bottom
+        activeParticipants.forEach(function(c) {
+            var option = document.createElement('option');
+            option.value = c.id;
+            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
+            var status = getCurrentStatus(c);
+            // Check if they've won a match
+            var hasWon = false;
+            if (tourn.rounds) {
+                tourn.rounds.forEach(function(r) {
+                    r.matches.forEach(function(m) {
+                        if (m.winnerIds && m.winnerIds.some(function(id) { return String(id) === String(c.id); })) {
+                            hasWon = true;
+                        }
+                    });
+                });
+            }
+            var suffix = hasWon ? ' \u2605' : '';
+            option.textContent = name + ' (' + status + ')' + suffix;
+            option.style.color = 'var(--text-dim)';
+            select.appendChild(option);
+        });
     }
+}
+
+/**
+ * Check if a character is eliminated by a specific week
+ * Checks both tournament eliminations and standalone eliminations
+ */
+function isCharacterEliminatedByWeek(char, week) {
+    if (!char) return false;
+    if (char.deceased) return true;
+    
+    // Check eliminatedWeeks array
+    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+        var weekNum = parseInt(week) || 1;
+        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+            var elimWeek = parseInt(char.eliminatedWeeks[i]);
+            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /**
@@ -82,9 +167,15 @@ function addCharacterToTournament() {
         return;
     }
     
+    var startWeek = parseInt(tourn.startWeek) || 1;
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (char && isCharacterEliminatedByWeek(char, startWeek)) {
+        alert('This character is already eliminated by week ' + startWeek + '.');
+        return;
+    }
+    
     tourn.participants.push({ characterId: charId });
     
-    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
     if (typeof logActivity === 'function') {
         logActivity('Added character ' + (char ? char.firstName : '') + ' to tournament: ' + tourn.name);
     }
@@ -196,6 +287,7 @@ function renderTournamentCharacters(tourn) {
 
 /**
  * Get available participants for a round
+ * Excludes eliminated players and players already in this round
  */
 function getAvailableParticipantsForRound(tourn, roundNumber) {
     var availableParticipants = [];
@@ -203,6 +295,7 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
     
     if (!tourn.participants) return availableParticipants;
     
+    // Track eliminated character IDs
     var eliminatedIds = [];
     if (tourn.eliminations) {
         tourn.eliminations.forEach(function(elim) {
@@ -213,6 +306,16 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
         });
     }
     
+    // Also check standalone eliminations
+    data.characters.forEach(function(c) {
+        if (isCharacterEliminatedByWeek(c, startWeek)) {
+            if (eliminatedIds.indexOf(c.id) === -1) {
+                eliminatedIds.push(c.id);
+            }
+        }
+    });
+    
+    // Track participants already used in previous rounds (losers are eliminated)
     if (tourn.rounds) {
         tourn.rounds.forEach(function(r) {
             if (r.matches) {
@@ -220,7 +323,9 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
                     if (m.participants) {
                         m.participants.forEach(function(id) {
                             if (m.loserIds && m.loserIds.some(function(lid) { return String(lid) === String(id); })) {
-                                eliminatedIds.push(id);
+                                if (eliminatedIds.indexOf(id) === -1) {
+                                    eliminatedIds.push(id);
+                                }
                             }
                         });
                     }
@@ -229,14 +334,35 @@ function getAvailableParticipantsForRound(tourn, roundNumber) {
         });
     }
     
+    // Filter participants
     tourn.participants.forEach(function(p) {
         var charId = p.characterId;
+        
+        // Skip if eliminated
         if (eliminatedIds.some(function(id) { return String(id) === String(charId); })) {
             return;
         }
-        availableParticipants.push(charId);
+        
+        // Skip if already in this round
+        var inRound = false;
+        if (tourn.rounds) {
+            tourn.rounds.forEach(function(r) {
+                if (r.roundNumber === roundNumber && r.matches) {
+                    r.matches.forEach(function(m) {
+                        if (m.participants && m.participants.some(function(id) { return String(id) === String(charId); })) {
+                            inRound = true;
+                        }
+                    });
+                }
+            });
+        }
+        
+        if (!inRound) {
+            availableParticipants.push(charId);
+        }
     });
     
+    // Remove duplicates
     var unique = [];
     var seen = {};
     availableParticipants.forEach(function(id) {
@@ -1425,7 +1551,7 @@ function showRoundMatchesModal(tournId, roundIndex) {
             if (matchStatus !== 'completed') {
                 html += '<button class="small primary complete-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Complete Match</button>';
             } else {
-                html += '<button class="small warning-btn reset-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">↻ Reset Match</button>';
+                html += '<button class="small warning-btn reset-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u21BB Reset Match</button>';
             }
             html += '<button class="small danger delete-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u2715</button>';
             html += '</div>';
@@ -1651,6 +1777,7 @@ function autoGenerateRounds(tournId) {
 
 // Make functions globally available
 window.populateCharacterSelector = populateCharacterSelector;
+window.isCharacterEliminatedByWeek = isCharacterEliminatedByWeek;
 window.addCharacterToTournament = addCharacterToTournament;
 window.removeCharacterFromTournament = removeCharacterFromTournament;
 window.renderTournamentCharacters = renderTournamentCharacters;
