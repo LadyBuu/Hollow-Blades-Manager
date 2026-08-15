@@ -6,7 +6,10 @@
 /**
  * Populate character selector for individual mode
  * ONLY shows TRAINEES
- * Clear distinction: Available (never participated) vs Already in tournament
+ * Clear distinction: 
+ * 1. Not in tournament
+ * 2. In tournament, no match yet
+ * 3. In tournament, completed match (with result)
  */
 function populateCharacterSelector(tourn) {
     var select = document.getElementById('tournament-char-select');
@@ -30,16 +33,50 @@ function populateCharacterSelector(tourn) {
         return nameA.localeCompare(nameB);
     });
     
-    // Separate: NOT in tournament yet vs Already in tournament
+    // Separate into three groups
     var notInTournament = [];
-    var inTournament = [];
+    var inTournamentNoMatch = [];
+    var inTournamentHasMatch = [];
     
     allTrainees.forEach(function(c) {
         var inTourn = existingIds.some(function(id) { return String(id) === String(c.id); });
-        if (inTourn) {
-            inTournament.push(c);
-        } else {
+        
+        if (!inTourn) {
             notInTournament.push(c);
+            return;
+        }
+        
+        // Check if they've completed a match in THIS tournament
+        var hasCompletedMatch = false;
+        var isWinner = false;
+        var isLoser = false;
+        
+        if (tourn.rounds) {
+            tourn.rounds.forEach(function(r) {
+                r.matches.forEach(function(m) {
+                    if (m.participants && m.participants.some(function(id) { return String(id) === String(c.id); })) {
+                        if (m.status === 'completed') {
+                            hasCompletedMatch = true;
+                            if (m.winnerIds && m.winnerIds.some(function(wid) { return String(wid) === String(c.id); })) {
+                                isWinner = true;
+                            }
+                            if (m.loserIds && m.loserIds.some(function(lid) { return String(lid) === String(c.id); })) {
+                                isLoser = true;
+                            }
+                        }
+                    }
+                });
+            });
+        }
+        
+        if (hasCompletedMatch) {
+            inTournamentHasMatch.push({
+                character: c,
+                isWinner: isWinner,
+                isLoser: isLoser
+            });
+        } else {
+            inTournamentNoMatch.push(c);
         }
     });
     
@@ -50,7 +87,7 @@ function populateCharacterSelector(tourn) {
         return;
     }
     
-    // SECTION 1: Trainees NOT in tournament yet (NEVER participated)
+    // SECTION 1: Trainees NOT in tournament yet
     if (notInTournament.length > 0) {
         notInTournament.forEach(function(c) {
             var option = document.createElement('option');
@@ -60,59 +97,50 @@ function populateCharacterSelector(tourn) {
             select.appendChild(option);
         });
         
-        // Add separator if there are participants already in tournament
-        if (inTournament.length > 0) {
-            var sep = document.createElement('option');
-            sep.disabled = true;
-            sep.textContent = '── Already in tournament ──';
-            select.appendChild(sep);
-        }
+        // Separator
+        var sep1 = document.createElement('option');
+        sep1.disabled = true;
+        sep1.textContent = '── In tournament - NO match yet ──';
+        select.appendChild(sep1);
     }
     
-    // SECTION 2: Trainees already in tournament (have participated or will participate)
-    if (inTournament.length > 0) {
-        inTournament.forEach(function(c) {
+    // SECTION 2: Trainees in tournament, no match yet
+    if (inTournamentNoMatch.length > 0) {
+        inTournamentNoMatch.forEach(function(c) {
             var option = document.createElement('option');
             option.value = c.id;
             var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
-            
-            // Check if they've completed a match
-            var hasCompletedMatch = false;
-            var isWinner = false;
-            var isLoser = false;
-            
-            if (tourn.rounds) {
-                tourn.rounds.forEach(function(r) {
-                    r.matches.forEach(function(m) {
-                        if (m.participants && m.participants.some(function(id) { return String(id) === String(c.id); })) {
-                            if (m.status === 'completed') {
-                                hasCompletedMatch = true;
-                                if (m.winnerIds && m.winnerIds.some(function(wid) { return String(wid) === String(c.id); })) {
-                                    isWinner = true;
-                                }
-                                if (m.loserIds && m.loserIds.some(function(lid) { return String(lid) === String(c.id); })) {
-                                    isLoser = true;
-                                }
-                            }
-                        }
-                    });
-                });
-            }
-            
+            option.textContent = name + ' (trainee)';
+            option.style.color = 'var(--text-dim)';
+            select.appendChild(option);
+        });
+        
+        // Separator
+        var sep2 = document.createElement('option');
+        sep2.disabled = true;
+        sep2.textContent = '── In tournament - HAS match result ──';
+        select.appendChild(sep2);
+    }
+    
+    // SECTION 3: Trainees in tournament with completed match
+    if (inTournamentHasMatch.length > 0) {
+        inTournamentHasMatch.forEach(function(item) {
+            var c = item.character;
+            var option = document.createElement('option');
+            option.value = c.id;
+            var name = [c.firstName, c.lastName].filter(function(n) { return n; }).join(' ');
             var suffix = '';
-            if (isLoser) {
-                suffix = ' \u274C Loser';
+            
+            if (item.isLoser) {
+                suffix = ' \u274C LOST';
                 option.style.color = 'var(--danger)';
                 option.disabled = true;
-            } else if (isWinner) {
-                suffix = ' \u2605 Winner';
+            } else if (item.isWinner) {
+                suffix = ' \u2605 WON';
                 option.style.color = 'var(--accent)';
-            } else if (hasCompletedMatch) {
-                suffix = ' \u2B06\uFE0F Advanced';
-                option.style.color = 'var(--warning)';
             } else {
-                suffix = ' (pending match)';
-                option.style.color = 'var(--text-dim)';
+                suffix = ' \u2B06\uFE0F ADVANCED';
+                option.style.color = 'var(--warning)';
             }
             
             option.textContent = name + ' (trainee)' + suffix;
