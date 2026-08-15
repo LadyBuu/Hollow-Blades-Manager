@@ -287,6 +287,7 @@ function renderRounds(tourn) {
         html += '<div style="display:flex;gap:4px;">';
         html += '<button class="small info-btn view-round-matches" data-round="' + roundIndex + '">View Matches</button>';
         if (!isCompleted) {
+            html += '<button class="small primary add-match-to-round-btn" data-round="' + roundIndex + '">+ Add Match</button>';
             html += '<button class="small primary complete-round-btn" data-round="' + roundIndex + '">Complete Round</button>';
         }
         html += '<button class="small danger delete-round-btn" data-round="' + roundIndex + '">\u2715</button>';
@@ -336,6 +337,13 @@ function renderRounds(tourn) {
         });
     });
     
+    container.querySelectorAll('.add-match-to-round-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var roundIndex = parseInt(this.dataset.round);
+            showAddMatchToRoundModal(tourn.id, roundIndex);
+        });
+    });
+    
     container.querySelectorAll('.complete-round-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -349,6 +357,297 @@ function renderRounds(tourn) {
             deleteRound(tourn.id, roundIndex);
         });
     });
+}
+
+/**
+ * Show modal to add a match to an existing round
+ */
+function showAddMatchToRoundModal(tournId, roundIndex) {
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.rounds || !tourn.rounds[roundIndex]) return;
+    
+    var round = tourn.rounds[roundIndex];
+    var roundLabel = String.fromCharCode(65 + roundIndex);
+    
+    // Get available participants (not eliminated and not already in this round)
+    var availableParticipants = getAvailableParticipantsForRound(tourn, roundIndex + 1);
+    
+    // Also exclude participants already in this round
+    var usedInRound = [];
+    if (round.matches) {
+        round.matches.forEach(function(m) {
+            if (m.participants) {
+                m.participants.forEach(function(id) {
+                    usedInRound.push(id);
+                });
+            }
+        });
+    }
+    
+    availableParticipants = availableParticipants.filter(function(id) {
+        return usedInRound.indexOf(id) === -1;
+    });
+    
+    if (availableParticipants.length < 2) {
+        alert('Not enough available participants for a new match. Need at least 2 participants not already in this round.');
+        return;
+    }
+    
+    var modal = document.getElementById('match-detail-modal');
+    document.getElementById('match-detail-title').textContent = 'Add Match to Round ' + roundLabel;
+    
+    var content = document.getElementById('match-detail-content');
+    
+    var html = '<div style="margin-bottom:12px;">';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;">Select participants for the new match. Available: ' + availableParticipants.length + '</p>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">';
+    availableParticipants.forEach(function(id) {
+        var name = getParticipantNameById(id);
+        html += '<span style="background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--border-soft);">' + name + '</span>';
+    });
+    html += '</div>';
+    html += '</div>';
+    
+    html += '<div style="margin-bottom:12px;">';
+    html += '<label style="font-size:0.7rem;color:var(--text-dim);">Match Type:</label>';
+    html += '<select id="new-match-type" style="padding:4px 8px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;margin-left:8px;width:auto;">';
+    html += '<option value="2">1v1 (2 players)</option>';
+    html += '<option value="3">1v1v1 (3 players)</option>';
+    html += '<option value="4">1v1v1v1 (4 players)</option>';
+    html += '<option value="5">1v1v1v1v1 (5 players)</option>';
+    html += '<option value="6">1v1v1v1v1v1 (6 players)</option>';
+    html += '<option value="8">8-player Free-for-All</option>';
+    html += '</select>';
+    html += '</div>';
+    
+    html += '<div id="new-match-participants" style="margin-bottom:12px;padding:8px;background:var(--panel-alt);border-radius:6px;border:1px solid var(--border-soft);min-height:50px;">';
+    html += '<div style="color:var(--text-dim);font-size:0.7rem;text-align:center;padding:8px;">No participants selected.</div>';
+    html += '</div>';
+    
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">';
+    html += '<button id="add-participant-to-match" class="small secondary">+ Add Participant</button>';
+    html += '<button id="clear-match-participants" class="small secondary">Clear All</button>';
+    html += '<button id="create-match-btn" class="primary small" style="margin-left:8px;" disabled>Add Match</button>';
+    html += '</div>';
+    
+    html += '<div class="form-actions" style="margin-top:8px;">';
+    html += '<button type="button" id="cancel-add-match" class="secondary">Cancel</button>';
+    html += '</div>';
+    
+    content.innerHTML = html;
+    
+    content.dataset.tournId = tournId;
+    content.dataset.roundIndex = roundIndex;
+    
+    var selectedContainer = document.getElementById('new-match-participants');
+    var addBtn = document.getElementById('add-participant-to-match');
+    var clearBtn = document.getElementById('clear-match-participants');
+    var createBtn = document.getElementById('create-match-btn');
+    var cancelBtn = document.getElementById('cancel-add-match');
+    var matchTypeSelect = document.getElementById('new-match-type');
+    
+    var creatorState = {
+        selectedIds: [],
+        availableParticipants: availableParticipants.slice()
+    };
+    
+    function updateSelectedDisplay() {
+        var matchType = parseInt(matchTypeSelect.value) || 2;
+        
+        if (creatorState.selectedIds.length === 0) {
+            selectedContainer.innerHTML = '<div style="color:var(--text-dim);font-size:0.7rem;text-align:center;padding:8px;">No participants selected.</div>';
+        } else {
+            var html = '<div style="margin-bottom:4px;"><span style="font-size:0.7rem;color:var(--text-dim);">Selected (' + creatorState.selectedIds.length + '/' + matchType + '):</span></div>';
+            creatorState.selectedIds.forEach(function(id, index) {
+                var name = getParticipantNameById(id);
+                html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">';
+                html += '<span style="background:var(--accent-soft);padding:2px 8px;border-radius:10px;font-size:0.7rem;border:1px solid var(--accent);">' + name + '</span>';
+                html += '<button class="small danger remove-selected-participant" data-index="' + index + '" style="padding:0 4px;font-size:0.6rem;">\u2715</button>';
+                html += '</div>';
+            });
+            var remaining = matchType - creatorState.selectedIds.length;
+            if (remaining > 0) {
+                html += '<div style="color:var(--text-dim);font-size:0.6rem;margin-top:2px;">Add ' + remaining + ' more participant(s).</div>';
+            } else {
+                html += '<div style="color:var(--accent);font-size:0.6rem;margin-top:2px;">\u2713 Match is ready! Click "Add Match".</div>';
+            }
+            selectedContainer.innerHTML = html;
+        }
+        
+        selectedContainer.querySelectorAll('.remove-selected-participant').forEach(function(btn) {
+            btn.onclick = function() {
+                var idx = parseInt(this.dataset.index);
+                var removedId = creatorState.selectedIds[idx];
+                creatorState.selectedIds.splice(idx, 1);
+                if (removedId && creatorState.availableParticipants.indexOf(removedId) === -1) {
+                    creatorState.availableParticipants.push(removedId);
+                    creatorState.availableParticipants.sort();
+                }
+                updateSelectedDisplay();
+                updateButtonStates();
+            };
+        });
+        
+        updateButtonStates();
+    }
+    
+    function updateButtonStates() {
+        var matchType = parseInt(matchTypeSelect.value) || 2;
+        var canCreate = creatorState.selectedIds.length >= 2 && creatorState.selectedIds.length === matchType;
+        createBtn.disabled = !canCreate;
+        createBtn.style.opacity = canCreate ? '1' : '0.5';
+    }
+    
+    // Add participant button
+    if (addBtn) {
+        addBtn.onclick = function() {
+            var matchType = parseInt(matchTypeSelect.value) || 2;
+            
+            if (creatorState.selectedIds.length >= matchType) {
+                alert('You have already selected the maximum number of participants for this match type (' + matchType + ').');
+                return;
+            }
+            
+            if (creatorState.availableParticipants.length === 0) {
+                alert('No more participants available.');
+                return;
+            }
+            
+            var container = document.getElementById('new-match-participants');
+            var selectHtml = '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;" id="temp-select-wrapper">';
+            selectHtml += '<select id="temp-participant-select" style="flex:1;padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.7rem;">';
+            selectHtml += '<option value="">Select participant...</option>';
+            creatorState.availableParticipants.forEach(function(id) {
+                var name = getParticipantNameById(id);
+                selectHtml += '<option value="' + id + '">' + name + '</option>';
+            });
+            selectHtml += '</select>';
+            selectHtml += '<button id="confirm-add-participant" class="primary small" style="padding:2px 8px;">Add</button>';
+            selectHtml += '<button id="cancel-add-participant" class="secondary small" style="padding:2px 8px;">\u2715</button>';
+            selectHtml += '</div>';
+            
+            var existing = container.querySelector('div:first-child');
+            if (existing) {
+                var wrapper = document.createElement('div');
+                wrapper.innerHTML = selectHtml;
+                var selectElement = wrapper.firstElementChild;
+                container.insertBefore(selectElement, existing);
+            } else {
+                container.innerHTML = selectHtml + container.innerHTML;
+            }
+            
+            var confirmBtn = document.getElementById('confirm-add-participant');
+            var cancelBtn2 = document.getElementById('cancel-add-participant');
+            var tempSelect = document.getElementById('temp-participant-select');
+            
+            if (confirmBtn) {
+                confirmBtn.onclick = function() {
+                    var id = tempSelect.value;
+                    if (!id) {
+                        alert('Please select a participant.');
+                        return;
+                    }
+                    var idx = creatorState.availableParticipants.indexOf(id);
+                    if (idx !== -1) {
+                        creatorState.availableParticipants.splice(idx, 1);
+                    }
+                    creatorState.selectedIds.push(id);
+                    var wrapper = document.getElementById('temp-select-wrapper');
+                    if (wrapper) wrapper.remove();
+                    updateSelectedDisplay();
+                    updateButtonStates();
+                };
+            }
+            if (cancelBtn2) {
+                cancelBtn2.onclick = function() {
+                    var wrapper = document.getElementById('temp-select-wrapper');
+                    if (wrapper) wrapper.remove();
+                };
+            }
+        };
+    }
+    
+    // Clear button
+    if (clearBtn) {
+        clearBtn.onclick = function() {
+            creatorState.selectedIds.forEach(function(id) {
+                if (creatorState.availableParticipants.indexOf(id) === -1) {
+                    creatorState.availableParticipants.push(id);
+                    creatorState.availableParticipants.sort();
+                }
+            });
+            creatorState.selectedIds = [];
+            updateSelectedDisplay();
+            updateButtonStates();
+        };
+    }
+    
+    // Create match button
+    if (createBtn) {
+        createBtn.onclick = function() {
+            var matchType = parseInt(matchTypeSelect.value) || 2;
+            
+            if (creatorState.selectedIds.length < 2) {
+                alert('Please select at least 2 participants.');
+                return;
+            }
+            if (creatorState.selectedIds.length !== matchType) {
+                alert('You need exactly ' + matchType + ' participants for this match type.');
+                return;
+            }
+            
+            // Add the match to the round
+            var round = tourn.rounds[roundIndex];
+            if (!round.matches) round.matches = [];
+            
+            round.matches.push({
+                participants: creatorState.selectedIds.slice(),
+                winnerIds: [],
+                loserIds: [],
+                status: 'pending',
+                roundNumber: roundIndex + 1
+            });
+            
+            // If round was completed, mark as in_progress
+            if (round.status === 'completed') {
+                round.status = 'in_progress';
+                tourn.status = 'active';
+            }
+            
+            saveData().catch(function(err) { console.error('Failed to save:', err); });
+            modal.classList.add('hidden');
+            viewTournament(tournId);
+            
+            if (typeof logActivity === 'function') {
+                var names = creatorState.selectedIds.map(function(id) { return getParticipantNameById(id); });
+                logActivity('Added match to Round ' + String.fromCharCode(65 + roundIndex) + ': ' + names.join(' vs '));
+            }
+        };
+    }
+    
+    // Cancel button
+    if (cancelBtn) {
+        cancelBtn.onclick = function() {
+            modal.classList.add('hidden');
+        };
+    }
+    
+    // Match type change
+    if (matchTypeSelect) {
+        matchTypeSelect.onchange = function() {
+            var newType = parseInt(this.value) || 2;
+            if (creatorState.selectedIds.length > newType) {
+                alert('You have ' + creatorState.selectedIds.length + ' participants selected, but this match type only allows ' + newType + '.');
+            }
+            updateSelectedDisplay();
+            updateButtonStates();
+        };
+    }
+    
+    updateSelectedDisplay();
+    updateButtonStates();
+    
+    modal.classList.remove('hidden');
 }
 
 /**
@@ -838,6 +1137,7 @@ function deleteRound(tournId, roundIndex) {
  * Delete a match from a round
  */
 function deleteMatch(tournId, roundIndex, matchIndex) {
+    if (!confirm('Delete this match?')) return;
     var tourn = getTournament(tournId);
     if (!tourn || !tourn.rounds || !tourn.rounds[roundIndex]) return;
     
@@ -873,7 +1173,14 @@ function toggleMatchWinner(tournId, roundIndex, matchIndex, participantId) {
         match.winnerIds.push(participantId);
     }
     
-    if (match.winnerIds.length > 0) {
+    // If match was completed, set back to in_progress
+    if (match.status === 'completed') {
+        match.status = 'in_progress';
+        round.status = 'in_progress';
+        tourn.status = 'active';
+        tourn.winner = null;
+        tourn.winners = [];
+    } else if (match.winnerIds.length > 0) {
         match.status = 'in_progress';
         round.status = 'in_progress';
         tourn.status = 'active';
@@ -908,7 +1215,14 @@ function toggleMatchLoser(tournId, roundIndex, matchIndex, participantId) {
         match.loserIds.push(participantId);
     }
     
-    if (match.loserIds.length > 0) {
+    // If match was completed, set back to in_progress
+    if (match.status === 'completed') {
+        match.status = 'in_progress';
+        round.status = 'in_progress';
+        tourn.status = 'active';
+        tourn.winner = null;
+        tourn.winners = [];
+    } else if (match.loserIds.length > 0) {
         match.status = 'in_progress';
         round.status = 'in_progress';
         tourn.status = 'active';
@@ -949,12 +1263,50 @@ function completeMatch(tournId, roundIndex, matchIndex) {
         return;
     }
     
+    // For 1v1, ensure exactly 1 winner
     if (allParticipants.length === 2 && match.winnerIds.length !== 1) {
         alert('For 1v1 matches, exactly 1 winner must be selected.');
         return;
     }
     
     match.status = 'completed';
+    
+    // Update eliminations for losers
+    if (match.loserIds) {
+        match.loserIds.forEach(function(loserId) {
+            // Add to tournament eliminations
+            if (!tourn.eliminations) tourn.eliminations = [];
+            var alreadyEliminated = tourn.eliminations.some(function(e) { return String(e.characterId) === String(loserId); });
+            if (!alreadyEliminated) {
+                tourn.eliminations.push({
+                    characterId: loserId,
+                    week: parseInt(tourn.startWeek) || 1,
+                    teamId: null,
+                    standalone: false,
+                    fromMatch: true,
+                    reason: 'Lost in Round ' + String.fromCharCode(65 + roundIndex) + ' match'
+                });
+                
+                // Mark character as eliminated
+                var char = data.characters.find(function(c) { return String(c.id) === String(loserId); });
+                if (char) {
+                    if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+                    var weekNum = parseInt(tourn.startWeek) || 1;
+                    if (char.eliminatedWeeks.indexOf(weekNum) === -1) {
+                        char.eliminatedWeeks.push(weekNum);
+                    }
+                    if (!char.eliminations) char.eliminations = [];
+                    char.eliminations.push({
+                        tournamentId: tournId,
+                        week: weekNum,
+                        reason: 'Lost in Round ' + String.fromCharCode(65 + roundIndex) + ' match',
+                        standalone: false,
+                        fromMatch: true
+                    });
+                }
+            }
+        });
+    }
     
     var allCompleted = round.matches.every(function(m) { return m.status === 'completed'; });
     if (allCompleted) {
@@ -1036,14 +1388,15 @@ function showRoundMatchesModal(tournId, roundIndex) {
                 html += '</div>';
             }
             
-            if (matchStatus !== 'completed' && match.participants) {
+            // Winner selection buttons (always show, even for completed matches - allows editing)
+            if (match.participants) {
                 html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">';
                 html += '<span style="font-size:0.6rem;color:var(--text-dim);">Set winners:</span>';
                 match.participants.forEach(function(id) {
                     var name = getParticipantNameById(id);
                     var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
                     var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
-                    if (!isLoser) {
+                    if (!isLoser || matchStatus === 'completed') {
                         html += '<button class="small set-winner-in-round" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="' + 
                             (isWinner ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + name + 
                             (isWinner ? ' \u2713' : '') + '</button>';
@@ -1051,13 +1404,14 @@ function showRoundMatchesModal(tournId, roundIndex) {
                 });
                 html += '</div>';
                 
+                // Loser selection buttons (always show)
                 html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;">';
                 html += '<span style="font-size:0.6rem;color:var(--text-dim);">Set losers (eliminated):</span>';
                 match.participants.forEach(function(id) {
                     var name = getParticipantNameById(id);
                     var isWinner = match.winnerIds && match.winnerIds.some(function(wid) { return String(wid) === String(id); });
                     var isLoser = match.loserIds && match.loserIds.some(function(lid) { return String(lid) === String(id); });
-                    if (!isWinner) {
+                    if (!isWinner || matchStatus === 'completed') {
                         html += '<button class="small set-loser-in-round" data-round="' + roundIndex + '" data-match="' + matchIndex + '" data-participant="' + id + '" style="' + 
                             (isLoser ? 'border-color:var(--danger);color:var(--danger);' : '') + '">' + name + 
                             (isLoser ? ' \u2715' : '') + '</button>';
@@ -1066,9 +1420,12 @@ function showRoundMatchesModal(tournId, roundIndex) {
                 html += '</div>';
             }
             
+            // Match actions
             html += '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">';
             if (matchStatus !== 'completed') {
                 html += '<button class="small primary complete-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">Complete Match</button>';
+            } else {
+                html += '<button class="small warning-btn reset-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">↻ Reset Match</button>';
             }
             html += '<button class="small danger delete-match-btn" data-round="' + roundIndex + '" data-match="' + matchIndex + '">\u2715</button>';
             html += '</div>';
@@ -1077,13 +1434,22 @@ function showRoundMatchesModal(tournId, roundIndex) {
         });
         html += '</div>';
     } else {
-        html += '<p class="empty-state" style="padding:12px;">No matches in this round. Add matches to the round.</p>';
+        html += '<p class="empty-state" style="padding:12px;">No matches in this round. <button class="small primary add-match-to-round-btn" data-round="' + roundIndex + '">+ Add Match</button></p>';
     }
     
     content.innerHTML = html;
     
     content.dataset.tournId = tournId;
     content.dataset.roundIndex = roundIndex;
+    
+    // Add match to round button (inside the modal)
+    content.querySelectorAll('.add-match-to-round-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var rIdx = parseInt(this.dataset.round);
+            modal.classList.add('hidden');
+            showAddMatchToRoundModal(tournId, rIdx);
+        });
+    });
     
     content.querySelectorAll('.set-winner-in-round').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -1108,6 +1474,14 @@ function showRoundMatchesModal(tournId, roundIndex) {
             var rIdx = parseInt(this.dataset.round);
             var mIdx = parseInt(this.dataset.match);
             completeMatch(tournId, rIdx, mIdx);
+        });
+    });
+    
+    content.querySelectorAll('.reset-match-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var rIdx = parseInt(this.dataset.round);
+            var mIdx = parseInt(this.dataset.match);
+            resetMatch(tournId, rIdx, mIdx);
         });
     });
     
@@ -1146,6 +1520,64 @@ function showRoundMatchesModal(tournId, roundIndex) {
 }
 
 /**
+ * Reset a completed match (undo winner/loser selections)
+ */
+function resetMatch(tournId, roundIndex, matchIndex) {
+    if (!confirm('Reset this match? This will remove winner/loser selections and allow re-editing.')) return;
+    
+    var tourn = getTournament(tournId);
+    if (!tourn || !tourn.rounds || !tourn.rounds[roundIndex]) return;
+    
+    var round = tourn.rounds[roundIndex];
+    var match = round.matches[matchIndex];
+    if (!match) return;
+    
+    // Remove eliminations for losers
+    if (match.loserIds) {
+        match.loserIds.forEach(function(loserId) {
+            // Remove from tournament eliminations
+            if (tourn.eliminations) {
+                tourn.eliminations = tourn.eliminations.filter(function(e) { 
+                    return String(e.characterId) !== String(loserId); 
+                });
+            }
+            
+            // Remove from character eliminatedWeeks
+            var char = data.characters.find(function(c) { return String(c.id) === String(loserId); });
+            if (char && char.eliminatedWeeks) {
+                var weekNum = parseInt(tourn.startWeek) || 1;
+                var idx = char.eliminatedWeeks.indexOf(weekNum);
+                if (idx !== -1) {
+                    char.eliminatedWeeks.splice(idx, 1);
+                }
+            }
+            if (char && char.eliminations) {
+                char.eliminations = char.eliminations.filter(function(e) {
+                    return !(String(e.tournamentId) === String(tournId) && e.fromMatch === true);
+                });
+            }
+        });
+    }
+    
+    // Reset match
+    match.winnerIds = [];
+    match.loserIds = [];
+    match.status = 'pending';
+    round.status = 'in_progress';
+    tourn.status = 'active';
+    tourn.winner = null;
+    tourn.winners = [];
+    
+    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    showRoundMatchesModal(tournId, roundIndex);
+    viewTournament(tournId);
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Reset match in Round ' + String.fromCharCode(65 + roundIndex));
+    }
+}
+
+/**
  * Auto-generate rounds for a tournament
  */
 function autoGenerateRounds(tournId) {
@@ -1167,6 +1599,9 @@ function autoGenerateRounds(tournId) {
     }
     
     tourn.rounds = [];
+    tourn.eliminations = [];
+    tourn.winner = null;
+    tourn.winners = [];
     
     var participantIds = tourn.participants.map(function(p) { return p.characterId; });
     var matchSize = 3;
@@ -1223,6 +1658,7 @@ window.getAvailableParticipantsForRound = getAvailableParticipantsForRound;
 window.renderRounds = renderRounds;
 window.addRound = addRound;
 window.showRoundMatchCreator = showRoundMatchCreator;
+window.showAddMatchToRoundModal = showAddMatchToRoundModal;
 window.completeRound = completeRound;
 window.deleteRound = deleteRound;
 window.deleteMatch = deleteMatch;
@@ -1230,4 +1666,5 @@ window.toggleMatchWinner = toggleMatchWinner;
 window.toggleMatchLoser = toggleMatchLoser;
 window.completeMatch = completeMatch;
 window.showRoundMatchesModal = showRoundMatchesModal;
+window.resetMatch = resetMatch;
 window.autoGenerateRounds = autoGenerateRounds;
