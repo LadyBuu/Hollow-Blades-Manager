@@ -190,7 +190,11 @@ function getTeamCharacters(teamId) {
     team.members.forEach(function(member) {
         var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
         if (char && !char.deceased) {
-            characters.push(char);
+            characters.push({
+                character: char,
+                teamId: team.id,
+                teamName: team.name
+            });
         }
     });
     return characters;
@@ -209,10 +213,10 @@ function getTournamentCharacters(tourn) {
     tourn.participants.forEach(function(p) {
         if (p.type === 'team') {
             var teamChars = getTeamCharacters(p.id);
-            teamChars.forEach(function(c) {
-                if (!seenIds[c.id]) {
-                    seenIds[c.id] = true;
-                    allChars.push(c);
+            teamChars.forEach(function(item) {
+                if (!seenIds[item.character.id]) {
+                    seenIds[item.character.id] = true;
+                    allChars.push(item);
                 }
             });
         }
@@ -238,6 +242,24 @@ function getTournamentParticipants(tourn) {
     return result;
 }
 
+/**
+ * Check if a participant is eliminated
+ */
+function isParticipantEliminated(tourn, participantId) {
+    if (!tourn || !tourn.eliminations) return false;
+    return tourn.eliminations.some(function(e) { return String(e.participantId) === String(participantId); });
+}
+
+/**
+ * Get non-eliminated participants
+ */
+function getActiveParticipants(tourn) {
+    if (!tourn || !tourn.participants) return [];
+    return tourn.participants.filter(function(p) {
+        return !isParticipantEliminated(tourn, p.id);
+    });
+}
+
 // Make functions globally available
 window.getTournament = getTournament;
 window.getTournaments = getTournaments;
@@ -252,4 +274,6 @@ window.getTournamentWinnerDisplay = getTournamentWinnerDisplay;
 window.getTeamCharacters = getTeamCharacters;
 window.getTournamentCharacters = getTournamentCharacters;
 window.getTournamentParticipants = getTournamentParticipants;
+window.isParticipantEliminated = isParticipantEliminated;
+window.getActiveParticipants = getActiveParticipants;
 window.tournamentState = tournamentState;
