@@ -178,7 +178,13 @@ function renderTournamentList() {
         btn.addEventListener('click', function() { showTournamentForm(btn.dataset.id); });
     });
     container.querySelectorAll('.delete-tournament').forEach(function(btn) {
-        btn.addEventListener('click', function() { deleteTournament(btn.dataset.id); });
+        btn.addEventListener('click', function() { 
+            var id = btn.dataset.id;
+            if (deleteTournament(id)) {
+                renderTournamentList();
+                closeTournamentDetail();
+            }
+        });
     });
 }
 
@@ -235,7 +241,6 @@ function populateParticipantSelector(tourn) {
         var teams = data.teams.filter(function(t) {
             if (t.status === 'deleted') return false;
             if (existingIds.indexOf(t.id) !== -1) return false;
-            // Check if team is active during tournament weeks
             var start = parseInt(t.startPeriod);
             var end = parseInt(t.endPeriod);
             if (isNaN(start)) return true;
@@ -1058,21 +1063,6 @@ function createRound() {
     viewTournament(tournId);
 }
 
-function isCharacterEliminatedByWeek(char, week) {
-    if (!char) return false;
-    if (char.deceased) return true;
-    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
-        var weekNum = parseInt(week) || 1;
-        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
-            var elimWeek = parseInt(char.eliminatedWeeks[i]);
-            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 function showTournamentForm(editId) {
     var modal = document.getElementById('tournament-form-modal');
     var title = document.getElementById('tournament-form-title');
@@ -1107,7 +1097,7 @@ function saveTournament(e) {
     var form = e.target;
     var editId = form.dataset.editId;
     
-    var data = {
+    var formData = {
         name: document.getElementById('tournament-name').value.trim(),
         mode: document.getElementById('tournament-mode').value,
         startWeek: parseInt(document.getElementById('tournament-start-week').value) || 1,
@@ -1115,21 +1105,21 @@ function saveTournament(e) {
         totalRounds: parseInt(document.getElementById('tournament-rounds').value) || 1
     };
     
-    if (!data.name) { alert('Tournament name is required.'); return; }
-    if (data.startWeek > data.endWeek) {
+    if (!formData.name) { alert('Tournament name is required.'); return; }
+    if (formData.startWeek > formData.endWeek) {
         alert('Start week must be before end week.');
         return;
     }
     
     if (editId) {
-        updateTournament(editId, data);
+        updateTournament(editId, formData);
         if (typeof logActivity === 'function') {
-            logActivity('Updated tournament: ' + data.name);
+            logActivity('Updated tournament: ' + formData.name);
         }
     } else {
-        createTournament(data);
+        createTournament(formData);
         if (typeof logActivity === 'function') {
-            logActivity('Created tournament: ' + data.name);
+            logActivity('Created tournament: ' + formData.name);
         }
     }
     
@@ -1148,50 +1138,108 @@ function closeTournamentDetail() {
 }
 
 function initTournamentEvents() {
-    document.getElementById('add-tournament-btn').addEventListener('click', function() { showTournamentForm(); });
-    document.getElementById('close-tournament-form').addEventListener('click', closeTournamentForm);
-    document.getElementById('cancel-tournament-form').addEventListener('click', closeTournamentForm);
-    document.getElementById('tournament-form-inner').addEventListener('submit', saveTournament);
-    document.getElementById('close-tournament-detail').addEventListener('click', closeTournamentDetail);
-    document.getElementById('add-participant-btn').addEventListener('click', addParticipant);
-    document.getElementById('refresh-participants-btn').addEventListener('click', function() {
-        var modal = document.getElementById('tournament-detail-modal');
-        var tournId = modal.dataset.tournamentId;
-        if (tournId) {
-            var tourn = getTournament(tournId);
-            if (tourn) {
-                populateParticipantSelector(tourn);
-                viewTournament(tournId);
+    // Add tournament button
+    var addBtn = document.getElementById('add-tournament-btn');
+    if (addBtn) {
+        addBtn.addEventListener('click', function() { showTournamentForm(); });
+    }
+    
+    // Form close buttons
+    var closeFormBtn = document.getElementById('close-tournament-form');
+    if (closeFormBtn) {
+        closeFormBtn.addEventListener('click', closeTournamentForm);
+    }
+    var cancelFormBtn = document.getElementById('cancel-tournament-form');
+    if (cancelFormBtn) {
+        cancelFormBtn.addEventListener('click', closeTournamentForm);
+    }
+    
+    // Form submit
+    var form = document.getElementById('tournament-form-inner');
+    if (form) {
+        form.addEventListener('submit', saveTournament);
+    }
+    
+    // Detail close button
+    var closeDetailBtn = document.getElementById('close-tournament-detail');
+    if (closeDetailBtn) {
+        closeDetailBtn.addEventListener('click', closeTournamentDetail);
+    }
+    
+    // Participants
+    var addParticipantBtn = document.getElementById('add-participant-btn');
+    if (addParticipantBtn) {
+        addParticipantBtn.addEventListener('click', addParticipant);
+    }
+    
+    var refreshBtn = document.getElementById('refresh-participants-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            var modal = document.getElementById('tournament-detail-modal');
+            var tournId = modal.dataset.tournamentId;
+            if (tournId) {
+                var tourn = getTournament(tournId);
+                if (tourn) {
+                    populateParticipantSelector(tourn);
+                    viewTournament(tournId);
+                }
             }
-        }
-    });
-    document.getElementById('create-round-btn').addEventListener('click', createRound);
-    document.getElementById('close-match-edit').addEventListener('click', function() {
-        document.getElementById('match-edit-modal').classList.add('hidden');
-    });
-    document.getElementById('cancel-match-edit').addEventListener('click', function() {
-        document.getElementById('match-edit-modal').classList.add('hidden');
-    });
-    document.getElementById('save-match-edit').addEventListener('click', function() {
-        document.getElementById('match-edit-modal').classList.add('hidden');
-        var modal = document.getElementById('tournament-detail-modal');
-        var tournId = modal.dataset.tournamentId;
-        if (tournId) viewTournament(tournId);
-    });
+        });
+    }
+    
+    // Create round
+    var createRoundBtn = document.getElementById('create-round-btn');
+    if (createRoundBtn) {
+        createRoundBtn.addEventListener('click', createRound);
+    }
+    
+    // Match edit modal
+    var closeMatchEdit = document.getElementById('close-match-edit');
+    if (closeMatchEdit) {
+        closeMatchEdit.addEventListener('click', function() {
+            document.getElementById('match-edit-modal').classList.add('hidden');
+        });
+    }
+    var cancelMatchEdit = document.getElementById('cancel-match-edit');
+    if (cancelMatchEdit) {
+        cancelMatchEdit.addEventListener('click', function() {
+            document.getElementById('match-edit-modal').classList.add('hidden');
+        });
+    }
+    var saveMatchEdit = document.getElementById('save-match-edit');
+    if (saveMatchEdit) {
+        saveMatchEdit.addEventListener('click', function() {
+            document.getElementById('match-edit-modal').classList.add('hidden');
+            var modal = document.getElementById('tournament-detail-modal');
+            var tournId = modal.dataset.tournamentId;
+            if (tournId) viewTournament(tournId);
+        });
+    }
     
     // Modal background clicks
-    document.getElementById('tournament-form-modal').addEventListener('click', function(e) {
-        if (e.target === this) closeTournamentForm();
-    });
-    document.getElementById('tournament-detail-modal').addEventListener('click', function(e) {
-        if (e.target === this) closeTournamentDetail();
-    });
-    document.getElementById('match-edit-modal').addEventListener('click', function(e) {
-        if (e.target === this) document.getElementById('match-edit-modal').classList.add('hidden');
-    });
+    var formModal = document.getElementById('tournament-form-modal');
+    if (formModal) {
+        formModal.addEventListener('click', function(e) {
+            if (e.target === this) closeTournamentForm();
+        });
+    }
+    var detailModal = document.getElementById('tournament-detail-modal');
+    if (detailModal) {
+        detailModal.addEventListener('click', function(e) {
+            if (e.target === this) closeTournamentDetail();
+        });
+    }
+    var matchModal = document.getElementById('match-edit-modal');
+    if (matchModal) {
+        matchModal.addEventListener('click', function(e) {
+            if (e.target === this) document.getElementById('match-edit-modal').classList.add('hidden');
+        });
+    }
 }
 
-// Export functions
+// ============================================================
+// EXPOSE ALL FUNCTIONS GLOBALLY
+// ============================================================
 window.renderTournamentsView = renderTournamentsView;
 window.renderTournamentList = renderTournamentList;
 window.viewTournament = viewTournament;
@@ -1200,4 +1248,19 @@ window.saveTournament = saveTournament;
 window.closeTournamentForm = closeTournamentForm;
 window.closeTournamentDetail = closeTournamentDetail;
 window.initTournamentEvents = initTournamentEvents;
-window.isCharacterEliminatedByWeek = isCharacterEliminatedByWeek;
+window.addParticipant = addParticipant;
+window.createRound = createRound;
+window.getAvailableParticipants = getAvailableParticipants;
+window.completeRound = completeRound;
+window.deleteRound = deleteRound;
+window.deleteMatch = deleteMatch;
+window.removeParticipant = removeParticipant;
+window.showRoundMatches = showRoundMatches;
+window.showAddMatchModal = showAddMatchModal;
+window.showEditMatchModal = showEditMatchModal;
+window.populateParticipantSelector = populateParticipantSelector;
+window.renderParticipants = renderParticipants;
+window.renderRounds = renderRounds;
+window.renderWinner = renderWinner;
+
+console.log('tournaments-ui.js loaded');
