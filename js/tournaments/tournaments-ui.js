@@ -188,6 +188,24 @@ function renderTournamentList() {
     });
 }
 
+function ensureTournamentArrays(tourn) {
+    if (!tourn) return;
+    if (!tourn.rounds) tourn.rounds = [];
+    if (!tourn.participants) tourn.participants = [];
+    if (!tourn.eliminations) tourn.eliminations = [];
+    if (!tourn.winners) tourn.winners = [];
+    // Ensure rounds is always an array
+    if (!Array.isArray(tourn.rounds)) {
+        tourn.rounds = [];
+    }
+    if (!Array.isArray(tourn.participants)) {
+        tourn.participants = [];
+    }
+    if (!Array.isArray(tourn.eliminations)) {
+        tourn.eliminations = [];
+    }
+}
+
 function viewTournament(id) {
     var tourn = getTournament(id);
     if (!tourn) return;
@@ -335,11 +353,16 @@ function renderParticipants(tourn) {
 function renderRounds(tourn) {
     var container = document.getElementById('rounds-container');
     var status = document.getElementById('rounds-status');
-    var roundCount = tourn.rounds ? tourn.rounds.length : 0;
+    
+    // FIX: Ensure tourn.rounds is an array
+    if (!tourn.rounds || typeof tourn.rounds !== 'object' || !Array.isArray(tourn.rounds)) {
+        tourn.rounds = [];
+    }
+    
+    var roundCount = tourn.rounds.length;
     if (status) status.textContent = roundCount + ' / ' + tourn.totalRounds + ' rounds';
     
-    // FIX: Check if tourn.rounds exists and is an array
-    if (!tourn.rounds || tourn.rounds.length === 0) {
+    if (roundCount === 0) {
         container.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No rounds created.</p>';
         return;
     }
@@ -1119,16 +1142,23 @@ function saveTournament(e) {
     
     if (editId) {
         var tourn = updateTournament(editId, formData);
-        // Ensure arrays exist after update
         if (tourn) {
-            ensureTournamentArrays(tourn);
+            // Ensure arrays exist after update
+            if (!tourn.rounds) tourn.rounds = [];
+            if (!tourn.participants) tourn.participants = [];
+            if (!tourn.eliminations) tourn.eliminations = [];
         }
         if (typeof logActivity === 'function') {
             logActivity('Updated tournament: ' + formData.name);
         }
     } else {
         var tourn = createTournament(formData);
-        ensureTournamentArrays(tourn);
+        if (tourn) {
+            // Ensure arrays exist
+            if (!tourn.rounds) tourn.rounds = [];
+            if (!tourn.participants) tourn.participants = [];
+            if (!tourn.eliminations) tourn.eliminations = [];
+        }
         if (typeof logActivity === 'function') {
             logActivity('Created tournament: ' + formData.name);
         }
@@ -1191,7 +1221,10 @@ function initTournamentEvents() {
             if (tournId) {
                 var tourn = getTournament(tournId);
                 if (tourn) {
-                    ensureTournamentArrays(tourn);
+                    // Ensure arrays exist
+                    if (!tourn.rounds) tourn.rounds = [];
+                    if (!tourn.participants) tourn.participants = [];
+                    if (!tourn.eliminations) tourn.eliminations = [];
                     populateParticipantSelector(tourn);
                     viewTournament(tournId);
                 }
