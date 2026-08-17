@@ -1,6 +1,6 @@
 /**
  * tournaments-ui.js - Tournament UI Rendering
- */
+ */ 
 
 function renderTournamentsView(container) {
     container.innerHTML = `
