@@ -55,6 +55,10 @@ function updateTournament(id, updates) {
     var tourn = getTournament(id);
     if (!tourn) return null;
     Object.assign(tourn, updates);
+    // Ensure rounds is always an array
+    if (!tourn.rounds) tourn.rounds = [];
+    if (!tourn.participants) tourn.participants = [];
+    if (!tourn.eliminations) tourn.eliminations = [];
     return tourn;
 }
 
@@ -136,6 +140,17 @@ function isCharacterEliminatedByWeek(char, week) {
     return false;
 }
 
+/**
+ * Ensure tournament has required arrays
+ */
+function ensureTournamentArrays(tourn) {
+    if (!tourn) return;
+    if (!tourn.rounds) tourn.rounds = [];
+    if (!tourn.participants) tourn.participants = [];
+    if (!tourn.eliminations) tourn.eliminations = [];
+    if (!tourn.winners) tourn.winners = [];
+}
+
 // ============================================================
 // EXPOSE ALL FUNCTIONS GLOBALLY
 // ============================================================
@@ -148,4 +163,7 @@ window.getParticipantName = getParticipantName;
 window.getParticipantType = getParticipantType;
 window.getTournamentStatusColor = getTournamentStatusColor;
 window.isCharacterEliminatedByWeek = isCharacterEliminatedByWeek;
+window.ensureTournamentArrays = ensureTournamentArrays;
 window.tournamentState = tournamentState;
+
+console.log('tournaments-core.js loaded');
