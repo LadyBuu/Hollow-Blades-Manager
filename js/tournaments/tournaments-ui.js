@@ -1,6 +1,6 @@
 /**
  * tournaments-ui.js - Tournament UI Rendering
- */ 
+ */
 
 function renderTournamentsView(container) {
     container.innerHTML = `
@@ -192,6 +192,9 @@ function viewTournament(id) {
     var tourn = getTournament(id);
     if (!tourn) return;
     
+    // Ensure arrays exist
+    ensureTournamentArrays(tourn);
+    
     tournamentState.currentTournamentId = id;
     
     var modal = document.getElementById('tournament-detail-modal');
@@ -335,6 +338,7 @@ function renderRounds(tourn) {
     var roundCount = tourn.rounds ? tourn.rounds.length : 0;
     if (status) status.textContent = roundCount + ' / ' + tourn.totalRounds + ' rounds';
     
+    // FIX: Check if tourn.rounds exists and is an array
     if (!tourn.rounds || tourn.rounds.length === 0) {
         container.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No rounds created.</p>';
         return;
@@ -1039,7 +1043,10 @@ function createRound() {
     var tourn = getTournament(tournId);
     if (!tourn) return;
     
-    if (tourn.rounds && tourn.rounds.length >= tourn.totalRounds) {
+    // Ensure rounds array exists
+    if (!tourn.rounds) tourn.rounds = [];
+    
+    if (tourn.rounds.length >= tourn.totalRounds) {
         alert('Maximum rounds reached for this tournament.');
         return;
     }
@@ -1049,7 +1056,6 @@ function createRound() {
         return;
     }
     
-    if (!tourn.rounds) tourn.rounds = [];
     var roundNumber = tourn.rounds.length + 1;
     
     tourn.rounds.push({
@@ -1112,12 +1118,17 @@ function saveTournament(e) {
     }
     
     if (editId) {
-        updateTournament(editId, formData);
+        var tourn = updateTournament(editId, formData);
+        // Ensure arrays exist after update
+        if (tourn) {
+            ensureTournamentArrays(tourn);
+        }
         if (typeof logActivity === 'function') {
             logActivity('Updated tournament: ' + formData.name);
         }
     } else {
-        createTournament(formData);
+        var tourn = createTournament(formData);
+        ensureTournamentArrays(tourn);
         if (typeof logActivity === 'function') {
             logActivity('Created tournament: ' + formData.name);
         }
@@ -1180,6 +1191,7 @@ function initTournamentEvents() {
             if (tournId) {
                 var tourn = getTournament(tournId);
                 if (tourn) {
+                    ensureTournamentArrays(tourn);
                     populateParticipantSelector(tourn);
                     viewTournament(tournId);
                 }
