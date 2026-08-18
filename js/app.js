@@ -1,6 +1,6 @@
 /**
  * app.js - Main Application Entry Point
- * Contains character elimination logic with standalone support
+ * Initializes the application and handles dashboard functionality
  */
 
 // Global data reference
@@ -12,6 +12,8 @@ var data = null;
 function initApp() {
     loadData()
         .then(function() {
+            console.log('Data loaded successfully');
+            
             // Initialize import/export
             if (typeof initImportExport === 'function') {
                 initImportExport();
@@ -47,6 +49,14 @@ function initApp() {
                     showYearModal();
                 });
             }
+            
+            // Log current state
+            console.log('App initialized with:', {
+                characters: data.characters ? data.characters.length : 0,
+                teams: data.teams ? data.teams.length : 0,
+                tournaments: data.tournaments ? data.tournaments.length : 0,
+                missions: data.missions ? data.missions.length : 0
+            });
         })
         .catch(function(err) {
             console.error('Failed to initialize application:', err);
@@ -151,12 +161,9 @@ function renderAll() {
 }
 
 // ============================================================
-// CHARACTER FUNCTIONS - with standalone elimination support
+// CHARACTER FUNCTIONS
 // ============================================================
 
-/**
- * Render characters (for characters.html page)
- */
 function renderCharacters() {
     var container = document.getElementById('characters-container');
     if (!container) return;
@@ -183,7 +190,6 @@ function renderCharacters() {
         var deadClass = isDead ? ' deceased' : '';
         var deadBadge = isDead ? ' <span class="deceased-badge">Deceased</span>' : '';
         
-        // Check for eliminations (including standalone)
         var hasEliminations = char.eliminations && char.eliminations.length > 0;
         var hasStandalone = false;
         var latestElimWeek = null;
@@ -226,9 +232,6 @@ function renderCharacters() {
     });
 }
 
-/**
- * Initialize character events
- */
 function initCharacterEvents() {
     var addBtn = document.getElementById('add-character-btn');
     if (addBtn) {
@@ -261,7 +264,6 @@ function initCharacterEvents() {
         });
     }
     
-    // Standalone elimination events
     var addStandaloneElimBtn = document.getElementById('add-standalone-elim-btn');
     if (addStandaloneElimBtn) {
         var newElimBtn = addStandaloneElimBtn.cloneNode(true);
@@ -282,9 +284,6 @@ function initCharacterEvents() {
     }
 }
 
-/**
- * Add standalone elimination to a character
- */
 function addStandaloneElimination() {
     var charId = document.getElementById('standalone-char-id')?.value;
     if (!charId) {
@@ -301,7 +300,6 @@ function addStandaloneElimination() {
         return;
     }
     
-    // Check if already eliminated at or before this week
     var alreadyEliminated = false;
     if (char.eliminatedWeeks) {
         char.eliminatedWeeks.forEach(function(w) {
@@ -335,7 +333,6 @@ function addStandaloneElimination() {
     
     saveData().then(function() {
         renderCharacters();
-        // Re-render character form if open
         var form = document.getElementById('character-form');
         if (form && !form.classList.contains('hidden')) {
             showCharacterForm(charId);
@@ -347,16 +344,12 @@ function addStandaloneElimination() {
     });
 }
 
-/**
- * Show character form for add or edit
- */
 function showCharacterForm(editId) {
     var form = document.getElementById('character-form');
     var title = document.getElementById('form-title');
     var formElement = document.getElementById('char-form');
     form.classList.remove('hidden');
     
-    // Scroll to the form smoothly
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     var deceasedCheck = document.getElementById('char-deceased');
@@ -395,7 +388,6 @@ function showCharacterForm(editId) {
                 deathFields.style.display = char.deceased ? 'block' : 'none';
             }
             
-            // Career status
             var container = document.getElementById('career-status-container');
             container.innerHTML = '';
             if (char.careerStatus && char.careerStatus.length > 0) {
@@ -406,7 +398,6 @@ function showCharacterForm(editId) {
                 addCareerStatusEntry(container);
             }
             
-            // Tournament eliminations
             var elimContainer = document.getElementById('elimination-container');
             elimContainer.innerHTML = '';
             if (char.eliminations) {
@@ -421,7 +412,6 @@ function showCharacterForm(editId) {
                 addEliminationEntry(elimContainer);
             }
             
-            // Standalone eliminations - show as list
             renderStandaloneEliminations(char);
             
             formElement.dataset.editId = editId;
@@ -445,23 +435,18 @@ function showCharacterForm(editId) {
         var specialtyField = document.getElementById('specialty-field');
         if (specialtyField) specialtyField.style.display = 'none';
         
-        // Hide standalone eliminations
         var standaloneContainer = document.getElementById('standalone-eliminations-container');
         if (standaloneContainer) standaloneContainer.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No standalone eliminations recorded.</p>';
         document.getElementById('standalone-char-id').value = '';
         document.getElementById('standalone-elim-week').value = 1;
         document.getElementById('standalone-elim-reason').value = '';
     }
-    // Focus the first input
     setTimeout(function() {
         var firstName = document.getElementById('char-firstname');
         if (firstName) firstName.focus();
     }, 300);
 }
 
-/**
- * Render standalone eliminations for a character
- */
 function renderStandaloneEliminations(char) {
     var container = document.getElementById('standalone-eliminations-container');
     if (!container) return;
@@ -492,9 +477,6 @@ function renderStandaloneEliminations(char) {
     });
 }
 
-/**
- * Remove standalone elimination
- */
 function removeStandaloneElimination(charId, index) {
     if (!confirm('Remove this standalone elimination?')) return;
     var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
@@ -503,7 +485,6 @@ function removeStandaloneElimination(charId, index) {
     var elim = char.eliminations[index];
     if (!elim || !elim.standalone) return;
     
-    // Remove from eliminatedWeeks
     if (char.eliminatedWeeks) {
         var weekIdx = char.eliminatedWeeks.indexOf(parseInt(elim.week));
         if (weekIdx !== -1) {
@@ -523,21 +504,14 @@ function removeStandaloneElimination(charId, index) {
     });
 }
 
-/**
- * Hide character form
- */
 function hideCharacterForm() {
     document.getElementById('character-form').classList.add('hidden');
-    // Scroll back to the top of the character list
     var list = document.getElementById('character-list');
     if (list) {
         list.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
 
-/**
- * Add a career status entry to the container
- */
 function addCareerStatusEntry(container, status, startYear, endYear) {
     var entry = document.createElement('div');
     entry.className = 'career-status-entry';
@@ -573,15 +547,11 @@ function addCareerStatusEntry(container, status, startYear, endYear) {
     };
 }
 
-/**
- * Add elimination entry to the form
- */
 function addEliminationEntry(container, tournamentId, week, reason) {
     var entry = document.createElement('div');
     entry.className = 'elimination-entry-form';
     entry.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;';
     
-    // Tournament dropdown
     var select = document.createElement('select');
     select.className = 'elimination-tournament';
     select.style.cssText = 'flex:1;min-width:120px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
@@ -633,9 +603,6 @@ function addEliminationEntry(container, tournamentId, week, reason) {
     container.appendChild(entry);
 }
 
-/**
- * Save character from form
- */
 function saveCharacter(e) {
     e.preventDefault();
     var form = e.target;
@@ -645,7 +612,6 @@ function saveCharacter(e) {
     var deathCause = document.getElementById('char-death-cause').value.trim();
     var deathAge = document.getElementById('char-death-age').value.trim();
     
-    // Collect career status
     var careerStatus = [];
     document.querySelectorAll('.career-status-entry').forEach(function(entry) {
         var select = entry.querySelector('.career-status-select');
@@ -660,7 +626,6 @@ function saveCharacter(e) {
         }
     });
     
-    // Collect tournament eliminations (only non-standalone)
     var eliminations = [];
     document.querySelectorAll('.elimination-entry-form').forEach(function(entry) {
         var select = entry.querySelector('.elimination-tournament');
@@ -712,7 +677,6 @@ function saveCharacter(e) {
     if (editId) {
         var index = data.characters.findIndex(function(c) { return String(c.id) === String(editId); });
         if (index !== -1) {
-            // Preserve standalone eliminations
             var existing = data.characters[index];
             var standaloneElims = [];
             if (existing.eliminations) {
@@ -764,9 +728,6 @@ function saveCharacter(e) {
     hideCharacterForm();
 }
 
-/**
- * Delete a character
- */
 function deleteCharacter(id) {
     if (!confirm('Delete this character permanently?')) return;
     var char = data.characters.find(function(c) { return String(c.id) === String(id); });
@@ -810,10 +771,8 @@ window.removeStandaloneElimination = removeStandaloneElimination;
 // INITIALIZE
 // ============================================================
 
-// Initialize the application when DOM is ready
 document.addEventListener('DOMContentLoaded', initApp);
 
-// Also re-run when page is fully loaded (for pages that load after)
 window.addEventListener('load', function() {
     var path = window.location.pathname;
     var page = path.split('/').pop() || 'index.html';
