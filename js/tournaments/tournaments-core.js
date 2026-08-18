@@ -11,10 +11,8 @@ var tournamentState = {
  * Get tournament by ID
  */
 function getTournament(id) {
-    if (!data.tournaments) return null;
+    if (!data || !data.tournaments) return null;
     var tourn = data.tournaments.find(function(t) { return String(t.id) === String(id); });
-    
-    // Ensure tournament has all required fields when retrieved
     if (tourn) {
         ensureTournamentIntegrity(tourn);
     }
@@ -25,7 +23,15 @@ function getTournament(id) {
  * Get all tournaments
  */
 function getTournaments() {
-    if (!data.tournaments) data.tournaments = [];
+    // Ensure data and data.tournaments exist
+    if (!data) {
+        console.warn('Data not initialized yet');
+        return [];
+    }
+    if (!data.tournaments) {
+        data.tournaments = [];
+        return [];
+    }
     // Ensure all tournaments have required fields
     data.tournaments.forEach(function(tourn) {
         ensureTournamentIntegrity(tourn);
@@ -34,61 +40,35 @@ function getTournaments() {
 }
 
 /**
- * Ensure tournament has all required fields - FIXED
+ * Ensure tournament has all required fields
  */
 function ensureTournamentIntegrity(tourn) {
     if (!tourn) return;
-    
-    // Set default mode if missing
-    if (!tourn.mode) {
-        console.warn('Tournament missing mode, setting default:', tourn.id);
-        tourn.mode = 'teams';
-    }
-    
-    // Ensure arrays exist
-    if (!tourn.participants || !Array.isArray(tourn.participants)) {
-        console.warn('Tournament missing participants, initializing:', tourn.id);
-        tourn.participants = [];
-    }
-    if (!tourn.rounds || !Array.isArray(tourn.rounds)) {
-        tourn.rounds = [];
-    }
-    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) {
-        tourn.eliminations = [];
-    }
-    if (!tourn.winners || !Array.isArray(tourn.winners)) {
-        tourn.winners = [];
-    }
-    
-    // Set default status if missing
-    if (!tourn.status) {
-        tourn.status = 'draft';
-    }
-    
-    // Set default totalRounds if missing
-    if (!tourn.totalRounds) {
-        tourn.totalRounds = 1;
-    }
-    
-    // Set default weeks if missing
-    if (!tourn.startWeek) {
-        tourn.startWeek = 1;
-    }
-    if (!tourn.endWeek) {
-        tourn.endWeek = 52;
-    }
+    if (!tourn.mode) tourn.mode = 'teams';
+    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = [];
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
+    if (!tourn.winners || !Array.isArray(tourn.winners)) tourn.winners = [];
+    if (!tourn.status) tourn.status = 'draft';
+    if (!tourn.totalRounds) tourn.totalRounds = 1;
+    if (!tourn.startWeek) tourn.startWeek = 1;
+    if (!tourn.endWeek) tourn.endWeek = 52;
 }
 
 /**
- * Create a new tournament - FIXED to ensure mode is set
+ * Create a new tournament
  */
 function createTournament(tournData) {
+    if (!data) {
+        console.error('Data not initialized');
+        return null;
+    }
     if (!data.tournaments) data.tournaments = [];
     
     var newTourn = {
         id: generateId('tourn'),
         name: tournData.name || 'New Tournament',
-        mode: tournData.mode || 'teams',  // Explicitly set mode
+        mode: tournData.mode || 'teams',
         startWeek: parseInt(tournData.startWeek) || 1,
         endWeek: parseInt(tournData.endWeek) || 52,
         totalRounds: parseInt(tournData.totalRounds) || 1,
@@ -101,8 +81,6 @@ function createTournament(tournData) {
         winners: [],
         createdAt: new Date().toISOString()
     };
-    
-    console.log('Creating tournament with mode:', newTourn.mode);
     data.tournaments.push(newTourn);
     return newTourn;
 }
@@ -114,7 +92,6 @@ function updateTournament(id, updates) {
     var tourn = getTournament(id);
     if (!tourn) return null;
     
-    // Preserve existing data
     var existingParticipants = tourn.participants || [];
     var existingRounds = tourn.rounds || [];
     var existingEliminations = tourn.eliminations || [];
@@ -122,24 +99,12 @@ function updateTournament(id, updates) {
     var existingWinners = tourn.winners || [];
     var existingMode = tourn.mode || 'teams';
     
-    // Apply updates
     Object.assign(tourn, updates);
     
-    // Restore mode if it got overwritten
-    if (!tourn.mode) {
-        tourn.mode = existingMode;
-    }
-    
-    // Restore arrays if they got overwritten
-    if (!tourn.participants || !Array.isArray(tourn.participants)) {
-        tourn.participants = existingParticipants;
-    }
-    if (!tourn.rounds || !Array.isArray(tourn.rounds)) {
-        tourn.rounds = existingRounds;
-    }
-    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) {
-        tourn.eliminations = existingEliminations;
-    }
+    if (!tourn.mode) tourn.mode = existingMode;
+    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = existingParticipants;
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = existingRounds;
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = existingEliminations;
     if (!tourn.winner) tourn.winner = existingWinner;
     if (!tourn.winners || !Array.isArray(tourn.winners)) tourn.winners = existingWinners;
     
@@ -151,7 +116,9 @@ function updateTournament(id, updates) {
  */
 function deleteTournament(id) {
     if (!confirm('Delete this tournament permanently?')) return false;
-    var tourn = getTournament(id);
+    if (!data || !data.tournaments) return false;
+    
+    var tourn = data.tournaments.find(function(t) { return String(t.id) === String(id); });
     if (!tourn) return false;
     
     var tournName = tourn.name;
@@ -170,13 +137,14 @@ function deleteTournament(id) {
  */
 function getParticipantName(id) {
     if (!id) return 'Unknown';
+    if (!data) return 'Unknown';
     
-    var char = data.characters.find(function(c) { return String(c.id) === String(id); });
+    var char = data.characters ? data.characters.find(function(c) { return String(c.id) === String(id); }) : null;
     if (char) {
         return [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
     }
     
-    var team = data.teams.find(function(t) { return String(t.id) === String(id); });
+    var team = data.teams ? data.teams.find(function(t) { return String(t.id) === String(id); }) : null;
     if (team) {
         return team.name;
     }
@@ -189,8 +157,9 @@ function getParticipantName(id) {
  */
 function getParticipantType(id) {
     if (!id) return 'unknown';
-    if (data.characters.some(function(c) { return String(c.id) === String(id); })) return 'character';
-    if (data.teams.some(function(t) { return String(t.id) === String(id); })) return 'team';
+    if (!data) return 'unknown';
+    if (data.characters && data.characters.some(function(c) { return String(c.id) === String(id); })) return 'character';
+    if (data.teams && data.teams.some(function(t) { return String(t.id) === String(id); })) return 'team';
     return 'unknown';
 }
 
@@ -229,21 +198,11 @@ function isCharacterEliminatedByWeek(char, week) {
  */
 function ensureTournamentArrays(tourn) {
     if (!tourn) return;
-    if (!tourn.participants || !Array.isArray(tourn.participants)) {
-        tourn.participants = [];
-    }
-    if (!tourn.rounds || !Array.isArray(tourn.rounds)) {
-        tourn.rounds = [];
-    }
-    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) {
-        tourn.eliminations = [];
-    }
-    if (!tourn.winners || !Array.isArray(tourn.winners)) {
-        tourn.winners = [];
-    }
-    if (!tourn.mode) {
-        tourn.mode = 'teams';
-    }
+    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = [];
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
+    if (!tourn.winners || !Array.isArray(tourn.winners)) tourn.winners = [];
+    if (!tourn.mode) tourn.mode = 'teams';
 }
 
 // ============================================================
