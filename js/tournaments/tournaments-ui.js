@@ -187,7 +187,7 @@ function viewTournament(id) {
     
     ensureTournamentArrays(tourn);
     
-    // Auto-check and update round statuses
+    // Auto-check and update round statuses - optimized
     updateRoundStatuses(tourn);
     
     tournamentState.currentTournamentId = id;
@@ -227,28 +227,33 @@ function viewTournament(id) {
 }
 
 function updateRoundStatuses(tourn) {
-    if (!tourn.rounds) return;
+    if (!tourn.rounds || tourn.rounds.length === 0) return;
     
     var allCompleted = true;
-    tourn.rounds.forEach(function(round) {
+    var anyMatches = false;
+    
+    for (var i = 0; i < tourn.rounds.length; i++) {
+        var round = tourn.rounds[i];
         if (!round.matches || round.matches.length === 0) {
             round.status = 'pending';
             allCompleted = false;
-            return;
+            continue;
         }
+        anyMatches = true;
         
-        var roundCompleted = round.matches.every(function(m) { return m.status === 'completed'; });
-        if (roundCompleted && round.matches.length > 0) {
-            round.status = 'completed';
-        } else {
-            round.status = 'pending';
-            allCompleted = false;
+        var roundCompleted = true;
+        for (var j = 0; j < round.matches.length; j++) {
+            if (round.matches[j].status !== 'completed') {
+                roundCompleted = false;
+                allCompleted = false;
+                break;
+            }
         }
-    });
+        round.status = roundCompleted ? 'completed' : 'pending';
+    }
     
-    // Check if all rounds are completed
-    var allRoundsComplete = tourn.rounds.every(function(r) { return r.status === 'completed'; });
-    if (allRoundsComplete && tourn.rounds.length > 0) {
+    // Only update tournament status if there are matches
+    if (anyMatches && allCompleted && tourn.rounds.length > 0) {
         tourn.status = 'completed';
         // Determine winner from last match of last round
         var lastRound = tourn.rounds[tourn.rounds.length - 1];
@@ -452,7 +457,10 @@ function renderEliminations(tourn) {
         var currentValue = select.value;
         select.innerHTML = '<option value="">Select individual...</option>';
         
+        // Get all characters from participants (including team members)
         var allChars = [];
+        
+        // First, get individual participants (for individual mode or characters)
         participants.forEach(function(p) {
             var char = data.characters.find(function(c) { return String(c.id) === String(p.id); });
             if (char) {
@@ -476,6 +484,7 @@ function renderEliminations(tourn) {
             }
         });
         
+        // For team mode, also get all team members
         if (tourn.mode === 'teams') {
             participants.forEach(function(p) {
                 var team = data.teams.find(function(t) { return String(t.id) === String(p.id); });
@@ -499,6 +508,7 @@ function renderEliminations(tourn) {
             });
         }
         
+        // Remove duplicates
         var seen = {};
         allChars = allChars.filter(function(c) {
             if (seen[c.id]) return false;
