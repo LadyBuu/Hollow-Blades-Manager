@@ -12,158 +12,87 @@ var data = null;
 function initApp() {
     console.log('Initializing app...');
     
-    // Check if loadData is available globally
+    // Use the global loadData function from database.js
     if (typeof loadData === 'function') {
         console.log('Loading data from IndexedDB...');
         loadData()
-            .then(function(loadedData) {
+            .then(function() {
                 console.log('Data loaded successfully');
-                data = loadedData;
                 onDataLoaded();
             })
             .catch(function(err) {
                 console.error('Failed to load data:', err);
-                // Initialize empty data as fallback
-                data = {
-                    characters: [],
-                    teams: [],
-                    tournaments: [],
-                    missions: [],
-                    activities: [],
-                    currentYear: new Date().getFullYear(),
-                    currentWeek: 1,
-                    curriculum: {
-                        disciplines: [],
-                        schedules: {},
-                        restDays: {},
-                        examDays: {},
-                        grades: {},
-                        rankings: {},
-                        currentWeek: 1,
-                        classInstructors: {},
-                        classLabels: {},
-                        classGroupLabels: {},
-                        classDurations: {},
-                        instructorClasses: {},
-                        instructorTemplates: {},
-                        instructorBlocks: {},
-                        instructorGroups: {},
-                        disciplineGroups: {},
-                        autoGroups: {}
-                    }
-                };
-                console.warn('Using empty data fallback');
-                onDataLoaded();
+                initEmptyData();
             });
     } else if (window.db && typeof window.db.loadData === 'function') {
         console.log('Loading data via db object...');
         window.db.loadData()
-            .then(function(loadedData) {
+            .then(function() {
                 console.log('Data loaded successfully');
-                data = loadedData;
                 onDataLoaded();
             })
             .catch(function(err) {
                 console.error('Failed to load data:', err);
-                data = {
-                    characters: [],
-                    teams: [],
-                    tournaments: [],
-                    missions: [],
-                    activities: [],
-                    currentYear: new Date().getFullYear(),
-                    currentWeek: 1,
-                    curriculum: {
-                        disciplines: [],
-                        schedules: {},
-                        restDays: {},
-                        examDays: {},
-                        grades: {},
-                        rankings: {},
-                        currentWeek: 1,
-                        classInstructors: {},
-                        classLabels: {},
-                        classGroupLabels: {},
-                        classDurations: {},
-                        instructorClasses: {},
-                        instructorTemplates: {},
-                        instructorBlocks: {},
-                        instructorGroups: {},
-                        disciplineGroups: {},
-                        autoGroups: {}
-                    }
-                };
-                console.warn('Using empty data fallback');
-                onDataLoaded();
+                initEmptyData();
             });
     } else {
         console.error('loadData function not available');
-        data = {
-            characters: [],
-            teams: [],
-            tournaments: [],
-            missions: [],
-            activities: [],
-            currentYear: new Date().getFullYear(),
-            currentWeek: 1,
-            curriculum: {
-                disciplines: [],
-                schedules: {},
-                restDays: {},
-                examDays: {},
-                grades: {},
-                rankings: {},
-                currentWeek: 1,
-                classInstructors: {},
-                classLabels: {},
-                classGroupLabels: {},
-                classDurations: {},
-                instructorClasses: {},
-                instructorTemplates: {},
-                instructorBlocks: {},
-                instructorGroups: {},
-                disciplineGroups: {},
-                autoGroups: {}
-            }
-        };
-        console.warn('Using empty data fallback');
-        onDataLoaded();
+        initEmptyData();
     }
 }
 
-/**
- * Called when data is loaded or initialized
- */
+function initEmptyData() {
+    data = {
+        characters: [],
+        teams: [],
+        tournaments: [],
+        missions: [],
+        activities: [],
+        currentYear: new Date().getFullYear(),
+        currentWeek: 1,
+        curriculum: {
+            disciplines: [],
+            schedules: {},
+            restDays: {},
+            examDays: {},
+            grades: {},
+            rankings: {},
+            currentWeek: 1,
+            classInstructors: {},
+            classLabels: {},
+            classGroupLabels: {},
+            classDurations: {},
+            instructorClasses: {},
+            instructorTemplates: {},
+            instructorBlocks: {},
+            instructorGroups: {},
+            disciplineGroups: {},
+            autoGroups: {}
+        }
+    };
+    console.warn('Using empty data fallback');
+    onDataLoaded();
+}
+
 function onDataLoaded() {
-    // Initialize import/export
     if (typeof initImportExport === 'function') {
         initImportExport();
     }
-    
-    // Initialize missions system
     if (typeof initMissionsSystem === 'function') {
         initMissionsSystem();
     }
-    
-    // Initialize team manager system
     if (typeof initTeamManagerSystem === 'function') {
         initTeamManagerSystem();
     }
-    
-    // Initialize curriculum system
     if (typeof initScheduleSystem === 'function') {
         initScheduleSystem();
     }
-    
-    // Initialize student schedule system
     if (typeof initStudentScheduleSystem === 'function') {
         initStudentScheduleSystem();
     }
     
-    // Update dashboard stats
     updateDashboardStats();
     
-    // Set up year click
     var yearDisplay = document.getElementById('header-current-year');
     if (yearDisplay) {
         yearDisplay.addEventListener('click', function() {
@@ -178,13 +107,9 @@ function onDataLoaded() {
         missions: data.missions ? data.missions.length : 0
     });
     
-    // Trigger render for the current page
     renderAll();
 }
 
-/**
- * Update dashboard statistics
- */
 function updateDashboardStats() {
     var charCount = document.getElementById('char-count');
     var teamCount = document.getElementById('team-count');
@@ -214,9 +139,6 @@ function updateDashboardStats() {
     if (yearDisplay) yearDisplay.textContent = data.currentYear || new Date().getFullYear();
 }
 
-/**
- * Show year modal
- */
 function showYearModal() {
     var currentYear = data.currentYear || new Date().getFullYear();
     var newYear = prompt('Enter the current year:', currentYear);
@@ -243,14 +165,16 @@ function showYearModal() {
     }
 }
 
-/**
- * Re-render all views
- */
 function renderAll() {
     var path = window.location.pathname;
     var page = path.split('/').pop() || 'index.html';
     
     console.log('Rendering page:', page);
+    
+    if (!data) {
+        console.warn('Data not initialized yet, waiting...');
+        return;
+    }
     
     if (page === 'index.html' || page === '') {
         updateDashboardStats();
@@ -294,10 +218,15 @@ function renderCharacters() {
     var container = document.getElementById('characters-container');
     if (!container) return;
     
+    if (!data || !data.characters) {
+        container.innerHTML = '<p class="empty-state">No characters created yet. Add your first character!</p>';
+        return;
+    }
+    
     var statusFilter = document.getElementById('char-status-filter')?.value || 'all';
     var nameFilter = document.getElementById('char-name-filter')?.value?.toLowerCase() || '';
     
-    if (!data.characters || data.characters.length === 0) {
+    if (data.characters.length === 0) {
         container.innerHTML = '<p class="empty-state">No characters created yet. Add your first character!</p>';
         return;
     }
@@ -772,6 +701,62 @@ function addCareerStatusEntry(container, status, startYear, endYear) {
     };
 }
 
+function addEliminationEntry(container, tournamentId, week, reason) {
+    var entry = document.createElement('div');
+    entry.className = 'elimination-entry-form';
+    entry.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;';
+    
+    var select = document.createElement('select');
+    select.className = 'elimination-tournament';
+    select.style.cssText = 'flex:1;min-width:120px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
+    select.innerHTML = '<option value="">Select tournament...</option>';
+    
+    if (data.tournaments) {
+        data.tournaments.forEach(function(t) {
+            var option = document.createElement('option');
+            option.value = t.id;
+            option.textContent = t.name;
+            if (tournamentId && String(t.id) === String(tournamentId)) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+    
+    var weekInput = document.createElement('input');
+    weekInput.type = 'number';
+    weekInput.className = 'elimination-week';
+    weekInput.placeholder = 'Week';
+    weekInput.style.cssText = 'width:70px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
+    if (week) weekInput.value = week;
+    
+    var reasonInput = document.createElement('input');
+    reasonInput.type = 'text';
+    reasonInput.className = 'elimination-reason';
+    reasonInput.placeholder = 'Reason (e.g., Defeated by...)';
+    reasonInput.style.cssText = 'flex:1;min-width:100px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:0.78rem;';
+    if (reason) reasonInput.value = reason;
+    
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'small danger remove-elimination';
+    removeBtn.textContent = '✕';
+    removeBtn.style.cssText = 'padding:4px 8px;font-size:0.65rem;';
+    removeBtn.onclick = function() {
+        if (container.children.length > 1) {
+            entry.remove();
+        } else {
+            alert('You need at least one elimination entry.');
+        }
+    };
+    
+    entry.appendChild(select);
+    entry.appendChild(weekInput);
+    entry.appendChild(reasonInput);
+    entry.appendChild(removeBtn);
+    container.appendChild(entry);
+}
+
 function saveCharacter(e) {
     e.preventDefault();
     var form = e.target;
@@ -817,15 +802,11 @@ function saveCharacter(e) {
         specialty: document.getElementById('char-specialty').value.trim()
     };
     
-    // Preserve eliminations
     if (editId) {
         var existing = data.characters.find(function(c) { return String(c.id) === String(editId); });
         if (existing && existing.eliminations) {
             charData.eliminations = existing.eliminations.slice();
         }
-    } else {
-        charData.eliminations = [];
-        charData.eliminatedWeeks = [];
     }
     
     if (!charData.firstName) {
@@ -842,6 +823,9 @@ function saveCharacter(e) {
         var index = data.characters.findIndex(function(c) { return String(c.id) === String(editId); });
         if (index !== -1) {
             var existing = data.characters[index];
+            if (!charData.eliminations) {
+                charData.eliminations = existing.eliminations || [];
+            }
             charData.id = existing.id;
             charData.createdAt = existing.createdAt;
             data.characters[index] = Object.assign({}, existing, charData);
@@ -996,26 +980,6 @@ function getWeekBlock(weekNum) {
     };
 }
 
-function saveData() {
-    if (typeof window.saveData === 'function') {
-        return window.saveData();
-    }
-    if (window.db && typeof window.db.saveData === 'function') {
-        return window.db.saveData();
-    }
-    return Promise.reject(new Error('saveData not available'));
-}
-
-function loadData() {
-    if (typeof window.loadData === 'function') {
-        return window.loadData();
-    }
-    if (window.db && typeof window.db.loadData === 'function') {
-        return window.db.loadData();
-    }
-    return Promise.reject(new Error('loadData not available'));
-}
-
 // ============================================================
 // EXPOSE FUNCTIONS GLOBALLY
 // ============================================================
@@ -1028,6 +992,7 @@ window.initCharacterEvents = initCharacterEvents;
 window.showCharacterForm = showCharacterForm;
 window.hideCharacterForm = hideCharacterForm;
 window.addCareerStatusEntry = addCareerStatusEntry;
+window.addEliminationEntry = addEliminationEntry;
 window.saveCharacter = saveCharacter;
 window.deleteCharacter = deleteCharacter;
 window.addStandaloneElimination = addStandaloneElimination;
@@ -1042,21 +1007,12 @@ window.getCharacterTeamCount = getCharacterTeamCount;
 window.generateId = generateId;
 window.getWeekBlock = getWeekBlock;
 window.logActivity = logActivity;
-window.saveData = saveData;
-window.loadData = loadData;
 
 // ============================================================
 // INITIALIZE
 // ============================================================
 
-console.log('app.js loaded');
-
-// Wait for DOM to be ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
-    initApp();
-}
+document.addEventListener('DOMContentLoaded', initApp);
 
 window.addEventListener('load', function() {
     var path = window.location.pathname;
