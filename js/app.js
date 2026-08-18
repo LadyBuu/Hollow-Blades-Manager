@@ -10,106 +10,176 @@ var data = null;
  * Initialize the application
  */
 function initApp() {
-    // Check if db object exists with loadData function
-    if (typeof window.db !== 'undefined' && window.db && typeof window.db.loadData === 'function') {
+    console.log('Initializing app...');
+    
+    // Check if loadData is available globally
+    if (typeof loadData === 'function') {
         console.log('Loading data from IndexedDB...');
+        loadData()
+            .then(function() {
+                console.log('Data loaded successfully');
+                onDataLoaded();
+            })
+            .catch(function(err) {
+                console.error('Failed to load data:', err);
+                // Initialize empty data as fallback
+                data = {
+                    characters: [],
+                    teams: [],
+                    tournaments: [],
+                    missions: [],
+                    activities: [],
+                    currentYear: new Date().getFullYear(),
+                    currentWeek: 1,
+                    curriculum: {
+                        disciplines: [],
+                        schedules: {},
+                        restDays: {},
+                        examDays: {},
+                        grades: {},
+                        rankings: {},
+                        currentWeek: 1,
+                        classInstructors: {},
+                        classLabels: {},
+                        classGroupLabels: {},
+                        classDurations: {},
+                        instructorClasses: {},
+                        instructorTemplates: {},
+                        instructorBlocks: {},
+                        instructorGroups: {},
+                        disciplineGroups: {},
+                        autoGroups: {}
+                    }
+                };
+                console.warn('Using empty data fallback');
+                onDataLoaded();
+            });
+    } else if (window.db && typeof window.db.loadData === 'function') {
+        console.log('Loading data via db object...');
         window.db.loadData()
             .then(function() {
                 console.log('Data loaded successfully');
-                
-                // Initialize import/export
-                if (typeof initImportExport === 'function') {
-                    initImportExport();
-                }
-                
-                // Initialize missions system
-                if (typeof initMissionsSystem === 'function') {
-                    initMissionsSystem();
-                }
-                
-                // Initialize team manager system
-                if (typeof initTeamManagerSystem === 'function') {
-                    initTeamManagerSystem();
-                }
-                
-                // Initialize curriculum system
-                if (typeof initScheduleSystem === 'function') {
-                    initScheduleSystem();
-                }
-                
-                // Initialize student schedule system
-                if (typeof initStudentScheduleSystem === 'function') {
-                    initStudentScheduleSystem();
-                }
-                
-                // Update dashboard stats
-                updateDashboardStats();
-                
-                // Set up year click
-                var yearDisplay = document.getElementById('header-current-year');
-                if (yearDisplay) {
-                    yearDisplay.addEventListener('click', function() {
-                        showYearModal();
-                    });
-                }
-                
-                console.log('App initialized with:', {
-                    characters: data.characters ? data.characters.length : 0,
-                    teams: data.teams ? data.teams.length : 0,
-                    tournaments: data.tournaments ? data.tournaments.length : 0,
-                    missions: data.missions ? data.missions.length : 0
-                });
+                onDataLoaded();
             })
             .catch(function(err) {
-                console.error('Failed to initialize application:', err);
-                alert('Failed to load data. Please check console for details.');
+                console.error('Failed to load data:', err);
+                // Initialize empty data as fallback
+                data = {
+                    characters: [],
+                    teams: [],
+                    tournaments: [],
+                    missions: [],
+                    activities: [],
+                    currentYear: new Date().getFullYear(),
+                    currentWeek: 1,
+                    curriculum: {
+                        disciplines: [],
+                        schedules: {},
+                        restDays: {},
+                        examDays: {},
+                        grades: {},
+                        rankings: {},
+                        currentWeek: 1,
+                        classInstructors: {},
+                        classLabels: {},
+                        classGroupLabels: {},
+                        classDurations: {},
+                        instructorClasses: {},
+                        instructorTemplates: {},
+                        instructorBlocks: {},
+                        instructorGroups: {},
+                        disciplineGroups: {},
+                        autoGroups: {}
+                    }
+                };
+                console.warn('Using empty data fallback');
+                onDataLoaded();
             });
     } else {
-        console.error('database.js not loaded properly. db.loadData not found.');
-        // Fallback: try to load data directly
-        if (typeof loadData === 'function') {
-            loadData()
-                .then(function() {
-                    console.log('Data loaded successfully (fallback)');
-                    updateDashboardStats();
-                })
-                .catch(function(err) {
-                    console.error('Failed to load data (fallback):', err);
-                });
-        } else {
-            // Initialize empty data
-            data = {
-                characters: [],
-                teams: [],
-                tournaments: [],
-                missions: [],
-                activities: [],
-                currentYear: new Date().getFullYear(),
+        console.error('loadData function not available');
+        // Initialize empty data as fallback
+        data = {
+            characters: [],
+            teams: [],
+            tournaments: [],
+            missions: [],
+            activities: [],
+            currentYear: new Date().getFullYear(),
+            currentWeek: 1,
+            curriculum: {
+                disciplines: [],
+                schedules: {},
+                restDays: {},
+                examDays: {},
+                grades: {},
+                rankings: {},
                 currentWeek: 1,
-                curriculum: {
-                    disciplines: [],
-                    schedules: {},
-                    restDays: {},
-                    examDays: {},
-                    grades: {},
-                    rankings: {},
-                    currentWeek: 1,
-                    classInstructors: {},
-                    classLabels: {},
-                    classGroupLabels: {},
-                    classDurations: {},
-                    instructorClasses: {},
-                    instructorTemplates: {},
-                    instructorBlocks: {},
-                    instructorGroups: {},
-                    disciplineGroups: {},
-                    autoGroups: {}
-                }
-            };
-            console.warn('Using empty data fallback');
-            updateDashboardStats();
-        }
+                classInstructors: {},
+                classLabels: {},
+                classGroupLabels: {},
+                classDurations: {},
+                instructorClasses: {},
+                instructorTemplates: {},
+                instructorBlocks: {},
+                instructorGroups: {},
+                disciplineGroups: {},
+                autoGroups: {}
+            }
+        };
+        console.warn('Using empty data fallback');
+        onDataLoaded();
     }
+}
+
+/**
+ * Called when data is loaded or initialized
+ */
+function onDataLoaded() {
+    // Initialize import/export
+    if (typeof initImportExport === 'function') {
+        initImportExport();
+    }
+    
+    // Initialize missions system
+    if (typeof initMissionsSystem === 'function') {
+        initMissionsSystem();
+    }
+    
+    // Initialize team manager system
+    if (typeof initTeamManagerSystem === 'function') {
+        initTeamManagerSystem();
+    }
+    
+    // Initialize curriculum system
+    if (typeof initScheduleSystem === 'function') {
+        initScheduleSystem();
+    }
+    
+    // Initialize student schedule system
+    if (typeof initStudentScheduleSystem === 'function') {
+        initStudentScheduleSystem();
+    }
+    
+    // Update dashboard stats
+    updateDashboardStats();
+    
+    // Set up year click
+    var yearDisplay = document.getElementById('header-current-year');
+    if (yearDisplay) {
+        yearDisplay.addEventListener('click', function() {
+            showYearModal();
+        });
+    }
+    
+    console.log('App initialized with:', {
+        characters: data.characters ? data.characters.length : 0,
+        teams: data.teams ? data.teams.length : 0,
+        tournaments: data.tournaments ? data.tournaments.length : 0,
+        missions: data.missions ? data.missions.length : 0
+    });
+    
+    // Trigger render for the current page
+    renderAll();
 }
 
 /**
@@ -164,16 +234,6 @@ function showYearModal() {
                     console.error('Failed to save year:', err);
                     alert('Failed to save year. Please try again.');
                 });
-            } else if (window.db && typeof window.db.saveData === 'function') {
-                window.db.saveData().then(function() {
-                    if (typeof logActivity === 'function') {
-                        logActivity('Set current year to ' + yearNum);
-                    }
-                    updateDashboardStats();
-                }).catch(function(err) {
-                    console.error('Failed to save year:', err);
-                    alert('Failed to save year. Please try again.');
-                });
             } else {
                 updateDashboardStats();
             }
@@ -190,6 +250,8 @@ function renderAll() {
     var path = window.location.pathname;
     var page = path.split('/').pop() || 'index.html';
     
+    console.log('Rendering page:', page);
+    
     if (page === 'index.html' || page === '') {
         updateDashboardStats();
     } else if (page === 'characters.html') {
@@ -203,6 +265,8 @@ function renderAll() {
         var container = document.getElementById('app-container');
         if (container && typeof renderTournamentsView === 'function') {
             renderTournamentsView(container);
+        } else {
+            console.error('renderTournamentsView not found');
         }
     } else if (page === 'curriculum.html') {
         var container = document.getElementById('app-container');
@@ -393,17 +457,22 @@ function addStandaloneElimination() {
         logActivity('Eliminated ' + char.firstName + ' (standalone, Week ' + week + '): ' + reason);
     }
     
-    saveData().then(function() {
+    if (typeof saveData === 'function') {
+        saveData().then(function() {
+            renderCharacters();
+            var form = document.getElementById('character-form');
+            if (form && !form.classList.contains('hidden')) {
+                showCharacterForm(charId);
+            }
+            alert('Character eliminated successfully!');
+        }).catch(function(err) {
+            console.error('Failed to save:', err);
+            alert('Failed to save elimination.');
+        });
+    } else {
         renderCharacters();
-        var form = document.getElementById('character-form');
-        if (form && !form.classList.contains('hidden')) {
-            showCharacterForm(charId);
-        }
-        alert('Character eliminated successfully!');
-    }).catch(function(err) {
-        console.error('Failed to save:', err);
-        alert('Failed to save elimination.');
-    });
+        alert('Character eliminated successfully! (Data not saved to IndexedDB)');
+    }
 }
 
 function showCharacterForm(editId) {
@@ -556,14 +625,20 @@ function removeStandaloneElimination(charId, index) {
     
     char.eliminations.splice(index, 1);
     
-    saveData().then(function() {
+    if (typeof saveData === 'function') {
+        saveData().then(function() {
+            renderCharacters();
+            showCharacterForm(charId);
+            alert('Standalone elimination removed.');
+        }).catch(function(err) {
+            console.error('Failed to save:', err);
+            alert('Failed to remove elimination.');
+        });
+    } else {
         renderCharacters();
         showCharacterForm(charId);
         alert('Standalone elimination removed.');
-    }).catch(function(err) {
-        console.error('Failed to save:', err);
-        alert('Failed to remove elimination.');
-    });
+    }
 }
 
 function hideCharacterForm() {
@@ -784,7 +859,9 @@ function saveCharacter(e) {
         }
     }
     
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    if (typeof saveData === 'function') {
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+    }
     renderCharacters();
     updateDashboardStats();
     hideCharacterForm();
@@ -805,7 +882,9 @@ function deleteCharacter(id) {
     if (typeof logActivity === 'function') {
         logActivity('Deleted character: ' + char.firstName);
     }
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
+    if (typeof saveData === 'function') {
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+    }
     renderCharacters();
     updateDashboardStats();
 }
@@ -895,20 +974,6 @@ function getWeekBlock(weekNum) {
     };
 }
 
-function saveData() {
-    if (window.db && typeof window.db.saveData === 'function') {
-        return window.db.saveData();
-    }
-    return Promise.reject(new Error('saveData not available'));
-}
-
-function loadData() {
-    if (window.db && typeof window.db.loadData === 'function') {
-        return window.db.loadData();
-    }
-    return Promise.reject(new Error('loadData not available'));
-}
-
 // ============================================================
 // EXPOSE FUNCTIONS GLOBALLY
 // ============================================================
@@ -935,8 +1000,6 @@ window.getCharacterTeamCount = getCharacterTeamCount;
 window.generateId = generateId;
 window.getWeekBlock = getWeekBlock;
 window.logActivity = logActivity;
-window.saveData = saveData;
-window.loadData = loadData;
 
 // ============================================================
 // INITIALIZE
