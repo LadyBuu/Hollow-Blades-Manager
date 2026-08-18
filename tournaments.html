@@ -48,18 +48,20 @@
     <script src="js/utils.js"></script>
     <script src="js/export.js"></script>
     <script src="js/tournaments/tournaments-core.js"></script>
-    <script src="js/tournaments/tournaments-teams.js"></script>
-    <script src="js/tournaments/tournaments-individuals.js"></script>
     <script src="js/tournaments/tournaments-ui.js"></script>
     <script src="js/app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Tournaments page loaded, waiting for data...');
             var checkData = setInterval(function() {
                 if (typeof data !== 'undefined' && data) {
                     clearInterval(checkData);
+                    console.log('Data ready, rendering tournaments...');
                     var container = document.getElementById('app-container');
                     if (container && typeof renderTournamentsView === 'function') {
                         renderTournamentsView(container);
+                    } else {
+                        console.error('renderTournamentsView not found');
                     }
                 }
             }, 200);
