@@ -181,16 +181,14 @@ function renderTournamentList() {
     });
 }
 
-function ensureTournamentArrays(tourn) {
-    if (!tourn) return;
-    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
-    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = [];
-    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
-}
-
 function viewTournament(id) {
     var tourn = getTournament(id);
-    if (!tourn) return;
+    if (!tourn) {
+        console.error('Tournament not found:', id);
+        return;
+    }
+    
+    console.log('Viewing tournament:', tourn.id, 'mode:', tourn.mode, 'participants:', tourn.participants ? tourn.participants.length : 0);
     
     ensureTournamentArrays(tourn);
     
@@ -279,6 +277,16 @@ function checkRoundStatuses(tourn) {
     } else if (tourn.rounds.length > 0 && tourn.status === 'draft') {
         tourn.status = 'active';
     }
+}
+
+function ensureTournamentArrays(tourn) {
+    if (!tourn) return;
+    if (!tourn.participants || !Array.isArray(tourn.participants)) {
+        console.warn('tourn.participants was not an array, fixing:', tourn.participants);
+        tourn.participants = [];
+    }
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
 }
 
 function populateParticipantSelector(tourn) {
@@ -454,7 +462,17 @@ function renderEliminations(tourn) {
     var container = document.getElementById('elimination-list');
     var select = document.getElementById('elimination-select');
     
-    // Populate elimination select - FIXED: Use tourn.mode to determine content
+    // CRITICAL FIX: Check if participants exist
+    if (!tourn.participants || tourn.participants.length === 0) {
+        console.warn('No participants found in tournament:', tourn.id);
+        if (select) {
+            select.innerHTML = '<option value="">No participants available</option>';
+        }
+        container.innerHTML = '<span style="color:var(--text-dim);font-size:0.75rem;">No participants in tournament</span>';
+        return;
+    }
+    
+    // Populate elimination select
     if (select) {
         var participants = tourn.participants || [];
         var currentValue = select.value;
@@ -464,7 +482,6 @@ function renderEliminations(tourn) {
         
         // Get characters from participants
         participants.forEach(function(p) {
-            // Check if participant is a character (individual mode) or a team (team mode)
             var char = data.characters.find(function(c) { return String(c.id) === String(p.id); });
             if (char) {
                 var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
