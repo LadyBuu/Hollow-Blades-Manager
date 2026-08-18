@@ -963,11 +963,17 @@ function addParticipant() {
     var modal = document.getElementById('tournament-detail-modal');
     var tournId = modal.dataset.tournamentId;
     var tourn = getTournament(tournId);
-    if (!tourn) return;
+    if (!tourn) {
+        alert('Tournament not found.');
+        return;
+    }
     
     var select = document.getElementById('participant-select');
     var id = select.value;
-    if (!id) { alert('Please select a participant.'); return; }
+    if (!id) {
+        alert('Please select a participant.');
+        return;
+    }
     
     if (!tourn.participants) tourn.participants = [];
     if (tourn.participants.some(function(p) { return String(p.id) === String(id); })) {
@@ -975,9 +981,19 @@ function addParticipant() {
         return;
     }
     
+    var name = getParticipantName(id);
     tourn.participants.push({ id: id, addedAt: new Date().toISOString() });
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    viewTournament(tournId);
+    
+    console.log('Adding participant:', name, 'to tournament:', tourn.id, 'total participants:', tourn.participants.length);
+    
+    // IMPORTANT: Save data and then refresh view
+    saveData().then(function() {
+        console.log('Participant saved successfully');
+        viewTournament(tournId);
+    }).catch(function(err) {
+        console.error('Failed to save participant:', err);
+        alert('Failed to add participant. Please check console.');
+    });
 }
 
 function removeParticipant(tournId, participantId) {
