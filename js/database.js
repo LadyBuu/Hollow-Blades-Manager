@@ -379,12 +379,22 @@ function migrateData() {
     console.log('Migration complete');
 }
 
-// Export for use in other files
+// ============================================================
+// EXPOSE FUNCTIONS GLOBALLY
+// ============================================================
+
+// Make loadData, saveData, and openDatabase globally available
+window.loadData = loadData;
+window.saveData = saveData;
+window.openDatabase = openDatabase;
+window.migrateData = migrateData;
+
+// Also export via db object
 window.db = {
-    openDatabase,
-    loadData,
-    saveData,
-    migrateData
+    openDatabase: openDatabase,
+    loadData: loadData,
+    saveData: saveData,
+    migrateData: migrateData
 };
 
 console.log('database.js loaded');
