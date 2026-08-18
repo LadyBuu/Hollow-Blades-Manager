@@ -259,7 +259,6 @@ function checkRoundStatuses(tourn) {
     
     // Only update tournament status if all rounds are completed
     if (allCompleted && tourn.rounds.length > 0) {
-        // Check if all rounds are completed
         var allRoundsComplete = true;
         for (var i = 0; i < tourn.rounds.length; i++) {
             if (tourn.rounds[i].status !== 'completed') {
@@ -269,7 +268,6 @@ function checkRoundStatuses(tourn) {
         }
         if (allRoundsComplete) {
             tourn.status = 'completed';
-            // Determine winner from last match of last round
             var lastRound = tourn.rounds[tourn.rounds.length - 1];
             if (lastRound.matches && lastRound.matches.length > 0) {
                 var lastMatch = lastRound.matches[lastRound.matches.length - 1];
@@ -392,12 +390,10 @@ function renderRounds(tourn) {
         html += '<button class="small danger delete-round-btn" data-round="' + roundIndex + '">\u2715</button>';
         html += '</div>';
         
-        // Add match button (only if round not completed)
         if (!isCompleted) {
             html += '<button class="small primary add-match-btn" data-round="' + roundIndex + '" style="margin-bottom:6px;">+ Add Match</button>';
         }
         
-        // Matches
         if (round.matches && round.matches.length > 0) {
             html += '<div style="display:flex;flex-direction:column;gap:4px;padding-left:8px;">';
             round.matches.forEach(function(match, matchIndex) {
@@ -431,7 +427,6 @@ function renderRounds(tourn) {
     
     container.innerHTML = html;
     
-    // Match click to edit
     container.querySelectorAll('.match-item').forEach(function(el) {
         el.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
@@ -459,17 +454,17 @@ function renderEliminations(tourn) {
     var container = document.getElementById('elimination-list');
     var select = document.getElementById('elimination-select');
     
-    // Populate elimination select with all participants
+    // Populate elimination select - FIXED: Use tourn.mode to determine content
     if (select) {
         var participants = tourn.participants || [];
         var currentValue = select.value;
         select.innerHTML = '<option value="">Select individual...</option>';
         
-        // Get all characters from participants (including team members)
         var allChars = [];
         
-        // First, get individual participants
+        // Get characters from participants
         participants.forEach(function(p) {
+            // Check if participant is a character (individual mode) or a team (team mode)
             var char = data.characters.find(function(c) { return String(c.id) === String(p.id); });
             if (char) {
                 var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
@@ -492,7 +487,7 @@ function renderEliminations(tourn) {
             }
         });
         
-        // For team mode, also get all team members
+        // If team mode, also get team members
         if (tourn.mode === 'teams') {
             participants.forEach(function(p) {
                 var team = data.teams.find(function(t) { return String(t.id) === String(p.id); });
@@ -864,7 +859,7 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
             });
         }
         
-        // Check statuses without re-rendering everything
+        // Check statuses
         checkRoundStatuses(tourn);
         
         saveData().catch(function(err) { console.error('Failed to save:', err); });
