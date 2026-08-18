@@ -846,6 +846,8 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
                     week: parseInt(tourn.startWeek) || 1,
                     reason: 'Lost in Round ' + (roundIndex + 1)
                 });
+                // Mark character as eliminated globally
+                markCharacterEliminated(loserId, tournId, 'Lost in Round ' + (roundIndex + 1));
             }
         } else if (tourn.mode === 'individuals' && winnerId) {
             match.participants.forEach(function(id) {
@@ -858,6 +860,7 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
                             week: parseInt(tourn.startWeek) || 1,
                             reason: 'Lost in Round ' + (roundIndex + 1)
                         });
+                        markCharacterEliminated(id, tournId, 'Lost in Round ' + (roundIndex + 1));
                     }
                 }
             });
@@ -867,6 +870,9 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
         saveData().catch(function(err) { console.error('Failed to save:', err); });
         modal.classList.add('hidden');
         viewTournament(tournId);
+        if (typeof renderCharacters === 'function') {
+            renderCharacters();
+        }
     };
     
     document.getElementById('delete-match-btn').onclick = function() {
@@ -989,15 +995,75 @@ function removeParticipant(tournId, participantId) {
     viewTournament(tournId);
 }
 
+/**
+ * Mark a character as eliminated globally
+ */
+function markCharacterEliminated(charId, tournamentId, reason) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) return;
+    
+    if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+    var weekNum = parseInt(tourn.startWeek) || 1;
+    if (char.eliminatedWeeks.indexOf(weekNum) === -1) {
+        char.eliminatedWeeks.push(weekNum);
+    }
+    
+    if (!char.eliminations) char.eliminations = [];
+    var alreadyExists = char.eliminations.some(function(e) {
+        return !e.standalone && String(e.tournamentId) === String(tournamentId);
+    });
+    if (!alreadyExists) {
+        char.eliminations.push({
+            tournamentId: tournamentId,
+            week: weekNum,
+            reason: reason || 'Eliminated from tournament',
+            standalone: false,
+            fromMatch: true
+        });
+    }
+    console.log('Character marked as eliminated:', char.firstName);
+}
+
+/**
+ * Remove character elimination globally
+ */
+function unmarkCharacterEliminated(charId, tournamentId) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) return;
+    
+    if (char.eliminatedWeeks) {
+        var weekNum = parseInt(tourn.startWeek) || 1;
+        var idx = char.eliminatedWeeks.indexOf(weekNum);
+        if (idx !== -1) {
+            char.eliminatedWeeks.splice(idx, 1);
+        }
+    }
+    
+    if (char.eliminations) {
+        char.eliminations = char.eliminations.filter(function(e) {
+            return !(String(e.tournamentId) === String(tournamentId) && !e.standalone);
+        });
+    }
+    console.log('Character uneliminated:', char.firstName);
+}
+
 function eliminateParticipant() {
+    console.log('=== eliminateParticipant called ===');
+    
     var modal = document.getElementById('tournament-detail-modal');
     var tournId = modal.dataset.tournamentId;
     var tourn = getTournament(tournId);
-    if (!tourn) return;
+    if (!tourn) {
+        alert('Tournament not found.');
+        return;
+    }
     
     var select = document.getElementById('elimination-select');
     var id = select.value;
-    if (!id) { alert('Please select an individual to eliminate.'); return; }
+    if (!id) {
+        alert('Please select an individual to eliminate.');
+        return;
+    }
     
     if (tourn.eliminations && tourn.eliminations.some(function(e) { return String(e.participantId) === String(id); })) {
         alert('Already eliminated.');
@@ -1011,20 +1077,20 @@ function eliminateParticipant() {
         reason: 'Eliminated'
     });
     
-    var char = data.characters.find(function(c) { return String(c.id) === String(id); });
-    if (char) {
-        if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
-        var weekNum = parseInt(tourn.startWeek) || 1;
-        if (char.eliminatedWeeks.indexOf(weekNum) === -1) {
-            char.eliminatedWeeks.push(weekNum);
-        }
-    }
+    console.log('Eliminated participant:', id, 'Eliminations now:', tourn.eliminations.length);
+    
+    // Mark character as eliminated globally
+    markCharacterEliminated(id, tournId, 'Eliminated from tournament');
     
     saveData().then(function() {
+        console.log('Elimination saved successfully');
         viewTournament(tournId);
+        if (typeof renderCharacters === 'function') {
+            renderCharacters();
+        }
     }).catch(function(err) {
         console.error('Failed to save elimination:', err);
-        alert('Failed to eliminate participant.');
+        alert('Failed to eliminate participant. Error: ' + err.message);
     });
 }
 
@@ -1032,19 +1098,21 @@ function uneliminateParticipant(tournId, participantId) {
     var tourn = getTournament(tournId);
     if (!tourn) return;
     
+    // Remove from tournament eliminations
     tourn.eliminations = tourn.eliminations.filter(function(e) { return String(e.participantId) !== String(participantId); });
     
-    var char = data.characters.find(function(c) { return String(c.id) === String(participantId); });
-    if (char && char.eliminatedWeeks) {
-        var weekNum = parseInt(tourn.startWeek) || 1;
-        var idx = char.eliminatedWeeks.indexOf(weekNum);
-        if (idx !== -1) {
-            char.eliminatedWeeks.splice(idx, 1);
-        }
-    }
+    // Remove from character's eliminations
+    unmarkCharacterEliminated(participantId, tournId);
     
-    saveData().catch(function(err) { console.error('Failed to save:', err); });
-    viewTournament(tournId);
+    saveData().then(function() {
+        viewTournament(tournId);
+        if (typeof renderCharacters === 'function') {
+            renderCharacters();
+        }
+    }).catch(function(err) {
+        console.error('Failed to save unelimination:', err);
+        alert('Failed to restore participant.');
+    });
 }
 
 function createRound() {
@@ -1261,5 +1329,7 @@ window.uneliminateParticipant = uneliminateParticipant;
 window.renderEliminations = renderEliminations;
 window.ensureTournamentArrays = ensureTournamentArrays;
 window.checkRoundStatuses = checkRoundStatuses;
+window.markCharacterEliminated = markCharacterEliminated;
+window.unmarkCharacterEliminated = unmarkCharacterEliminated;
 
 console.log('tournaments-ui.js loaded');
