@@ -23,7 +23,6 @@ function getTournament(id) {
  * Get all tournaments
  */
 function getTournaments() {
-    // Ensure data and data.tournaments exist
     if (!data) {
         console.warn('Data not initialized yet');
         return [];
