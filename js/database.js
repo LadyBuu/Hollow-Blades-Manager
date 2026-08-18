@@ -36,6 +36,7 @@ function openDatabase() {
  * Load all application data from IndexedDB
  */
 function loadData() {
+    console.log('loadData called');
     return new Promise((resolve, reject) => {
         if (!db) {
             return openDatabase()
@@ -83,31 +84,21 @@ function loadData() {
                     };
                 }
                 
+                // Make sure global data is set
+                window.data = loadedData;
                 data = loadedData;
+                
                 console.log('Data loaded successfully:', {
                     tournaments: data.tournaments ? data.tournaments.length : 0,
                     characters: data.characters ? data.characters.length : 0,
-                    teams: data.teams ? data.teams.length : 0,
-                    missions: data.missions ? data.missions.length : 0
+                    teams: data.teams ? data.teams.length : 0
                 });
-                
-                // Log tournament details
-                if (data.tournaments && data.tournaments.length > 0) {
-                    data.tournaments.forEach(function(t) {
-                        console.log('Tournament loaded:', t.id, t.name, 
-                            'mode:', t.mode, 
-                            'participants:', t.participants ? t.participants.length : 0,
-                            'rounds:', t.rounds ? t.rounds.length : 0,
-                            'eliminations:', t.eliminations ? t.eliminations.length : 0
-                        );
-                    });
-                }
                 
                 migrateData();
                 resolve(data);
             } else {
                 console.log('No data found in IndexedDB, initializing empty data');
-                data = {
+                window.data = {
                     characters: [],
                     teams: [],
                     tournaments: [],
@@ -135,6 +126,7 @@ function loadData() {
                         autoGroups: {}
                     }
                 };
+                data = window.data;
                 resolve(data);
             }
         };
@@ -149,12 +141,18 @@ function loadData() {
  * Save all application data to IndexedDB
  */
 function saveData() {
+    console.log('saveData called');
     return new Promise((resolve, reject) => {
         if (!db) {
             return openDatabase()
                 .then(() => saveData())
                 .then(resolve)
                 .catch(reject);
+        }
+        
+        // Ensure data is the global data
+        if (window.data) {
+            data = window.data;
         }
         
         // Ensure ALL required top-level properties exist
@@ -205,16 +203,7 @@ function saveData() {
         console.log('Saving data to IndexedDB:', {
             tournaments: data.tournaments.length,
             characters: data.characters.length,
-            teams: data.teams.length,
-            missions: data.missions.length
-        });
-        
-        // Log tournament details being saved
-        data.tournaments.forEach(function(t) {
-            console.log('Saving tournament:', t.id, t.name, 
-                'participants:', t.participants ? t.participants.length : 0,
-                'eliminations:', t.eliminations ? t.eliminations.length : 0
-            );
+            teams: data.teams.length
         });
         
         const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -267,13 +256,6 @@ function migrateData() {
         if (!tourn.winner) tourn.winner = null;
         if (!tourn.currentRound) tourn.currentRound = 0;
         if (!tourn.createdAt) tourn.createdAt = new Date().toISOString();
-        
-        // Log migration
-        console.log('Migrated tournament:', tourn.id, tourn.name, 
-            'mode:', tourn.mode,
-            'participants:', tourn.participants.length,
-            'eliminations:', tourn.eliminations.length
-        );
     });
     
     // Migrate characters
@@ -383,7 +365,7 @@ function migrateData() {
 // EXPOSE FUNCTIONS GLOBALLY
 // ============================================================
 
-// Make loadData, saveData, and openDatabase globally available
+// Make loadData, saveData globally available
 window.loadData = loadData;
 window.saveData = saveData;
 window.openDatabase = openDatabase;
