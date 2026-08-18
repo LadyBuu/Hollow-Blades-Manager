@@ -181,14 +181,21 @@ function renderTournamentList() {
     });
 }
 
+function ensureTournamentArrays(tourn) {
+    if (!tourn) return;
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
+    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = [];
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
+}
+
 function viewTournament(id) {
     var tourn = getTournament(id);
     if (!tourn) return;
     
     ensureTournamentArrays(tourn);
     
-    // Auto-check and update round statuses - optimized
-    updateRoundStatuses(tourn);
+    // Check round statuses
+    checkRoundStatuses(tourn);
     
     tournamentState.currentTournamentId = id;
     
@@ -226,11 +233,10 @@ function viewTournament(id) {
     modal.classList.remove('hidden');
 }
 
-function updateRoundStatuses(tourn) {
+function checkRoundStatuses(tourn) {
     if (!tourn.rounds || tourn.rounds.length === 0) return;
     
     var allCompleted = true;
-    var anyMatches = false;
     
     for (var i = 0; i < tourn.rounds.length; i++) {
         var round = tourn.rounds[i];
@@ -239,7 +245,6 @@ function updateRoundStatuses(tourn) {
             allCompleted = false;
             continue;
         }
-        anyMatches = true;
         
         var roundCompleted = true;
         for (var j = 0; j < round.matches.length; j++) {
@@ -252,27 +257,30 @@ function updateRoundStatuses(tourn) {
         round.status = roundCompleted ? 'completed' : 'pending';
     }
     
-    // Only update tournament status if there are matches
-    if (anyMatches && allCompleted && tourn.rounds.length > 0) {
-        tourn.status = 'completed';
-        // Determine winner from last match of last round
-        var lastRound = tourn.rounds[tourn.rounds.length - 1];
-        if (lastRound.matches && lastRound.matches.length > 0) {
-            var lastMatch = lastRound.matches[lastRound.matches.length - 1];
-            if (lastMatch.winner) {
-                tourn.winner = lastMatch.winner;
+    // Only update tournament status if all rounds are completed
+    if (allCompleted && tourn.rounds.length > 0) {
+        // Check if all rounds are completed
+        var allRoundsComplete = true;
+        for (var i = 0; i < tourn.rounds.length; i++) {
+            if (tourn.rounds[i].status !== 'completed') {
+                allRoundsComplete = false;
+                break;
+            }
+        }
+        if (allRoundsComplete) {
+            tourn.status = 'completed';
+            // Determine winner from last match of last round
+            var lastRound = tourn.rounds[tourn.rounds.length - 1];
+            if (lastRound.matches && lastRound.matches.length > 0) {
+                var lastMatch = lastRound.matches[lastRound.matches.length - 1];
+                if (lastMatch.winner) {
+                    tourn.winner = lastMatch.winner;
+                }
             }
         }
     } else if (tourn.rounds.length > 0 && tourn.status === 'draft') {
         tourn.status = 'active';
     }
-}
-
-function ensureTournamentArrays(tourn) {
-    if (!tourn) return;
-    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
-    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = [];
-    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
 }
 
 function populateParticipantSelector(tourn) {
@@ -460,7 +468,7 @@ function renderEliminations(tourn) {
         // Get all characters from participants (including team members)
         var allChars = [];
         
-        // First, get individual participants (for individual mode or characters)
+        // First, get individual participants
         participants.forEach(function(p) {
             var char = data.characters.find(function(c) { return String(c.id) === String(p.id); });
             if (char) {
@@ -856,8 +864,8 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
             });
         }
         
-        // Auto-update round and tournament status
-        updateRoundStatuses(tourn);
+        // Check statuses without re-rendering everything
+        checkRoundStatuses(tourn);
         
         saveData().catch(function(err) { console.error('Failed to save:', err); });
         modal.classList.add('hidden');
@@ -1239,6 +1247,6 @@ window.eliminateParticipant = eliminateParticipant;
 window.uneliminateParticipant = uneliminateParticipant;
 window.renderEliminations = renderEliminations;
 window.ensureTournamentArrays = ensureTournamentArrays;
-window.updateRoundStatuses = updateRoundStatuses;
+window.checkRoundStatuses = checkRoundStatuses;
 
 console.log('tournaments-ui.js loaded');
