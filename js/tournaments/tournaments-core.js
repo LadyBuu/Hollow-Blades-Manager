@@ -54,11 +54,30 @@ function createTournament(tournData) {
 function updateTournament(id, updates) {
     var tourn = getTournament(id);
     if (!tourn) return null;
+    
+    // Preserve existing data
+    var existingParticipants = tourn.participants || [];
+    var existingRounds = tourn.rounds || [];
+    var existingEliminations = tourn.eliminations || [];
+    var existingWinner = tourn.winner || null;
+    var existingWinners = tourn.winners || [];
+    
+    // Apply updates
     Object.assign(tourn, updates);
-    // Ensure rounds is always an array
-    if (!tourn.rounds) tourn.rounds = [];
-    if (!tourn.participants) tourn.participants = [];
-    if (!tourn.eliminations) tourn.eliminations = [];
+    
+    // Restore arrays if they got overwritten
+    if (!tourn.participants || !Array.isArray(tourn.participants)) {
+        tourn.participants = existingParticipants;
+    }
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) {
+        tourn.rounds = existingRounds;
+    }
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) {
+        tourn.eliminations = existingEliminations;
+    }
+    if (!tourn.winner) tourn.winner = existingWinner;
+    if (!tourn.winners || !Array.isArray(tourn.winners)) tourn.winners = existingWinners;
+    
     return tourn;
 }
 
@@ -141,14 +160,16 @@ function isCharacterEliminatedByWeek(char, week) {
 }
 
 /**
- * Ensure tournament has required arrays
+ * Ensure tournament has required arrays - FIXED to preserve data
  */
 function ensureTournamentArrays(tourn) {
     if (!tourn) return;
-    if (!tourn.rounds) tourn.rounds = [];
-    if (!tourn.participants) tourn.participants = [];
-    if (!tourn.eliminations) tourn.eliminations = [];
-    if (!tourn.winners) tourn.winners = [];
+    if (!tourn.participants || !Array.isArray(tourn.participants)) tourn.participants = [];
+    if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
+    if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
+    if (!tourn.winners || !Array.isArray(tourn.winners)) tourn.winners = [];
+    // Preserve mode
+    if (!tourn.mode) tourn.mode = 'teams';
 }
 
 // ============================================================
