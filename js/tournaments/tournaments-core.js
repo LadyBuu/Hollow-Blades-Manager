@@ -52,6 +52,8 @@ function ensureTournamentIntegrity(tourn) {
     if (!tourn.totalRounds) tourn.totalRounds = 1;
     if (!tourn.startWeek) tourn.startWeek = 1;
     if (!tourn.endWeek) tourn.endWeek = 52;
+    if (!tourn.teams || !Array.isArray(tourn.teams)) tourn.teams = [];
+    if (!tourn.matches || !Array.isArray(tourn.matches)) tourn.matches = [];
 }
 
 /**
@@ -74,7 +76,9 @@ function createTournament(tournData) {
         currentRound: 0,
         status: 'draft',
         participants: [],
+        teams: [],
         rounds: [],
+        matches: [],
         eliminations: [],
         winner: null,
         winners: [],
@@ -201,7 +205,87 @@ function ensureTournamentArrays(tourn) {
     if (!tourn.rounds || !Array.isArray(tourn.rounds)) tourn.rounds = [];
     if (!tourn.eliminations || !Array.isArray(tourn.eliminations)) tourn.eliminations = [];
     if (!tourn.winners || !Array.isArray(tourn.winners)) tourn.winners = [];
+    if (!tourn.teams || !Array.isArray(tourn.teams)) tourn.teams = [];
+    if (!tourn.matches || !Array.isArray(tourn.matches)) tourn.matches = [];
     if (!tourn.mode) tourn.mode = 'teams';
+}
+
+/**
+ * Mark a character as eliminated globally
+ * @param {string} charId - Character ID
+ * @param {Object} tournament - Tournament object (not just ID)
+ * @param {string} reason - Reason for elimination
+ */
+function markCharacterEliminated(charId, tournament, reason) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) {
+        console.warn('Character not found for elimination:', charId);
+        return;
+    }
+    
+    console.log('Marking character as eliminated:', char.firstName, 'in tournament:', tournament ? tournament.name : 'unknown');
+    
+    var weekNum = tournament ? (parseInt(tournament.startWeek) || 1) : 1;
+    var tournamentId = tournament ? tournament.id : null;
+    
+    // Add to eliminatedWeeks if not already present
+    if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+    if (char.eliminatedWeeks.indexOf(weekNum) === -1) {
+        char.eliminatedWeeks.push(weekNum);
+        char.eliminatedWeeks.sort(function(a, b) { return parseInt(a) - parseInt(b); });
+        console.log('Added week', weekNum, 'to eliminatedWeeks for', char.firstName);
+    }
+    
+    // Add to eliminations array
+    if (!char.eliminations) char.eliminations = [];
+    var alreadyExists = char.eliminations.some(function(e) {
+        return !e.standalone && String(e.tournamentId) === String(tournamentId);
+    });
+    if (!alreadyExists) {
+        char.eliminations.push({
+            tournamentId: tournamentId,
+            week: weekNum,
+            reason: reason || 'Eliminated from tournament',
+            standalone: false,
+            fromMatch: true
+        });
+        console.log('Added elimination record for', char.firstName);
+    }
+}
+
+/**
+ * Remove character elimination globally
+ * @param {string} charId - Character ID
+ * @param {Object} tournament - Tournament object
+ */
+function unmarkCharacterEliminated(charId, tournament) {
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) {
+        console.warn('Character not found for unelimination:', charId);
+        return;
+    }
+    
+    console.log('Unmarking character elimination:', char.firstName);
+    
+    var tournamentId = tournament ? tournament.id : null;
+    var weekNum = tournament ? (parseInt(tournament.startWeek) || 1) : 1;
+    
+    // Remove from eliminatedWeeks
+    if (char.eliminatedWeeks) {
+        var idx = char.eliminatedWeeks.indexOf(weekNum);
+        if (idx !== -1) {
+            char.eliminatedWeeks.splice(idx, 1);
+            console.log('Removed week', weekNum, 'from eliminatedWeeks for', char.firstName);
+        }
+    }
+    
+    // Remove from eliminations
+    if (char.eliminations) {
+        char.eliminations = char.eliminations.filter(function(e) {
+            return !(String(e.tournamentId) === String(tournamentId) && !e.standalone);
+        });
+        console.log('Removed elimination record for', char.firstName);
+    }
 }
 
 // ============================================================
@@ -218,6 +302,8 @@ window.getTournamentStatusColor = getTournamentStatusColor;
 window.isCharacterEliminatedByWeek = isCharacterEliminatedByWeek;
 window.ensureTournamentArrays = ensureTournamentArrays;
 window.ensureTournamentIntegrity = ensureTournamentIntegrity;
+window.markCharacterEliminated = markCharacterEliminated;
+window.unmarkCharacterEliminated = unmarkCharacterEliminated;
 window.tournamentState = tournamentState;
 
 console.log('tournaments-core.js loaded');
