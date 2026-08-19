@@ -1,6 +1,9 @@
 /**
  * tournaments-ui.js - Tournament UI Rendering
- * Simplified tournament management with auto-completion
+ * Supports multi-participant matches (1v1, 1v1v1, 1v1v1v1, etc.)
+ * - 1 Winner advances to next round
+ * - 1 Loser is eliminated from tournament
+ * - Remaining participants advance to another match (get another chance)
  */
 
 function renderTournamentsView(container) {
@@ -266,21 +269,15 @@ function checkRoundStatuses(tourn) {
             // Find the winner from the last round's matches
             var lastRound = tourn.rounds[tourn.rounds.length - 1];
             if (lastRound.matches && lastRound.matches.length > 0) {
-                // For single match, use its winner
-                if (lastRound.matches.length === 1) {
-                    tourn.winner = lastRound.matches[0].winner;
-                } else {
-                    // For multiple matches, collect all winners
-                    var winners = [];
-                    lastRound.matches.forEach(function(m) {
-                        if (m.winner) winners.push(m.winner);
-                    });
-                    if (winners.length === 1) {
-                        tourn.winner = winners[0];
-                    } else if (winners.length > 1) {
-                        tourn.winners = winners;
-                        tourn.winner = winners[0];
-                    }
+                var winners = [];
+                lastRound.matches.forEach(function(m) {
+                    if (m.winner) winners.push(m.winner);
+                });
+                if (winners.length === 1) {
+                    tourn.winner = winners[0];
+                } else if (winners.length > 1) {
+                    tourn.winners = winners;
+                    tourn.winner = winners[0];
                 }
                 console.log('Tournament completed! Winner:', tourn.winner);
             }
@@ -424,9 +421,11 @@ function renderRounds(tourn) {
                         var name = getParticipantName(id);
                         var isWinner = match.winner && String(match.winner) === String(id);
                         var isLoser = match.loser && String(match.loser) === String(id);
+                        var isAdvancing = match.status === 'completed' && !isWinner && !isLoser && match.participants.length > 2;
                         var label = name;
                         if (isWinner) label += ' \u2605';
                         else if (isLoser) label += ' \u274C';
+                        else if (isAdvancing) label += ' ⬆️';
                         participantNames.push(label);
                     });
                 }
@@ -487,6 +486,7 @@ function renderEliminations(tourn) {
         var currentValue = select.value;
         select.innerHTML = '<option value="">Select individual...</option>';
         
+        var currentWeek = parseInt(tourn.startWeek) || 1;
         var allChars = [];
         
         participants.forEach(function(p) {
@@ -503,11 +503,60 @@ function renderEliminations(tourn) {
                         });
                     }
                 });
+                
+                var isEliminatedInThisTournament = tourn.eliminations && tourn.eliminations.some(function(e) { 
+                    return String(e.participantId) === String(char.id); 
+                });
+                
+                var wasEliminatedBefore = false;
+                if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+                    for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+                        var elimWeek = parseInt(char.eliminatedWeeks[i]);
+                        if (!isNaN(elimWeek) && elimWeek < currentWeek) {
+                            wasEliminatedBefore = true;
+                            break;
+                        }
+                    }
+                }
+                if (char.eliminations) {
+                    for (var i = 0; i < char.eliminations.length; i++) {
+                        var elim = char.eliminations[i];
+                        if (elim.standalone) {
+                            var elimWeek = parseInt(elim.week);
+                            if (!isNaN(elimWeek) && elimWeek < currentWeek) {
+                                wasEliminatedBefore = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                var isDeceased = char.deceased || false;
+                if (isDeceased) {
+                    if (char.deathYear) {
+                        var deathYear = parseInt(char.deathYear);
+                        if (!isNaN(deathYear) && deathYear <= currentWeek) {
+                            isDeceased = true;
+                        }
+                    }
+                    if (char.deathAge) {
+                        var birthYear = parseInt(char.birthYear);
+                        if (!isNaN(birthYear)) {
+                            var deathYear = birthYear + parseInt(char.deathAge);
+                            if (deathYear <= currentWeek) {
+                                isDeceased = true;
+                            }
+                        }
+                    }
+                }
+                
                 allChars.push({
                     id: char.id,
                     name: name,
                     team: teamName,
-                    isEliminated: tourn.eliminations && tourn.eliminations.some(function(e) { return String(e.participantId) === String(char.id); })
+                    isEliminatedInThisTournament: isEliminatedInThisTournament,
+                    wasEliminatedBefore: wasEliminatedBefore || isDeceased,
+                    isDeceased: isDeceased
                 });
             }
         });
@@ -522,11 +571,59 @@ function renderEliminations(tourn) {
                             var name = [char.firstName, char.lastName].filter(function(n) { return n; }).join(' ');
                             var isInList = allChars.some(function(c) { return String(c.id) === String(char.id); });
                             if (!isInList) {
+                                var isEliminatedInThisTournament = tourn.eliminations && tourn.eliminations.some(function(e) { 
+                                    return String(e.participantId) === String(char.id); 
+                                });
+                                
+                                var wasEliminatedBefore = false;
+                                if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+                                    for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+                                        var elimWeek = parseInt(char.eliminatedWeeks[i]);
+                                        if (!isNaN(elimWeek) && elimWeek < currentWeek) {
+                                            wasEliminatedBefore = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (char.eliminations) {
+                                    for (var i = 0; i < char.eliminations.length; i++) {
+                                        var elim = char.eliminations[i];
+                                        if (elim.standalone) {
+                                            var elimWeek = parseInt(elim.week);
+                                            if (!isNaN(elimWeek) && elimWeek < currentWeek) {
+                                                wasEliminatedBefore = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                var isDeceased = char.deceased || false;
+                                if (isDeceased) {
+                                    if (char.deathYear) {
+                                        var deathYear = parseInt(char.deathYear);
+                                        if (!isNaN(deathYear) && deathYear <= currentWeek) {
+                                            isDeceased = true;
+                                        }
+                                    }
+                                    if (char.deathAge) {
+                                        var birthYear = parseInt(char.birthYear);
+                                        if (!isNaN(birthYear)) {
+                                            var deathYear = birthYear + parseInt(char.deathAge);
+                                            if (deathYear <= currentWeek) {
+                                                isDeceased = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                
                                 allChars.push({
                                     id: char.id,
                                     name: name,
                                     team: team.name,
-                                    isEliminated: tourn.eliminations && tourn.eliminations.some(function(e) { return String(e.participantId) === String(char.id); })
+                                    isEliminatedInThisTournament: isEliminatedInThisTournament,
+                                    wasEliminatedBefore: wasEliminatedBefore || isDeceased,
+                                    isDeceased: isDeceased
                                 });
                             }
                         }
@@ -544,16 +641,66 @@ function renderEliminations(tourn) {
         
         allChars.sort(function(a, b) { return a.name.localeCompare(b.name); });
         
+        var availableChars = [];
+        var eliminatedInThisTournament = [];
+        var eliminatedBefore = [];
+        
         allChars.forEach(function(c) {
+            if (c.isEliminatedInThisTournament) {
+                eliminatedInThisTournament.push(c);
+            } else if (c.wasEliminatedBefore || c.isDeceased) {
+                eliminatedBefore.push(c);
+            } else {
+                availableChars.push(c);
+            }
+        });
+        
+        availableChars.forEach(function(c) {
             var option = document.createElement('option');
             option.value = c.id;
             var teamDisplay = c.team ? ' (' + c.team + ')' : '';
-            option.textContent = c.name + teamDisplay + (c.isEliminated ? ' \u274C' : '');
-            if (c.isEliminated) {
-                option.style.color = 'var(--danger)';
-            }
+            option.textContent = c.name + teamDisplay + ' ✓ available';
+            option.style.color = 'var(--accent)';
             select.appendChild(option);
         });
+        
+        if (eliminatedInThisTournament.length > 0) {
+            var separator = document.createElement('option');
+            separator.disabled = true;
+            separator.textContent = '── Already eliminated in this tournament ──';
+            separator.style.color = 'var(--text-dim)';
+            select.appendChild(separator);
+            
+            eliminatedInThisTournament.forEach(function(c) {
+                var option = document.createElement('option');
+                option.value = c.id;
+                var teamDisplay = c.team ? ' (' + c.team + ')' : '';
+                option.textContent = c.name + teamDisplay + ' ✗ eliminated';
+                option.style.color = 'var(--danger)';
+                option.disabled = true;
+                select.appendChild(option);
+            });
+        }
+        
+        if (eliminatedBefore.length > 0) {
+            var separator = document.createElement('option');
+            separator.disabled = true;
+            separator.textContent = '── Eliminated in previous tournaments ──';
+            separator.style.color = 'var(--text-dim)';
+            select.appendChild(separator);
+            
+            eliminatedBefore.forEach(function(c) {
+                var option = document.createElement('option');
+                option.value = c.id;
+                var teamDisplay = c.team ? ' (' + c.team + ')' : '';
+                var reason = c.isDeceased ? ' ✝ deceased' : ' ⚠ eliminated before week ' + currentWeek;
+                option.textContent = c.name + teamDisplay + reason;
+                option.style.color = 'var(--text-dim)';
+                option.style.textDecoration = 'line-through';
+                option.disabled = true;
+                select.appendChild(option);
+            });
+        }
         
         if (currentValue) select.value = currentValue;
     }
@@ -564,6 +711,8 @@ function renderEliminations(tourn) {
     }
     
     var html = '';
+    var currentWeek = parseInt(tourn.startWeek) || 1;
+    
     tourn.eliminations.forEach(function(elim) {
         var name = getParticipantName(elim.participantId);
         var teamName = '';
@@ -576,9 +725,18 @@ function renderEliminations(tourn) {
                 });
             }
         });
-        html += '<span style="background:var(--danger-soft);padding:2px 8px;border-radius:10px;font-size:0.75rem;border:1px solid var(--danger);">';
+        
+        var elimWeek = parseInt(elim.week);
+        var isBeforeStart = !isNaN(elimWeek) && elimWeek < currentWeek;
+        
+        html += '<span style="background:' + (isBeforeStart ? 'var(--bg)' : 'var(--danger-soft)') + ';padding:2px 8px;border-radius:10px;font-size:0.75rem;border:1px solid ' + (isBeforeStart ? 'var(--border)' : 'var(--danger)') + ';' + (isBeforeStart ? 'opacity:0.5;' : '') + '">';
         html += name + (teamName ? ' (' + teamName + ')' : '') + ' \u274C';
-        html += ' <button class="uneliminate-btn small" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:0.6rem;padding:0 2px;" data-id="' + elim.participantId + '">\u21BB</button>';
+        if (isBeforeStart) {
+            html += ' <span style="font-size:0.6rem;color:var(--text-dim);">(before tournament)</span>';
+        }
+        if (!isBeforeStart) {
+            html += ' <button class="uneliminate-btn small" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:0.6rem;padding:0 2px;" data-id="' + elim.participantId + '">\u21BB</button>';
+        }
         html += '</span>';
     });
     container.innerHTML = html;
@@ -746,6 +904,7 @@ function showAddMatchModal(tournId, roundIndex) {
             participants: selectedIds.slice(),
             winner: null,
             loser: null,
+            advancing: [],
             status: 'pending'
         });
         
@@ -786,24 +945,40 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
     var content = document.getElementById('match-edit-content');
     
     var html = '<div style="margin-bottom:12px;">';
+    html += '<p style="color:var(--text-dim);font-size:0.8rem;">For matches with more than 2 participants:</p>';
+    html += '<ul style="color:var(--text-dim);font-size:0.75rem;margin:4px 0 8px 20px;padding:0;">';
+    html += '<li><strong style="color:var(--accent);">1 Winner</strong> — advances to next round</li>';
+    html += '<li><strong style="color:var(--danger);">1 Loser</strong> — eliminated from tournament</li>';
+    html += '<li><strong style="color:var(--warning);">Remaining participants</strong> — advance to another match (get another chance)</li>';
+    html += '</ul>';
+    html += '</div>';
+    
+    html += '<div style="margin-bottom:12px;">';
     html += '<p style="color:var(--text-dim);font-size:0.8rem;">Participants:</p>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">';
     match.participants.forEach(function(id) {
         var name = getParticipantName(id);
         var isWinner = match.winner && String(match.winner) === String(id);
         var isLoser = match.loser && String(match.loser) === String(id);
+        var isAdvancing = match.status === 'completed' && !isWinner && !isLoser && match.participants.length > 2;
         var style = 'background:var(--panel-alt);padding:2px 8px;border-radius:10px;font-size:0.75rem;border:1px solid var(--border-soft);';
-        if (isWinner) style += 'border-color:var(--accent);';
-        else if (isLoser) style += 'border-color:var(--danger);';
-        html += '<span style="' + style + '">' + name + (isWinner ? ' \u2605' : '') + (isLoser ? ' \u274C' : '') + '</span>';
+        if (isWinner) style += 'border-color:var(--accent);background:var(--accent-soft);';
+        else if (isLoser) style += 'border-color:var(--danger);background:var(--danger-soft);';
+        else if (isAdvancing) style += 'border-color:var(--warning);background:var(--warning-soft);';
+        html += '<span style="' + style + '">' + name + 
+            (isWinner ? ' \u2605 Winner' : '') + 
+            (isLoser ? ' \u274C Loser' : '') + 
+            (isAdvancing ? ' ⬆️ Advances' : '') + 
+        '</span>';
     });
     html += '</div>';
     html += '</div>';
     
+    // Winner selection
     html += '<div style="margin-bottom:12px;">';
-    html += '<label style="font-size:0.7rem;color:var(--text-dim);">Winner:</label>';
-    html += '<select id="edit-match-winner" style="padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;margin-left:8px;">';
-    html += '<option value="">None</option>';
+    html += '<label style="font-size:0.7rem;color:var(--text-dim);">Winner (advances to next round):</label>';
+    html += '<select id="edit-match-winner" style="padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;margin-left:8px;width:auto;min-width:150px;">';
+    html += '<option value="">None (match not completed)</option>';
     match.participants.forEach(function(id) {
         var name = getParticipantName(id);
         var selected = match.winner && String(match.winner) === String(id) ? 'selected' : '';
@@ -812,23 +987,34 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
     html += '</select>';
     html += '</div>';
     
-    if (tourn.mode === 'teams') {
-        html += '<div style="margin-bottom:12px;">';
-        html += '<label style="font-size:0.7rem;color:var(--text-dim);">Loser (team eliminated):</label>';
-        html += '<select id="edit-match-loser" style="padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;margin-left:8px;">';
-        html += '<option value="">None</option>';
-        match.participants.forEach(function(id) {
-            var name = getParticipantName(id);
-            var selected = match.loser && String(match.loser) === String(id) ? 'selected' : '';
-            html += '<option value="' + id + '" ' + selected + '>' + name + '</option>';
-        });
-        html += '</select>';
-        html += '<span style="font-size:0.6rem;color:var(--text-dim);margin-left:8px;">The losing team is eliminated from the tournament (individual eliminations handled separately).</span>';
-        html += '</div>';
-    }
+    // Loser selection (eliminated)
+    html += '<div style="margin-bottom:12px;">';
+    html += '<label style="font-size:0.7rem;color:var(--text-dim);">Loser (eliminated from tournament):</label>';
+    html += '<select id="edit-match-loser" style="padding:4px 8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;font-size:0.75rem;margin-left:8px;width:auto;min-width:150px;">';
+    html += '<option value="">None</option>';
+    match.participants.forEach(function(id) {
+        var name = getParticipantName(id);
+        var selected = match.loser && String(match.loser) === String(id) ? 'selected' : '';
+        var isWinner = match.winner && String(match.winner) === String(id);
+        var disabled = isWinner ? 'disabled' : '';
+        html += '<option value="' + id + '" ' + selected + ' ' + disabled + '>' + name + (isWinner ? ' (already winner)' : '') + '</option>';
+    });
+    html += '</select>';
+    html += '<span style="font-size:0.6rem;color:var(--text-dim);margin-left:8px;">The loser is eliminated. Others advance to another match.</span>';
+    html += '</div>';
+    
+    html += '<div style="margin-bottom:12px;padding:8px;background:var(--bg);border-radius:4px;border:1px solid var(--border-soft);">';
+    html += '<p style="font-size:0.7rem;color:var(--text-dim);margin:0;">';
+    html += '<strong>How it works:</strong><br>';
+    html += '• Select <strong>1 Winner</strong> who advances to the next round.<br>';
+    html += '• Select <strong>1 Loser</strong> who is eliminated from the tournament.<br>';
+    html += '• All <strong>other participants</strong> will be placed in the "advancing" pool for the next round.<br>';
+    html += '• If you don\'t select a Loser, no one is eliminated from this match.';
+    html += '</p>';
+    html += '</div>';
     
     html += '<div class="form-actions">';
-    html += '<button type="button" id="save-edit-match" class="primary">Save</button>';
+    html += '<button type="button" id="save-edit-match" class="primary">Save Match Results</button>';
     html += '<button type="button" id="delete-match-btn" class="danger">Delete Match</button>';
     html += '<button type="button" id="cancel-edit-match" class="secondary">Cancel</button>';
     html += '</div>';
@@ -838,20 +1024,72 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
     content.dataset.roundIndex = roundIndex;
     content.dataset.matchIndex = matchIndex;
     
+    // Winner selection - auto-clear loser if same participant selected as winner
+    var winnerSelect = document.getElementById('edit-match-winner');
+    var loserSelect = document.getElementById('edit-match-loser');
+    
+    if (winnerSelect) {
+        winnerSelect.addEventListener('change', function() {
+            var winnerId = this.value;
+            if (loserSelect && winnerId) {
+                Array.from(loserSelect.options).forEach(function(opt) {
+                    if (opt.value === winnerId) {
+                        opt.disabled = true;
+                        if (opt.selected) {
+                            opt.selected = false;
+                        }
+                    } else {
+                        opt.disabled = false;
+                    }
+                });
+            }
+        });
+    }
+    
+    if (loserSelect) {
+        loserSelect.addEventListener('change', function() {
+            var loserId = this.value;
+            if (winnerSelect && loserId) {
+                Array.from(winnerSelect.options).forEach(function(opt) {
+                    if (opt.value === loserId) {
+                        opt.disabled = true;
+                        if (opt.selected) {
+                            opt.selected = false;
+                        }
+                    } else {
+                        opt.disabled = false;
+                    }
+                });
+            }
+        });
+    }
+    
     document.getElementById('save-edit-match').onclick = function() {
         var winnerId = document.getElementById('edit-match-winner').value;
         var loserId = document.getElementById('edit-match-loser') ? document.getElementById('edit-match-loser').value : null;
         var match = tourn.rounds[roundIndex].matches[matchIndex];
+        
+        if (winnerId && loserId && winnerId === loserId) {
+            alert('A participant cannot be both winner and loser.');
+            return;
+        }
+        
+        if (match.participants.length === 2 && !winnerId) {
+            alert('For 2-person matches, you must select a winner to complete the match.');
+            return;
+        }
         
         if (winnerId) {
             match.winner = winnerId;
             match.status = 'completed';
         } else {
             match.winner = null;
-            match.status = 'pending';
+            if (!loserId) {
+                match.status = 'pending';
+            }
         }
         
-        if (loserId && tourn.mode === 'teams') {
+        if (loserId) {
             match.loser = loserId;
             if (!tourn.eliminations) tourn.eliminations = [];
             if (!tourn.eliminations.some(function(e) { return String(e.participantId) === String(loserId); })) {
@@ -860,27 +1098,44 @@ function showEditMatchModal(tournId, roundIndex, matchIndex) {
                     week: parseInt(tourn.startWeek) || 1,
                     reason: 'Lost in Round ' + (roundIndex + 1)
                 });
-                // Pass the tournament object, not just ID
                 markCharacterEliminated(loserId, tourn, 'Lost in Round ' + (roundIndex + 1));
             }
-        } else if (tourn.mode === 'individuals' && winnerId) {
-            match.participants.forEach(function(id) {
-                if (String(id) !== String(winnerId)) {
-                    match.loser = id;
-                    if (!tourn.eliminations) tourn.eliminations = [];
-                    if (!tourn.eliminations.some(function(e) { return String(e.participantId) === String(id); })) {
-                        tourn.eliminations.push({
-                            participantId: id,
-                            week: parseInt(tourn.startWeek) || 1,
-                            reason: 'Lost in Round ' + (roundIndex + 1)
-                        });
-                        markCharacterEliminated(id, tourn, 'Lost in Round ' + (roundIndex + 1));
-                    }
-                }
-            });
+        } else {
+            match.loser = null;
+        }
+        
+        if (winnerId) {
+            match.status = 'completed';
+        }
+        
+        // Get advancing participants (all except winner and loser)
+        var advancingParticipants = match.participants.filter(function(id) {
+            return String(id) !== String(winnerId) && String(id) !== String(loserId);
+        });
+        
+        if (advancingParticipants.length > 0) {
+            match.advancing = advancingParticipants;
+            console.log('Advancing participants for next round:', advancingParticipants.map(function(id) {
+                return getParticipantName(id);
+            }));
+        }
+        
+        // Check if all matches in this round are complete
+        var allMatchesComplete = true;
+        round.matches.forEach(function(m) {
+            if (m.status !== 'completed') {
+                allMatchesComplete = false;
+            }
+        });
+        
+        if (allMatchesComplete) {
+            round.status = 'completed';
+        } else if (winnerId) {
+            round.status = 'in_progress';
         }
         
         checkRoundStatuses(tourn);
+        
         saveData().catch(function(err) { console.error('Failed to save:', err); });
         modal.classList.add('hidden');
         viewTournament(tournId);
@@ -908,7 +1163,7 @@ function createMatchEditModal() {
     modal.id = 'match-edit-modal';
     modal.className = 'modal hidden';
     modal.innerHTML = `
-        <div class="modal-content" style="max-width:550px;">
+        <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <h3 id="match-edit-title">Edit Match</h3>
                 <button class="close-modal" id="close-match-edit">&times;</button>
@@ -1042,7 +1297,6 @@ function eliminateParticipant() {
     
     console.log('Eliminated participant:', id, 'Eliminations now:', tourn.eliminations.length);
     
-    // Pass the tournament object, not just the ID
     markCharacterEliminated(id, tourn, 'Eliminated from tournament');
     
     saveData().then(function() {
@@ -1066,10 +1320,8 @@ function uneliminateParticipant(tournId, participantId) {
     
     console.log('Uneliminating participant:', participantId);
     
-    // Remove from tournament eliminations
     tourn.eliminations = tourn.eliminations.filter(function(e) { return String(e.participantId) !== String(participantId); });
     
-    // Remove from character's eliminations - pass tourn object
     unmarkCharacterEliminated(participantId, tourn);
     
     saveData().then(function() {
@@ -1104,12 +1356,99 @@ function createRound() {
     }
     
     var roundNumber = tourn.rounds.length + 1;
-    tourn.rounds.push({
+    var newRound = {
         roundNumber: roundNumber,
         status: 'pending',
         matches: []
-    });
+    };
     
+    // If this is not the first round, get advancing participants from previous round
+    if (roundNumber > 1) {
+        var previousRound = tourn.rounds[roundNumber - 2];
+        var advancingIds = [];
+        
+        if (previousRound.matches) {
+            previousRound.matches.forEach(function(match) {
+                if (match.status === 'completed') {
+                    // Winner advances directly
+                    if (match.winner) {
+                        advancingIds.push(match.winner);
+                    }
+                    // Advancing participants (neither winner nor loser)
+                    if (match.advancing) {
+                        match.advancing.forEach(function(id) {
+                            if (advancingIds.indexOf(id) === -1) {
+                                advancingIds.push(id);
+                            }
+                        });
+                    }
+                    // If there's no winner and no loser, all participants advance
+                    if (!match.winner && !match.loser) {
+                        match.participants.forEach(function(id) {
+                            if (advancingIds.indexOf(id) === -1) {
+                                advancingIds.push(id);
+                            }
+                        });
+                    }
+                } else {
+                    // If match not completed, all participants advance
+                    match.participants.forEach(function(id) {
+                        if (advancingIds.indexOf(id) === -1) {
+                            advancingIds.push(id);
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Remove duplicates
+        advancingIds = advancingIds.filter(function(id, index, self) {
+            return self.indexOf(id) === index;
+        });
+        
+        // Remove eliminated participants
+        if (tourn.eliminations) {
+            advancingIds = advancingIds.filter(function(id) {
+                return !tourn.eliminations.some(function(e) { return String(e.participantId) === String(id); });
+            });
+        }
+        
+        if (advancingIds.length > 0) {
+            console.log('Advancing participants to round', roundNumber, ':', advancingIds.map(function(id) {
+                return getParticipantName(id);
+            }));
+            
+            // Add advancing participants to the new round
+            newRound.advancingFromPrevious = advancingIds;
+        }
+        
+        if (advancingIds.length < 2 && previousRound.matches && previousRound.matches.length > 0) {
+            // Check if we have enough participants to continue
+            var allPreviousParticipants = [];
+            previousRound.matches.forEach(function(m) {
+                if (m.participants) {
+                    m.participants.forEach(function(id) {
+                        if (allPreviousParticipants.indexOf(id) === -1) {
+                            allPreviousParticipants.push(id);
+                        }
+                    });
+                }
+            });
+            
+            var eliminatedCount = 0;
+            if (tourn.eliminations) {
+                eliminatedCount = tourn.eliminations.length;
+            }
+            
+            var remaining = allPreviousParticipants.length - eliminatedCount;
+            if (remaining < 2) {
+                alert('Not enough participants remain for another round. ' + remaining + ' participant(s) remaining.');
+                return;
+            }
+        }
+    }
+    
+    tourn.rounds.push(newRound);
     tourn.status = 'active';
     saveData().catch(function(err) { console.error('Failed to save:', err); });
     viewTournament(tournId);
