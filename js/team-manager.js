@@ -1,6 +1,6 @@
 /**
  * team-manager.js - Team Manager
- * Divided into three tabs: Academic, Professional, Temporary
+ * Divided into four tabs: Academic, Professional, Temporary, Civilian
  * Each tab shows only the appropriate team type with relevant filters
  * Shows current members and full history (all members ever part of the team)
  */
@@ -55,6 +55,8 @@ function getFilteredTeams(type, filter) {
         teams = teams.filter(function(t) { return t.type === 'professional'; });
     } else if (type === 'temporary') {
         teams = teams.filter(function(t) { return t.type === 'temporary' || t.type === 'internship'; });
+    } else if (type === 'civilian') {
+        teams = teams.filter(function(t) { return t.type === 'civilian'; });
     }
     
     // Filter by status
@@ -131,7 +133,7 @@ function getTeamPeriodDisplay(team) {
         }
         return '-';
     } else {
-        // Temporary
+        // Temporary or Civilian
         if (team.startPeriod && team.endPeriod) {
             return team.startPeriod + ' - ' + team.endPeriod;
         } else if (team.startPeriod) {
@@ -215,7 +217,7 @@ function getMemberStatusAtWeek(member, week) {
 function getMemberStatusInfo(status) {
     var map = {
         'active': { label: 'Active', color: 'var(--accent)' },
-        'left': { label: 'Left', color: 'var(--text-dim)' },
+        'left': { label: 'Former', color: 'var(--text-dim)' },
         'deceased': { label: 'Deceased', color: 'var(--danger)' },
         'eliminated': { label: 'Eliminated', color: 'var(--danger)' },
         'future': { label: 'Future Member', color: 'var(--warning)' },
@@ -263,7 +265,7 @@ function getCharacterAvailability(charId, week, teamId) {
         }
     }
     
-    // Check if already in another team during this time
+    // Check if already in this team
     var teamIdStr = String(teamId);
     for (var i = 0; i < data.teams.length; i++) {
         var team = data.teams[i];
@@ -276,7 +278,10 @@ function getCharacterAvailability(charId, week, teamId) {
                     var join = parseInt(member.joinPeriod);
                     var leave = parseInt(member.leavePeriod);
                     if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
-                        return { available: false, reason: 'In team: ' + team.name };
+                        return { available: true, reason: 'In team: ' + team.name + ' (still active)' };
+                    }
+                    if (!isNaN(join) && join <= weekNum && !isNaN(leave) && leave < weekNum) {
+                        return { available: true, reason: 'Former member of: ' + team.name };
                     }
                 }
             }
@@ -305,6 +310,7 @@ function renderTeamManagerView(container) {
                 <button class="tab-btn ${activeTab === 'academic' ? 'active' : ''}" data-tab="academic">Academic</button>
                 <button class="tab-btn ${activeTab === 'professional' ? 'active' : ''}" data-tab="professional">Professional</button>
                 <button class="tab-btn ${activeTab === 'temporary' ? 'active' : ''}" data-tab="temporary">Temporary</button>
+                <button class="tab-btn ${activeTab === 'civilian' ? 'active' : ''}" data-tab="civilian">Civilian</button>
             </div>
             <div class="tab-content">
                 <div id="tab-academic" class="tab-panel ${activeTab === 'academic' ? 'active' : ''}" style="${activeTab === 'academic' ? 'display:block;' : 'display:none;'}">
@@ -315,6 +321,9 @@ function renderTeamManagerView(container) {
                 </div>
                 <div id="tab-temporary" class="tab-panel ${activeTab === 'temporary' ? 'active' : ''}" style="${activeTab === 'temporary' ? 'display:block;' : 'display:none;'}">
                     <div id="temporary-content"></div>
+                </div>
+                <div id="tab-civilian" class="tab-panel ${activeTab === 'civilian' ? 'active' : ''}" style="${activeTab === 'civilian' ? 'display:block;' : 'display:none;'}">
+                    <div id="civilian-content"></div>
                 </div>
             </div>
         </div>
@@ -339,6 +348,7 @@ function renderTeamManagerView(container) {
                                     <option value="academic">Academic</option>
                                     <option value="professional">Professional</option>
                                     <option value="temporary">Temporary</option>
+                                    <option value="civilian">Civilian</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -391,19 +401,19 @@ function renderTeamManagerView(container) {
 
         <!-- Member Modal -->
         <div id="member-modal" class="modal hidden">
-            <div class="modal-content" style="max-width:700px;">
+            <div class="modal-content" style="max-width:800px;">
                 <div class="modal-header">
                     <h3 id="modal-team-name">Team Members</h3>
                     <button class="close-modal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="member-form">
-                        <select id="member-character">
+                        <select id="member-character" style="min-width:200px;">
                             <option value="">Select character...</option>
                         </select>
-                        <input type="text" id="member-role" placeholder="Role">
-                        <input type="text" id="member-join" placeholder="Join Week/Year">
-                        <input type="text" id="member-leave" placeholder="Leave Week/Year">
+                        <input type="text" id="member-role" placeholder="Role" style="min-width:120px;">
+                        <input type="text" id="member-join" placeholder="Join Week/Year" style="min-width:100px;">
+                        <input type="text" id="member-leave" placeholder="Leave Week/Year" style="min-width:100px;">
                         <button id="add-member-btn" class="primary small">Add Member</button>
                     </div>
                     <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">
@@ -507,6 +517,41 @@ function populateMissionSelector() {
 }
 
 /**
+ * Get characters by status based on team type
+ */
+function getCharactersForTeamType(teamType) {
+    var chars = data.characters || [];
+    var result = [];
+    
+    chars.forEach(function(c) {
+        var status = getCurrentStatus(c).toLowerCase();
+        
+        // Never show civilians unless team type is civilian
+        if (status === 'civilian' && teamType !== 'civilian') return;
+        
+        if (teamType === 'academic') {
+            // Academic: only show trainees
+            if (status === 'trainee') {
+                result.push(c);
+            }
+        } else if (teamType === 'civilian') {
+            // Civilian: only show civilians
+            if (status === 'civilian') {
+                result.push(c);
+            }
+        } else {
+            // Professional or Temporary: show trainees, rookies, juniors, seniors, instructors
+            var allowedStatuses = ['trainee', 'rookie', 'junior', 'senior', 'instructor', 'support'];
+            if (allowedStatuses.indexOf(status) !== -1) {
+                result.push(c);
+            }
+        }
+    });
+    
+    return result;
+}
+
+/**
  * Render a specific team tab
  */
 function renderTeamTab(tab) {
@@ -527,19 +572,7 @@ function renderTeamTab(tab) {
                 <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active during this 2-week block</span>
             </div>
         `;
-    } else if (tab === 'professional') {
-        filterHtml = `
-            <div class="filter-section">
-                <label for="team-status-filter">Status:</label>
-                <select id="team-status-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:0.75rem;width:auto;">
-                    <option value="active" ${filter === 'active' ? 'selected' : ''}>Active</option>
-                    <option value="inactive" ${filter === 'inactive' ? 'selected' : ''}>Inactive</option>
-                    <option value="all" ${filter === 'all' ? 'selected' : ''}>All</option>
-                </select>
-            </div>
-        `;
     } else {
-        // Temporary
         filterHtml = `
             <div class="filter-section">
                 <label for="team-status-filter">Status:</label>
@@ -553,27 +586,15 @@ function renderTeamTab(tab) {
     }
     
     var listHeader = '';
-    if (tab === 'academic') {
-        listHeader = `
-            <div class="list-header team-header" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;">
-                <span>Team Name</span>
-                <span>Period</span>
-                <span>Rank</span>
-                <span>Members</span>
-                <span>Actions</span>
-            </div>
-        `;
-    } else {
-        listHeader = `
-            <div class="list-header team-header" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;">
-                <span>Team Name</span>
-                <span>Period</span>
-                <span>Status</span>
-                <span>Members</span>
-                <span>Actions</span>
-            </div>
-        `;
-    }
+    listHeader = `
+        <div class="list-header team-header" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;">
+            <span>Team Name</span>
+            <span>Period</span>
+            <span>Rank</span>
+            <span>Members</span>
+            <span>Actions</span>
+        </div>
+    `;
     
     var teamsHtml = renderTeamList(teams, tab);
     
@@ -594,7 +615,8 @@ function renderTeamList(teams, tab) {
         var labels = {
             'academic': 'academic teams',
             'professional': 'professional teams',
-            'temporary': 'temporary teams'
+            'temporary': 'temporary teams',
+            'civilian': 'civilian teams'
         };
         return '<p class="empty-state">No ' + (labels[tab] || 'teams') + ' found. Create your first team!</p>';
     }
@@ -612,7 +634,7 @@ function renderTeamList(teams, tab) {
         
         var rankDisplay = team.currentRank || '-';
         var missionDisplay = '';
-        if (tab === 'temporary' && team.temporaryMission) {
+        if ((tab === 'temporary' || tab === 'professional') && team.temporaryMission) {
             var missionTitle = getMissionTitle(team.temporaryMission);
             if (missionTitle) {
                 missionDisplay = ' <span style="font-size:0.6rem;color:var(--text-dim);">(' + missionTitle + ')</span>';
@@ -621,15 +643,8 @@ function renderTeamList(teams, tab) {
         
         html += '<div class="list-item team-item" data-id="' + team.id + '" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;">';
         html += '<span><strong>' + team.name + '</strong>' + missionDisplay + '</span>';
-        
-        if (tab === 'academic') {
-            html += '<span style="font-size:0.75rem;">' + periodDisplay + '</span>';
-            html += '<span style="font-size:0.75rem;">' + rankDisplay + '</span>';
-        } else {
-            html += '<span style="font-size:0.75rem;">' + periodDisplay + '</span>';
-            html += '<span style="color:' + statusColor + ';font-size:0.75rem;">' + statusLabel + '</span>';
-        }
-        
+        html += '<span style="font-size:0.75rem;">' + periodDisplay + '</span>';
+        html += '<span style="font-size:0.75rem;">' + rankDisplay + '</span>';
         html += '<span style="font-size:0.75rem;">' + memberCount + '</span>';
         html += '<span class="actions">' +
             '<button class="small toggle-members" data-id="' + team.id + '">' + (isExpanded ? '▼' : '▶') + '</button>' +
@@ -829,7 +844,7 @@ function showTeamForm(editId, tab) {
 function toggleMissionField(type) {
     var field = document.getElementById('temporary-mission-field');
     if (field) {
-        field.style.display = (type === 'temporary') ? 'block' : 'none';
+        field.style.display = (type === 'temporary' || type === 'professional') ? 'block' : 'none';
     }
 }
 
@@ -977,6 +992,21 @@ function closeTeamForm() {
 }
 
 /**
+ * Get status priority for sorting
+ */
+function getStatusPriority(status) {
+    var map = {
+        'active': 0,
+        'future': 1,
+        'left': 2,
+        'eliminated': 3,
+        'deceased': 4,
+        'unknown': 5
+    };
+    return map[status] !== undefined ? map[status] : 5;
+}
+
+/**
  * Open member management modal - shows full member history with character status
  */
 function openMemberModal(teamId, tab) {
@@ -992,62 +1022,169 @@ function openMemberModal(teamId, tab) {
     select.innerHTML = '<option value="">Select character...</option>';
     
     var currentWeek = teamManagerState.filterWeek || 1;
+    var teamType = team.type || 'academic';
     
-    // Get all characters and sort by availability
-    var sortedChars = data.characters.slice().sort(function(a, b) {
-        var nameA = [a.firstName, a.middleName, a.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.firstName, b.middleName, b.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+    // Get characters based on team type
+    var eligibleChars = getCharactersForTeamType(teamType);
+    
+    // Create a map for quick lookup
+    var charMap = {};
+    eligibleChars.forEach(function(c) { charMap[c.id] = c; });
+    
+    // Get members already in this team
+    var currentMemberIds = [];
+    var formerMemberIds = [];
+    if (team.members) {
+        team.members.forEach(function(m) {
+            var status = getMemberStatusAtWeek(m, currentWeek);
+            if (status === 'active' || status === 'future') {
+                currentMemberIds.push(m.characterId);
+            } else {
+                formerMemberIds.push(m.characterId);
+            }
+        });
+    }
+    
+    // Get available characters (not currently active in this team)
+    var availableChars = [];
+    var formerChars = [];
+    var eliminatedChars = [];
+    var deceasedChars = [];
+    
+    eligibleChars.forEach(function(char) {
+        var charId = char.id;
+        var charStatus = getCurrentStatus(char).toLowerCase();
+        var isDeceased = char.deceased || false;
+        
+        // Check if already in this team
+        var inTeam = currentMemberIds.indexOf(charId) !== -1;
+        var isFormer = formerMemberIds.indexOf(charId) !== -1;
+        
+        if (inTeam) {
+            // Already in team - show at top
+            availableChars.unshift({ char: char, status: 'in_team', label: '✓ Already in team' });
+            return;
+        }
+        
+        // Check if eliminated
+        var isEliminated = false;
+        if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+            for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+                var elimWeek = parseInt(char.eliminatedWeeks[i]);
+                if (!isNaN(elimWeek) && elimWeek <= currentWeek) {
+                    isEliminated = true;
+                    break;
+                }
+            }
+        }
+        
+        // Check if deceased
+        if (isDeceased) {
+            if (char.deathYear) {
+                var deathYear = parseInt(char.deathYear);
+                if (!isNaN(deathYear) && deathYear <= currentWeek) {
+                    isDeceased = true;
+                }
+            }
+            if (char.deathAge) {
+                var birthYear = parseInt(char.birthYear);
+                if (!isNaN(birthYear)) {
+                    var deathYear = birthYear + parseInt(char.deathAge);
+                    if (deathYear <= currentWeek) {
+                        isDeceased = true;
+                    }
+                }
+            }
+        }
+        
+        if (isDeceased) {
+            deceasedChars.push({ char: char, status: 'deceased', label: '✝ Deceased' });
+        } else if (isEliminated) {
+            eliminatedChars.push({ char: char, status: 'eliminated', label: '⚠ Eliminated' });
+        } else if (isFormer) {
+            formerChars.push({ char: char, status: 'former', label: '↩ Former Member' });
+        } else {
+            availableChars.push({ char: char, status: 'available', label: 'Available' });
+        }
+    });
+    
+    // Sort available chars by name
+    availableChars.sort(function(a, b) {
+        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         return nameA.localeCompare(nameB);
     });
     
-    // Separate available and unavailable characters
-    var availableChars = [];
-    var unavailableChars = [];
-    
-    sortedChars.forEach(function(char) {
-        var availability = getCharacterAvailability(char.id, currentWeek, teamId);
-        var inThisTeam = team.members && team.members.some(function(m) { return String(m.characterId) === String(char.id); });
-        var status = getCurrentStatus(char);
-        
-        if (inThisTeam) {
-            // Already in team - show at top
-            availableChars.unshift({ char: char, availability: availability, inTeam: true, status: status });
-        } else if (availability.available) {
-            availableChars.push({ char: char, availability: availability, inTeam: false, status: status });
-        } else {
-            unavailableChars.push({ char: char, availability: availability, inTeam: false, status: status });
-        }
+    // Sort former chars by name
+    formerChars.sort(function(a, b) {
+        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        return nameA.localeCompare(nameB);
     });
     
-    // Add available characters first, then unavailable
-    var allChars = availableChars.concat(unavailableChars);
+    // Sort eliminated chars by name
+    eliminatedChars.sort(function(a, b) {
+        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
     
-    allChars.forEach(function(item) {
-        var char = item.char;
-        var availability = item.availability;
-        var inThisTeam = item.inTeam;
-        var status = item.status;
-        
-        var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
-        var deadMarker = char.deceased ? ' Deceased' : '';
-        var statusMarker = '';
-        var style = '';
-        
-        if (inThisTeam) {
-            statusMarker = ' ✓';
-            style = 'color:var(--accent);font-weight:600;';
-        } else if (!availability.available) {
-            statusMarker = ' (' + availability.reason + ')';
-            style = 'color:var(--text-dim);font-style:italic;text-decoration:line-through;';
+    // Sort deceased chars by name
+    deceasedChars.sort(function(a, b) {
+        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    // Build the dropdown
+    var groupOrder = [
+        { items: availableChars, label: '— Available —' },
+        { items: formerChars, label: '— Former Members —' },
+        { items: eliminatedChars, label: '— Eliminated —' },
+        { items: deceasedChars, label: '— Deceased —' }
+    ];
+    
+    var hasItems = false;
+    groupOrder.forEach(function(group) {
+        if (group.items.length > 0) {
+            if (!hasItems) {
+                hasItems = true;
+            } else {
+                var separator = document.createElement('option');
+                separator.disabled = true;
+                separator.textContent = group.label;
+                separator.style.color = 'var(--text-dim)';
+                select.appendChild(separator);
+            }
+            
+            group.items.forEach(function(item) {
+                var char = item.char;
+                var name = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
+                var status = getCurrentStatus(char);
+                var option = document.createElement('option');
+                option.value = char.id;
+                
+                var label = name + ' [' + status + ']';
+                if (item.label) {
+                    label += ' ' + item.label;
+                }
+                option.textContent = label;
+                
+                if (item.status === 'deceased') {
+                    option.style.color = 'var(--danger)';
+                    option.style.textDecoration = 'line-through';
+                } else if (item.status === 'eliminated') {
+                    option.style.color = 'var(--danger)';
+                } else if (item.status === 'former') {
+                    option.style.color = 'var(--text-dim)';
+                    option.style.fontStyle = 'italic';
+                } else if (item.status === 'in_team') {
+                    option.style.color = 'var(--accent)';
+                    option.style.fontWeight = 'bold';
+                }
+                select.appendChild(option);
+            });
         }
-        
-        var option = document.createElement('option');
-        option.value = char.id;
-        // Show name + status (trainee, instructor, etc.) + availability info
-        var statusDisplay = status ? ' [' + status + ']' : '';
-        option.textContent = name + statusDisplay + deadMarker + statusMarker;
-        option.style.cssText = style;
-        select.appendChild(option);
     });
     
     document.getElementById('member-role').value = '';
@@ -1076,45 +1213,82 @@ function renderMembers(team) {
     var currentWeek = teamManagerState.filterWeek || 1;
     var html = '';
     
-    // Sort members: active first, then by join period - preserve original index
-    var sortedMembers = team.members.slice().map(function(member, idx) {
-        return { member: member, originalIndex: idx };
-    }).sort(function(a, b) {
-        var aActive = getMemberStatusAtWeek(a.member, currentWeek) === 'active';
-        var bActive = getMemberStatusAtWeek(b.member, currentWeek) === 'active';
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
+    // Separate current/active members from former
+    var activeMembers = [];
+    var formerMembers = [];
+    
+    team.members.forEach(function(member, index) {
+        var status = getMemberStatusAtWeek(member, currentWeek);
+        if (status === 'active' || status === 'future') {
+            activeMembers.push({ member: member, index: index, status: status });
+        } else {
+            formerMembers.push({ member: member, index: index, status: status });
+        }
+    });
+    
+    // Sort active members by join period
+    activeMembers.sort(function(a, b) {
         var aJoin = parseInt(a.member.joinPeriod) || 0;
         var bJoin = parseInt(b.member.joinPeriod) || 0;
         return aJoin - bJoin;
     });
     
-    sortedMembers.forEach(function(item) {
+    // Sort former members by status priority then name
+    formerMembers.sort(function(a, b) {
+        var aPriority = getStatusPriority(a.status);
+        var bPriority = getStatusPriority(b.status);
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        var aName = a.member.characterId || '';
+        var bName = b.member.characterId || '';
+        return aName.localeCompare(bName);
+    });
+    
+    var allMembers = activeMembers.concat(formerMembers);
+    
+    allMembers.forEach(function(item) {
         var member = item.member;
-        var originalIndex = item.originalIndex;
+        var index = item.index;
+        var status = item.status;
         var char = data.characters.find(function(c) { return String(c.id) === String(member.characterId); });
         var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
         var age = char ? getCharacterAge(char) : '-';
-        var deadMarker = char && char.deceased ? ' Deceased' : '';
         
-        var status = getMemberStatusAtWeek(member, currentWeek);
         var statusInfo = getMemberStatusInfo(status);
-        
         var periodDisplay = periodLabel + (member.joinPeriod || '?');
         if (member.leavePeriod) {
             periodDisplay += ' → ' + periodLabel + member.leavePeriod;
         }
         
-        html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;" data-member-index="' + originalIndex + '">' +
+        var statusIcon = '';
+        var statusSuffix = '';
+        if (status === 'deceased') {
+            statusIcon = '✝ ';
+            statusSuffix = ' (Deceased)';
+        } else if (status === 'eliminated') {
+            statusIcon = '⚠ ';
+            statusSuffix = ' (Eliminated)';
+        } else if (status === 'left') {
+            statusIcon = '↩ ';
+            statusSuffix = ' (Former)';
+        } else if (status === 'future') {
+            statusIcon = '⏳ ';
+            statusSuffix = ' (Future)';
+        } else if (status === 'active') {
+            statusIcon = '✓ ';
+        }
+        
+        html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;' + 
+            (status === 'deceased' ? 'opacity:0.6;' : '') + 
+            (status === 'left' ? 'opacity:0.7;' : '') + '" data-member-index="' + index + '">' +
             '<div class="member-info">' +
-                '<span><strong>' + name + deadMarker + '</strong></span>' +
+                '<span><strong>' + name + '</strong></span>' +
                 '<span class="role">' + (member.role || 'Member') + '</span>' +
                 '<span class="years">' + periodDisplay + '</span>' +
                 '<span class="years">Age: ' + age + '</span>' +
-                '<span style="color:' + statusInfo.color + ';font-size:0.7rem;font-weight:600;">' + statusInfo.label + '</span>' +
+                '<span style="color:' + statusInfo.color + ';font-size:0.7rem;font-weight:600;">' + statusIcon + statusInfo.label + statusSuffix + '</span>' +
             '</div>' +
             '<div class="member-actions">' +
-                '<button class="small edit-member" data-index="' + originalIndex + '">Edit</button>' +
+                '<button class="small edit-member" data-index="' + index + '">Edit</button>' +
                 '<button class="small danger remove-member" data-char="' + member.characterId + '">Remove</button>' +
             '</div>' +
         '</div>';
@@ -1164,7 +1338,7 @@ function addMember() {
         return;
     }
     
-    // Check availability
+    // Check availability (but allow adding anyway with warning)
     var currentWeek = teamManagerState.filterWeek || 1;
     var availability = getCharacterAvailability(charId, currentWeek, teamId);
     if (!availability.available) {
@@ -1600,3 +1774,5 @@ window.closeTeamForm = closeTeamForm;
 window.initTeamManagerEvents = initTeamManagerEvents;
 window.initTeamManagerSystem = initTeamManagerSystem;
 window.teamManagerState = teamManagerState;
+window.getCharactersForTeamType = getCharactersForTeamType;
+window.getStatusPriority = getStatusPriority;
