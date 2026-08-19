@@ -227,6 +227,63 @@ function getMemberStatusInfo(status) {
 }
 
 /**
+ * Check if a character is currently active in ANY team during the given week
+ * Returns the team name if found, or null if not in any team
+ */
+function getCharacterCurrentTeam(charId, week, excludeTeamId) {
+    var weekNum = parseInt(week) || 1;
+    var excludeId = excludeTeamId ? String(excludeTeamId) : null;
+    
+    for (var i = 0; i < data.teams.length; i++) {
+        var team = data.teams[i];
+        if (team.status === 'deleted' || team.status === 'inactive') continue;
+        if (excludeId && String(team.id) === excludeId) continue;
+        
+        if (team.members) {
+            for (var j = 0; j < team.members.length; j++) {
+                var member = team.members[j];
+                if (String(member.characterId) === String(charId)) {
+                    var join = parseInt(member.joinPeriod);
+                    var leave = parseInt(member.leavePeriod);
+                    // Check if the character is active in this team during the week
+                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+                        return team.name;
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Check if a character is a former member of ANY team (left before the given week)
+ */
+function getCharacterFormerTeam(charId, week) {
+    var weekNum = parseInt(week) || 1;
+    
+    for (var i = 0; i < data.teams.length; i++) {
+        var team = data.teams[i];
+        if (team.status === 'deleted') continue;
+        
+        if (team.members) {
+            for (var j = 0; j < team.members.length; j++) {
+                var member = team.members[j];
+                if (String(member.characterId) === String(charId)) {
+                    var join = parseInt(member.joinPeriod);
+                    var leave = parseInt(member.leavePeriod);
+                    // Check if the character left this team before the given week
+                    if (!isNaN(join) && join <= weekNum && !isNaN(leave) && leave < weekNum) {
+                        return team.name;
+                    }
+                }
+            }
+        }
+    }
+    return null;
+}
+
+/**
  * Get character availability status for a specific time
  */
 function getCharacterAvailability(charId, week, teamId) {
@@ -265,27 +322,10 @@ function getCharacterAvailability(charId, week, teamId) {
         }
     }
     
-    // Check if already in this team
-    var teamIdStr = String(teamId);
-    for (var i = 0; i < data.teams.length; i++) {
-        var team = data.teams[i];
-        if (String(team.id) === teamIdStr) continue;
-        if (team.status === 'deleted' || team.status === 'inactive') continue;
-        if (team.members) {
-            for (var j = 0; j < team.members.length; j++) {
-                var member = team.members[j];
-                if (String(member.characterId) === String(charId)) {
-                    var join = parseInt(member.joinPeriod);
-                    var leave = parseInt(member.leavePeriod);
-                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
-                        return { available: true, reason: 'In team: ' + team.name + ' (still active)' };
-                    }
-                    if (!isNaN(join) && join <= weekNum && !isNaN(leave) && leave < weekNum) {
-                        return { available: true, reason: 'Former member of: ' + team.name };
-                    }
-                }
-            }
-        }
+    // Check if already in any team during this week (excluding current team)
+    var currentTeam = getCharacterCurrentTeam(charId, weekNum, teamId);
+    if (currentTeam) {
+        return { available: false, reason: 'Currently in team: ' + currentTeam };
     }
     
     return { available: true, reason: 'Available' };
@@ -1027,10 +1067,6 @@ function openMemberModal(teamId, tab) {
     // Get characters based on team type
     var eligibleChars = getCharactersForTeamType(teamType);
     
-    // Create a map for quick lookup
-    var charMap = {};
-    eligibleChars.forEach(function(c) { charMap[c.id] = c; });
-    
     // Get members already in this team
     var currentMemberIds = [];
     var formerMemberIds = [];
@@ -1045,11 +1081,13 @@ function openMemberModal(teamId, tab) {
         });
     }
     
-    // Get available characters (not currently active in this team)
-    var availableChars = [];
+    // Build character lists with availability info
+    var inTeamChars = [];
+    var inOtherTeamChars = [];
     var formerChars = [];
     var eliminatedChars = [];
     var deceasedChars = [];
+    var availableChars = [];
     
     eligibleChars.forEach(function(char) {
         var charId = char.id;
@@ -1061,21 +1099,11 @@ function openMemberModal(teamId, tab) {
         var isFormer = formerMemberIds.indexOf(charId) !== -1;
         
         if (inTeam) {
-            // Already in team - show at top
-            availableChars.unshift({ char: char, status: 'in_team', label: '✓ Already in team' });
+            // Already in team - show at top with "Already in team" label
+            var status = getMemberStatusAtWeek({ characterId: charId, joinPeriod: '', leavePeriod: '' }, currentWeek);
+            var statusInfo = getMemberStatusInfo(status);
+            inTeamChars.push({ char: char, status: 'in_team', label: '✓ Already in team', statusInfo: statusInfo });
             return;
-        }
-        
-        // Check if eliminated
-        var isEliminated = false;
-        if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
-            for (var i = 0; i < char.eliminatedWeeks.length; i++) {
-                var elimWeek = parseInt(char.eliminatedWeeks[i]);
-                if (!isNaN(elimWeek) && elimWeek <= currentWeek) {
-                    isEliminated = true;
-                    break;
-                }
-            }
         }
         
         // Check if deceased
@@ -1099,46 +1127,64 @@ function openMemberModal(teamId, tab) {
         
         if (isDeceased) {
             deceasedChars.push({ char: char, status: 'deceased', label: '✝ Deceased' });
-        } else if (isEliminated) {
-            eliminatedChars.push({ char: char, status: 'eliminated', label: '⚠ Eliminated' });
-        } else if (isFormer) {
-            formerChars.push({ char: char, status: 'former', label: '↩ Former Member' });
-        } else {
-            availableChars.push({ char: char, status: 'available', label: 'Available' });
+            return;
         }
+        
+        // Check if eliminated
+        var isEliminated = false;
+        if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
+            for (var i = 0; i < char.eliminatedWeeks.length; i++) {
+                var elimWeek = parseInt(char.eliminatedWeeks[i]);
+                if (!isNaN(elimWeek) && elimWeek <= currentWeek) {
+                    isEliminated = true;
+                    break;
+                }
+            }
+        }
+        
+        if (isEliminated) {
+            eliminatedChars.push({ char: char, status: 'eliminated', label: '⚠ Eliminated' });
+            return;
+        }
+        
+        // Check if former member of this team
+        if (isFormer) {
+            formerChars.push({ char: char, status: 'former', label: '↩ Former Member' });
+            return;
+        }
+        
+        // Check if in another team currently
+        var availability = getCharacterAvailability(charId, currentWeek, teamId);
+        if (!availability.available) {
+            // In another team currently
+            inOtherTeamChars.push({ char: char, status: 'in_other_team', label: '⊘ ' + availability.reason });
+            return;
+        }
+        
+        // Available
+        availableChars.push({ char: char, status: 'available', label: '' });
     });
     
-    // Sort available chars by name
-    availableChars.sort(function(a, b) {
+    // Sort functions
+    function sortByName(a, b) {
         var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         return nameA.localeCompare(nameB);
-    });
+    }
     
-    // Sort former chars by name
-    formerChars.sort(function(a, b) {
-        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
+    // Sort each group
+    inTeamChars.sort(sortByName);
+    availableChars.sort(sortByName);
+    inOtherTeamChars.sort(sortByName);
+    formerChars.sort(sortByName);
+    eliminatedChars.sort(sortByName);
+    deceasedChars.sort(sortByName);
     
-    // Sort eliminated chars by name
-    eliminatedChars.sort(function(a, b) {
-        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
-    
-    // Sort deceased chars by name
-    deceasedChars.sort(function(a, b) {
-        var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
-        return nameA.localeCompare(nameB);
-    });
-    
-    // Build the dropdown
+    // Build the dropdown with groups
     var groupOrder = [
+        { items: inTeamChars, label: '— Already in Team —' },
         { items: availableChars, label: '— Available —' },
+        { items: inOtherTeamChars, label: '— In Other Teams —' },
         { items: formerChars, label: '— Former Members —' },
         { items: eliminatedChars, label: '— Eliminated —' },
         { items: deceasedChars, label: '— Deceased —' }
@@ -1147,14 +1193,14 @@ function openMemberModal(teamId, tab) {
     var hasItems = false;
     groupOrder.forEach(function(group) {
         if (group.items.length > 0) {
-            if (!hasItems) {
-                hasItems = true;
-            } else {
+            if (hasItems) {
                 var separator = document.createElement('option');
                 separator.disabled = true;
                 separator.textContent = group.label;
                 separator.style.color = 'var(--text-dim)';
                 select.appendChild(separator);
+            } else {
+                hasItems = true;
             }
             
             group.items.forEach(function(item) {
@@ -1181,6 +1227,8 @@ function openMemberModal(teamId, tab) {
                 } else if (item.status === 'in_team') {
                     option.style.color = 'var(--accent)';
                     option.style.fontWeight = 'bold';
+                } else if (item.status === 'in_other_team') {
+                    option.style.color = 'var(--text-dim)';
                 }
                 select.appendChild(option);
             });
@@ -1338,7 +1386,7 @@ function addMember() {
         return;
     }
     
-    // Check availability (but allow adding anyway with warning)
+    // Check availability
     var currentWeek = teamManagerState.filterWeek || 1;
     var availability = getCharacterAvailability(charId, currentWeek, teamId);
     if (!availability.available) {
@@ -1763,6 +1811,8 @@ window.getTeamPeriodDisplay = getTeamPeriodDisplay;
 window.getMemberStatusAtWeek = getMemberStatusAtWeek;
 window.getMemberStatusInfo = getMemberStatusInfo;
 window.getCharacterAvailability = getCharacterAvailability;
+window.getCharacterCurrentTeam = getCharacterCurrentTeam;
+window.getCharacterFormerTeam = getCharacterFormerTeam;
 window.showTeamForm = showTeamForm;
 window.saveTeam = saveTeam;
 window.deleteTeam = deleteTeam;
@@ -1776,3 +1826,5 @@ window.initTeamManagerSystem = initTeamManagerSystem;
 window.teamManagerState = teamManagerState;
 window.getCharactersForTeamType = getCharactersForTeamType;
 window.getStatusPriority = getStatusPriority;
+
+console.log('team-manager.js loaded');
