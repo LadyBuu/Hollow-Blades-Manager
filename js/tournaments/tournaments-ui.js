@@ -463,7 +463,10 @@ function renderRounds(tourn) {
     });
     
     container.querySelectorAll('.add-match-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        // Remove existing listeners by cloning
+        var newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', function() {
             var roundIndex = parseInt(this.dataset.round);
             showAddMatchModal(tourn.id, roundIndex);
         });
@@ -484,8 +487,11 @@ function renderRounds(tourn) {
     });
     
     container.querySelectorAll('.delete-round-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            deleteRound(tourn.id, roundIndex);
+        // Remove existing listeners by cloning
+        var newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', function() {
+            deleteRound(tourn.id, parseInt(this.dataset.round));
         });
     });
 }
@@ -1261,7 +1267,11 @@ function showAddMatchModal(tournId, roundIndex) {
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;" id="match-available-participants">';
     availableParticipants.forEach(function(id) {
         var name = getParticipantName(id);
-        html += '<button class="small participant-tag" data-id="' + id + '" style="background:var(--panel-alt);border:1px solid var(--border);padding:4px 10px;border-radius:10px;cursor:pointer;">' + name + '</button>';
+        // Check if this participant has a status from previous round
+        var statusInfo = getParticipantStatusForRound(tourn, roundIndex + 1, id);
+        var statusLabel = statusInfo ? ' [' + statusInfo.label + ']' : '';
+        var statusColor = statusInfo ? statusInfo.color : 'var(--border)';
+        html += '<button class="small participant-tag" data-id="' + id + '" style="background:var(--panel-alt);border:1px solid ' + statusColor + ';padding:4px 10px;border-radius:10px;cursor:pointer;">' + name + statusLabel + '</button>';
     });
     html += '</div>';
     
@@ -1287,7 +1297,9 @@ function showAddMatchModal(tournId, roundIndex) {
             var html = '<div style="display:flex;flex-wrap:wrap;gap:4px;width:100%;">';
             selectedIds.forEach(function(id) {
                 var name = getParticipantName(id);
-                html += '<span style="background:var(--accent-soft);padding:2px 10px;border-radius:10px;font-size:0.75rem;border:1px solid var(--accent);display:inline-flex;align-items:center;gap:4px;">' + name + ' <button class="remove-selected small" data-id="' + id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">\u2715</button></span>';
+                var statusInfo = getParticipantStatusForRound(tourn, roundIndex + 1, id);
+                var statusLabel = statusInfo ? ' [' + statusInfo.label + ']' : '';
+                html += '<span style="background:var(--accent-soft);padding:2px 10px;border-radius:10px;font-size:0.75rem;border:1px solid var(--accent);display:inline-flex;align-items:center;gap:4px;">' + name + statusLabel + ' <button class="remove-selected small" data-id="' + id + '" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 2px;">\u2715</button></span>';
             });
             var remaining = matchSize - selectedIds.length;
             if (remaining > 0) {
@@ -1301,14 +1313,16 @@ function showAddMatchModal(tournId, roundIndex) {
         
         availableContainer.querySelectorAll('.participant-tag').forEach(function(btn) {
             var id = btn.dataset.id;
+            var statusInfo = getParticipantStatusForRound(tourn, roundIndex + 1, id);
+            var statusLabel = statusInfo ? ' [' + statusInfo.label + ']' : '';
             if (selectedIds.indexOf(id) !== -1) {
                 btn.style.background = 'var(--accent-soft)';
                 btn.style.borderColor = 'var(--accent)';
-                btn.textContent = getParticipantName(id) + ' \u2713';
+                btn.textContent = getParticipantName(id) + statusLabel + ' \u2713';
             } else {
                 btn.style.background = 'var(--panel-alt)';
-                btn.style.borderColor = 'var(--border)';
-                btn.textContent = getParticipantName(id);
+                btn.style.borderColor = statusInfo ? statusInfo.color : 'var(--border)';
+                btn.textContent = getParticipantName(id) + statusLabel;
             }
         });
     }
@@ -1384,6 +1398,27 @@ function showAddMatchModal(tournId, roundIndex) {
     
     updateSelection();
     modal.classList.remove('hidden');
+}
+
+/**
+ * Get participant status for a specific round (shows if they won/advanced/eliminated from previous round)
+ */
+function getParticipantStatusForRound(tourn, roundNumber, participantId) {
+    if (roundNumber <= 1) return null;
+    
+    var prevRound = tourn.rounds[roundNumber - 2];
+    if (!prevRound) return null;
+    
+    var status = getParticipantRoundStatus(tourn, roundNumber - 2, participantId);
+    
+    var statusMap = {
+        'winner': { label: 'Winner', color: 'var(--accent)' },
+        'advancing': { label: 'Advancing', color: 'var(--warning)' },
+        'eliminated': { label: 'Eliminated', color: 'var(--danger)' },
+        'pending': { label: 'Pending', color: 'var(--text-dim)' }
+    };
+    
+    return statusMap[status] || null;
 }
 
 function showEditMatchModal(tournId, roundIndex, matchIndex) {
@@ -1850,6 +1885,7 @@ function createRound() {
                             }
                         });
                     }
+                    // If there's no winner and no loser, all participants advance
                     if (!match.winner && !match.loser) {
                         match.participants.forEach(function(id) {
                             if (advancingIds.indexOf(id) === -1) {
@@ -1858,6 +1894,7 @@ function createRound() {
                         });
                     }
                 } else {
+                    // If match not completed, all participants advance
                     match.participants.forEach(function(id) {
                         if (advancingIds.indexOf(id) === -1) {
                             advancingIds.push(id);
@@ -1867,10 +1904,12 @@ function createRound() {
             });
         }
         
+        // Remove duplicates
         advancingIds = advancingIds.filter(function(id, index, self) {
             return self.indexOf(id) === index;
         });
         
+        // Remove eliminated participants
         if (tourn.eliminations) {
             advancingIds = advancingIds.filter(function(id) {
                 return !tourn.eliminations.some(function(e) { return String(e.participantId) === String(id); });
@@ -1884,33 +1923,9 @@ function createRound() {
             
             newRound.advancingFromPrevious = advancingIds;
             
-            if (newRound.matches.length === 0) {
-                var shuffled = advancingIds.slice();
-                for (var i = shuffled.length - 1; i > 0; i--) {
-                    var j = Math.floor(Math.random() * (i + 1));
-                    var temp = shuffled[i];
-                    shuffled[i] = shuffled[j];
-                    shuffled[j] = temp;
-                }
-                
-                for (var i = 0; i < shuffled.length; i += matchSize) {
-                    var matchParticipants = shuffled.slice(i, i + matchSize);
-                    if (matchParticipants.length >= 2) {
-                        newRound.matches.push({
-                            participants: matchParticipants,
-                            winner: null,
-                            loser: null,
-                            advancing: [],
-                            status: 'pending'
-                        });
-                    } else if (matchParticipants.length === 1 && newRound.matches.length > 0) {
-                        var lastMatch = newRound.matches[newRound.matches.length - 1];
-                        if (lastMatch.participants.length < matchSize) {
-                            lastMatch.participants.push(matchParticipants[0]);
-                        }
-                    }
-                }
-            }
+            // DO NOT auto-create matches - user will add them manually
+            // Just store the advancing participants for reference
+            newRound.availableParticipants = advancingIds.slice();
         }
         
         if ((!advancingIds || advancingIds.length < 2) && previousRound.matches && previousRound.matches.length > 0) {
@@ -1978,6 +1993,7 @@ function deleteMatch(tournId, roundIndex, matchIndex) {
     var tourn = getTournament(tournId);
     if (!tourn || !tourn.rounds || !tourn.rounds[roundIndex]) return;
     
+    // Single confirmation - removed the double prompt
     if (!confirm('Delete this match?')) return;
     
     tourn.rounds[roundIndex].matches.splice(matchIndex, 1);
@@ -2162,5 +2178,6 @@ window.renderRoundStatusSummary = renderRoundStatusSummary;
 window.showRoundStatusModal = showRoundStatusModal;
 window.renderParticipantStatusList = renderParticipantStatusList;
 window.renderMatchStatusList = renderMatchStatusList;
+window.getParticipantStatusForRound = getParticipantStatusForRound;
 
 console.log('tournaments-ui.js loaded');
