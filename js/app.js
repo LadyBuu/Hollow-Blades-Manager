@@ -254,6 +254,7 @@ function renderCharacters() {
     
     var statusFilter = document.getElementById('char-status-filter')?.value || 'all';
     var nameFilter = document.getElementById('char-name-filter')?.value?.toLowerCase() || '';
+    var hideEliminatedDeceased = document.getElementById('hide-eliminated-deceased')?.checked || false;
     
     if (data.characters.length === 0) {
         container.innerHTML = '<p class="empty-state">No characters created yet. Add your first character!</p>';
@@ -267,6 +268,12 @@ function renderCharacters() {
     });
     
     var filteredChars = sortedChars.filter(function(char) {
+        // Hide eliminated/deceased if checkbox is checked
+        if (hideEliminatedDeceased) {
+            if (char.deceased) return false;
+            if (char.eliminations && char.eliminations.length > 0) return false;
+        }
+        
         if (nameFilter) {
             var fullName = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
             if (fullName.indexOf(nameFilter) === -1) return false;
@@ -279,7 +286,10 @@ function renderCharacters() {
                 if (!hasElimination) return false;
             } else {
                 var status = getCurrentStatus(char).toLowerCase();
-                if (status !== statusFilter) return false;
+                // Check if the status matches or starts with the filter (for "Former" statuses)
+                if (status !== statusFilter && !status.startsWith(statusFilter + ' ')) {
+                    return false;
+                }
             }
         }
         return true;
@@ -428,13 +438,22 @@ function initCharacterEvents() {
         });
     }
     
+    var hideCheckbox = document.getElementById('hide-eliminated-deceased');
+    if (hideCheckbox) {
+        hideCheckbox.addEventListener('change', function() {
+            renderCharacters();
+        });
+    }
+    
     var clearFilter = document.getElementById('clear-char-filter');
     if (clearFilter) {
         clearFilter.addEventListener('click', function() {
             var statusFilter = document.getElementById('char-status-filter');
             var nameFilter = document.getElementById('char-name-filter');
+            var hideCheckbox = document.getElementById('hide-eliminated-deceased');
             if (statusFilter) statusFilter.value = 'all';
             if (nameFilter) nameFilter.value = '';
+            if (hideCheckbox) hideCheckbox.checked = false;
             renderCharacters();
         });
     }
@@ -446,7 +465,18 @@ function showCharacterForm(editId) {
     var formElement = document.getElementById('char-form');
     form.classList.remove('hidden');
     
-    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Find the character list item and scroll to it, not the top
+    var targetElement = form;
+    if (editId) {
+        // Try to find the list item for this character
+        var listItem = document.querySelector('.char-item[data-id="' + editId + '"]');
+        if (listItem) {
+            targetElement = listItem;
+        }
+    }
+    
+    // Scroll to the target element with smooth behavior
+    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     var deceasedCheck = document.getElementById('char-deceased');
     var deathFields = document.getElementById('death-fields');
@@ -691,7 +721,13 @@ function hideCharacterForm() {
     document.getElementById('character-form').classList.add('hidden');
     var list = document.getElementById('character-list');
     if (list) {
-        list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Scroll to the character list header instead of the top
+        var header = list.querySelector('.list-header');
+        if (header) {
+            header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 }
 
@@ -899,24 +935,67 @@ function getCharacterAge(char) {
     return age !== null ? age + ' yrs' : '-';
 }
 
+/**
+ * Get current career status for a character
+ * Returns the most recent status based on the career status history
+ * @param {Object} char - Character object
+ * @returns {string} Current status name
+ */
 function getCurrentStatus(char) {
     if (!char || !char.careerStatus || char.careerStatus.length === 0) {
         return 'Civilian';
     }
     
     var currentYear = data.currentYear || new Date().getFullYear();
-    var currentStatus = 'Civilian';
+    var mostRecentStatus = 'Civilian';
+    var mostRecentStart = -Infinity;
+    var hasExactMatch = false;
     
+    // First, check if any status exactly matches the current year
     char.careerStatus.forEach(function(status) {
         var start = parseInt(status.startYear);
         var end = status.endYear ? parseInt(status.endYear) : null;
         
-        if (!isNaN(start) && start <= currentYear && (end === null || currentYear <= end)) {
-            currentStatus = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+        if (!isNaN(start)) {
+            if (start <= currentYear && (end === null || currentYear <= end)) {
+                mostRecentStatus = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+                hasExactMatch = true;
+            }
         }
     });
     
-    return currentStatus;
+    if (hasExactMatch) {
+        return mostRecentStatus;
+    }
+    
+    // Otherwise, find the most recent status by start year
+    char.careerStatus.forEach(function(status) {
+        var start = parseInt(status.startYear);
+        var end = status.endYear ? parseInt(status.endYear) : null;
+        
+        if (!isNaN(start) && start <= currentYear) {
+            if (start > mostRecentStart) {
+                mostRecentStart = start;
+                mostRecentStatus = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+            }
+        }
+    });
+    
+    // Check if all roles have ended
+    var allEnded = true;
+    char.careerStatus.forEach(function(status) {
+        var start = parseInt(status.startYear);
+        var end = status.endYear ? parseInt(status.endYear) : null;
+        if (!isNaN(start) && start <= currentYear && (end === null || end >= currentYear)) {
+            allEnded = false;
+        }
+    });
+    
+    if (allEnded && mostRecentStatus !== 'Civilian' && mostRecentStart > -Infinity) {
+        return mostRecentStatus + ' (Former)';
+    }
+    
+    return mostRecentStatus;
 }
 
 function getCharacterTeamCount(charId) {
@@ -935,7 +1014,9 @@ function getStudents() {
         if (c.deceased) return false;
         var status = getCurrentStatus(c).toLowerCase();
         return status === 'trainee' || status === 'rookie' || 
-               status === 'junior' || status === 'student';
+               status === 'junior' || status === 'student' ||
+               status.startsWith('trainee') || status.startsWith('rookie') || 
+               status.startsWith('junior') || status.startsWith('student');
     }).sort(function(a, b) { return a.firstName.localeCompare(b.firstName); });
 }
 
