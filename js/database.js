@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'TournamentManagerDB';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const STORE_NAME = 'tournamentData';
 
 let db = null;
@@ -84,6 +84,42 @@ function loadData() {
                     };
                 }
                 
+                // Ensure social data exists
+                if (!loadedData.social) {
+                    loadedData.social = {
+                        relationships: [],
+                        relationshipTypes: [
+                            { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                            { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                            { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                            { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                            { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                            { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                            { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                            { id: 'other', label: 'Other', color: '#7f8c8d' }
+                        ],
+                        nextId: 1
+                    };
+                }
+                if (!loadedData.social.relationships) {
+                    loadedData.social.relationships = [];
+                }
+                if (!loadedData.social.relationshipTypes) {
+                    loadedData.social.relationshipTypes = [
+                        { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                        { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                        { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                        { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                        { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                        { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                        { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                        { id: 'other', label: 'Other', color: '#7f8c8d' }
+                    ];
+                }
+                if (!loadedData.social.nextId) {
+                    loadedData.social.nextId = 1;
+                }
+                
                 // Make sure global data is set
                 window.data = loadedData;
                 data = loadedData;
@@ -91,7 +127,8 @@ function loadData() {
                 console.log('Data loaded successfully:', {
                     tournaments: data.tournaments ? data.tournaments.length : 0,
                     characters: data.characters ? data.characters.length : 0,
-                    teams: data.teams ? data.teams.length : 0
+                    teams: data.teams ? data.teams.length : 0,
+                    social: data.social ? data.social.relationships.length : 0
                 });
                 
                 migrateData();
@@ -124,6 +161,20 @@ function loadData() {
                         instructorGroups: {},
                         disciplineGroups: {},
                         autoGroups: {}
+                    },
+                    social: {
+                        relationships: [],
+                        relationshipTypes: [
+                            { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                            { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                            { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                            { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                            { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                            { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                            { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                            { id: 'other', label: 'Other', color: '#7f8c8d' }
+                        ],
+                        nextId: 1
                     }
                 };
                 data = window.data;
@@ -186,6 +237,37 @@ function saveData() {
             };
         }
         
+        if (!data.social) {
+            data.social = {
+                relationships: [],
+                relationshipTypes: [
+                    { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                    { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                    { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                    { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                    { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                    { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                    { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                    { id: 'other', label: 'Other', color: '#7f8c8d' }
+                ],
+                nextId: 1
+            };
+        }
+        if (!data.social.relationships) data.social.relationships = [];
+        if (!data.social.relationshipTypes) {
+            data.social.relationshipTypes = [
+                { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                { id: 'other', label: 'Other', color: '#7f8c8d' }
+            ];
+        }
+        if (!data.social.nextId) data.social.nextId = 1;
+        
         // Ensure all tournaments have required fields
         data.tournaments.forEach(function(t) {
             if (!t.participants) t.participants = [];
@@ -203,7 +285,8 @@ function saveData() {
         console.log('Saving data to IndexedDB:', {
             tournaments: data.tournaments.length,
             characters: data.characters.length,
-            teams: data.teams.length
+            teams: data.teams.length,
+            social: data.social.relationships.length
         });
         
         const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -357,6 +440,48 @@ function migrateData() {
     if (!data.curriculum.grades) data.curriculum.grades = {};
     if (!data.curriculum.rankings) data.curriculum.rankings = {};
     if (!data.curriculum.currentWeek) data.curriculum.currentWeek = 1;
+    if (!data.curriculum.classInstructors) data.curriculum.classInstructors = {};
+    if (!data.curriculum.classLabels) data.curriculum.classLabels = {};
+    if (!data.curriculum.classGroupLabels) data.curriculum.classGroupLabels = {};
+    if (!data.curriculum.classDurations) data.curriculum.classDurations = {};
+    if (!data.curriculum.instructorClasses) data.curriculum.instructorClasses = {};
+    if (!data.curriculum.instructorTemplates) data.curriculum.instructorTemplates = {};
+    if (!data.curriculum.instructorBlocks) data.curriculum.instructorBlocks = {};
+    if (!data.curriculum.instructorGroups) data.curriculum.instructorGroups = {};
+    if (!data.curriculum.disciplineGroups) data.curriculum.disciplineGroups = {};
+    if (!data.curriculum.autoGroups) data.curriculum.autoGroups = {};
+    
+    // Social migration
+    if (!data.social) {
+        data.social = {
+            relationships: [],
+            relationshipTypes: [
+                { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                { id: 'other', label: 'Other', color: '#7f8c8d' }
+            ],
+            nextId: 1
+        };
+    }
+    if (!data.social.relationships) data.social.relationships = [];
+    if (!data.social.relationshipTypes) {
+        data.social.relationshipTypes = [
+            { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+            { id: 'professional', label: 'Professional', color: '#c9a24b' },
+            { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+            { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+            { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+            { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+            { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+            { id: 'other', label: 'Other', color: '#7f8c8d' }
+        ];
+    }
+    if (!data.social.nextId) data.social.nextId = 1;
     
     console.log('Migration complete');
 }
