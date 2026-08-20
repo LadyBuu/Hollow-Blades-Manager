@@ -1,6 +1,7 @@
 /**
  * missions.js - Mission Manager
  * Handles mission creation, assignment, tracking, and completion
+ * Professional and Temporary teams can be assigned to missions
  */
 
 // Mission state
@@ -306,46 +307,69 @@ function removeObjective(missionId, objectiveIndex) {
 }
 
 /**
- * Populate team selectors in forms - SHOWS ALL TEAM TYPES using team manager
+ * Populate team selectors in forms - SHOWS ALL TEAM TYPES
+ * Professional and Temporary teams are included for mission assignment
  */
 function populateTeamSelectors() {
     var select = document.getElementById('mission-team');
     if (!select) return;
     
-    // Use the team manager's filtered teams function if available
-    var teams = [];
-    if (typeof getFilteredTeams === 'function') {
-        // Get all active teams of all types
-        var academic = getFilteredTeams('academic', 'active');
-        var professional = getFilteredTeams('professional', 'active');
-        var temporary = getFilteredTeams('temporary', 'active');
-        teams = academic.concat(professional).concat(temporary);
-    } else {
-        // Fallback
-        teams = data.teams.filter(function(t) { 
-            return t.status !== 'deleted' && t.status !== 'inactive'; 
+    // Get all active teams of all types
+    var allTeams = data.teams.filter(function(t) { 
+        return t.status !== 'deleted' && t.status !== 'inactive'; 
+    });
+    
+    // Separate by type for better organization
+    var academicTeams = allTeams.filter(function(t) { return t.type === 'academic'; });
+    var professionalTeams = allTeams.filter(function(t) { return t.type === 'professional'; });
+    var temporaryTeams = allTeams.filter(function(t) { return t.type === 'temporary' || t.type === 'internship'; });
+    
+    // Sort each group by name
+    academicTeams.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    professionalTeams.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    temporaryTeams.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    
+    // Build the select with grouped options
+    select.innerHTML = '<option value="">Unassigned</option>';
+    
+    // Add Professional teams first (most common for missions)
+    if (professionalTeams.length > 0) {
+        var optGroup = document.createElement('optgroup');
+        optGroup.label = 'Professional Teams';
+        professionalTeams.forEach(function(team) {
+            var option = document.createElement('option');
+            option.value = team.id;
+            option.textContent = team.name;
+            optGroup.appendChild(option);
         });
+        select.appendChild(optGroup);
     }
     
-    // Sort by type then name
-    var typeOrder = { 'academic': 0, 'professional': 1, 'temporary': 2, 'internship': 2 };
-    teams.sort(function(a, b) {
-        var ta = typeOrder[a.type] !== undefined ? typeOrder[a.type] : 3;
-        var tb = typeOrder[b.type] !== undefined ? typeOrder[b.type] : 3;
-        if (ta !== tb) return ta - tb;
-        return a.name.localeCompare(b.name);
-    });
+    // Add Temporary teams
+    if (temporaryTeams.length > 0) {
+        var optGroup = document.createElement('optgroup');
+        optGroup.label = 'Temporary Teams';
+        temporaryTeams.forEach(function(team) {
+            var option = document.createElement('option');
+            option.value = team.id;
+            option.textContent = team.name;
+            optGroup.appendChild(option);
+        });
+        select.appendChild(optGroup);
+    }
     
-    select.innerHTML = '<option value="">Unassigned</option>';
-    teams.forEach(function(team) {
-        var option = document.createElement('option');
-        option.value = team.id;
-        var typeLabel = team.type === 'academic' ? 'Academic' : 
-                        team.type === 'professional' ? 'Professional' : 
-                        'Temporary';
-        option.textContent = team.name + ' (' + typeLabel + ')';
-        select.appendChild(option);
-    });
+    // Add Academic teams (for reference - though they shouldn't typically be assigned missions)
+    if (academicTeams.length > 0) {
+        var optGroup = document.createElement('optgroup');
+        optGroup.label = 'Academic Teams';
+        academicTeams.forEach(function(team) {
+            var option = document.createElement('option');
+            option.value = team.id;
+            option.textContent = team.name + ' (Academic)';
+            optGroup.appendChild(option);
+        });
+        select.appendChild(optGroup);
+    }
 }
 
 /**
@@ -505,6 +529,7 @@ function renderMissions() {
         var statusInfo = getStatusInfo(mission.status);
         var teamName = getTeamName(mission.assignedTeamId);
         var teamType = getTeamTypeLabel(mission.assignedTeamId);
+        var teamDisplay = teamName + (teamType ? ' (' + teamType + ')' : '');
         var progressBar = mission.progress || 0;
         var difficultyLabel = getDifficultyLabel(mission.difficulty);
         
@@ -517,7 +542,7 @@ function renderMissions() {
         html += '<span style="color:' + priorityInfo.color + ';font-size:0.75rem;">' + priorityInfo.label + '</span>';
         html += '<span style="font-size:0.75rem;">' + difficultyLabel + '</span>';
         html += '<span style="color:' + statusInfo.color + ';font-size:0.75rem;">' + statusInfo.label + '</span>';
-        html += '<span style="font-size:0.75rem;">' + teamName + (teamType ? ' (' + teamType + ')' : '') + '</span>';
+        html += '<span style="font-size:0.75rem;">' + teamDisplay + '</span>';
         html += '<span style="display:flex;align-items:center;gap:8px;">';
         html += '<div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;">';
         html += '<div style="height:100%;width:' + progressBar + '%;background:var(--accent);border-radius:3px;"></div>';
@@ -553,6 +578,7 @@ function showMissionDetail(id) {
     var statusInfo = getStatusInfo(mission.status);
     var teamName = getTeamName(mission.assignedTeamId);
     var teamType = getTeamTypeLabel(mission.assignedTeamId);
+    var teamDisplay = teamName + (teamType ? ' (' + teamType + ')' : '');
     var difficultyLabel = getDifficultyLabel(mission.difficulty);
     
     var progressBar = mission.progress || 0;
@@ -591,8 +617,6 @@ function showMissionDetail(id) {
         });
         tagsHtml += '</div>';
     }
-    
-    var teamDisplay = teamName + (teamType ? ' (' + teamType + ')' : '');
     
     content.innerHTML = `
         <div class="detail-row"><span class="label">Status:</span> <span style="color:${statusInfo.color};font-weight:600;">${statusInfo.label}</span></div>
