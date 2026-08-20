@@ -1,336 +1,62 @@
 /**
- * utils.js - Utility Functions
- * Shared helper functions used across the application
+ * app.js - Main Application Entry Point
+ * Initializes the application and handles dashboard functionality
  */
 
-/**
- * Generate a unique ID
- * @param {string} prefix - Optional prefix for the ID
- * @returns {string} Unique ID string
- */
-function generateId(prefix = 'id') {
-    return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-}
+// Global data reference
+var data = null;
 
 /**
- * Get week block information for a given week number
- * @param {number} weekNum - Week number (1-52)
- * @returns {Object} Object containing start, end, and label
+ * Initialize the application
  */
-function getWeekBlock(weekNum) {
-    const num = parseInt(weekNum) || 1;
-    const start = Math.floor((num - 1) / 2) * 2 + 1;
-    return {
-        start: start,
-        end: start + 1,
-        label: start + '-' + (start + 1)
-    };
-}
-
-/**
- * Get ranking block from a period value
- * @param {string|number} period - Period value (week number)
- * @returns {Object|null} Block information or null if invalid
- */
-function getRankingBlock(period) {
-    const num = parseInt(period);
-    if (isNaN(num)) return null;
-    return getWeekBlock(num);
-}
-
-/**
- * Calculate character age
- * @param {Object} char - Character object
- * @returns {number|null} Age or null if cannot calculate
- */
-function calculateAge(char) {
-    if (!char || !char.birthYear) return null;
-    const birthYear = parseInt(char.birthYear);
-    if (isNaN(birthYear)) return null;
+function initApp() {
+    console.log('Initializing app...');
     
-    if (char.deceased) {
-        if (char.deathAge) return parseInt(char.deathAge);
-        if (char.deathYear) {
-            const deathYear = parseInt(char.deathYear);
-            if (!isNaN(deathYear)) return deathYear - birthYear;
-        }
-        return null;
+    // Use the global loadData function from database.js
+    if (typeof loadData === 'function') {
+        console.log('Loading data from IndexedDB...');
+        loadData()
+            .then(function() {
+                console.log('Data loaded successfully');
+                onDataLoaded();
+            })
+            .catch(function(err) {
+                console.error('Failed to load data:', err);
+                initEmptyData();
+            });
+    } else if (window.db && typeof window.db.loadData === 'function') {
+        console.log('Loading data via db object...');
+        window.db.loadData()
+            .then(function() {
+                console.log('Data loaded successfully');
+                onDataLoaded();
+            })
+            .catch(function(err) {
+                console.error('Failed to load data:', err);
+                initEmptyData();
+            });
+    } else {
+        console.error('loadData function not available');
+        initEmptyData();
     }
-    
-    const currentYear = data.currentYear || new Date().getFullYear();
-    return currentYear - birthYear;
 }
 
-/**
- * Get character age as display string
- * @param {Object} char - Character object
- * @returns {string} Age or '-' if unknown
- */
-function getCharacterAge(char) {
-    const age = calculateAge(char);
-    return age !== null ? age + ' yrs' : '-';
-}
-
-/**
- * Get current career status for a character
- * @param {Object} char - Character object
- * @returns {string} Current status name
- */
-function getCurrentStatus(char) {
-    if (!char || !char.careerStatus || char.careerStatus.length === 0) {
-        return 'Civilian';
-    }
-    
-    const currentYear = data.currentYear || new Date().getFullYear();
-    let currentStatus = 'Civilian';
-    
-    char.careerStatus.forEach(status => {
-        const start = parseInt(status.startYear);
-        const end = status.endYear ? parseInt(status.endYear) : null;
-        
-        if (!isNaN(start) && start <= currentYear && (end === null || currentYear <= end)) {
-            currentStatus = status.status.charAt(0).toUpperCase() + status.status.slice(1);
-        }
-    });
-    
-    return currentStatus;
-}
-
-/**
- * Count teams a character belongs to
- * @param {string} charId - Character ID
- * @returns {number|string} Team count or '-' if none
- */
-function getCharacterTeamCount(charId) {
-    let count = 0;
-    data.teams.forEach(team => {
-        if (team.members && team.members.some(m => String(m.characterId) === String(charId))) {
-            count++;
-        }
-    });
-    return count > 0 ? count : '-';
-}
-
-/**
- * Get participant name from participant object
- * @param {Object} participant - Participant object with type and id
- * @param {Object} tourn - Tournament context (optional)
- * @returns {string} Display name
- */
-function getParticipantName(participant, tourn) {
-    if (!participant) return 'Unknown';
-    
-    // Handle string input
-    if (typeof participant === 'string') {
-        // Try to find as team
-        var team = data.teams.find(function(t) { return t.name === participant; });
-        if (team) return team.name;
-        // Try to find as character
-        var char = data.characters.find(function(c) {
-            var fullName = [c.firstName, c.middleName, c.lastName]
-                .filter(function(n) { return n; })
-                .join(' ');
-            return fullName === participant;
-        });
-        if (char) return [char.firstName, char.middleName, char.lastName]
-            .filter(function(n) { return n; })
-            .join(' ');
-        return participant;
-    }
-    
-    // Handle object participant
-    if (participant.type === 'char') {
-        var char = data.characters.find(function(c) { return String(c.id) === String(participant.id); });
-        if (char) {
-            return [char.firstName, char.middleName, char.lastName]
-                .filter(function(n) { return n; })
-                .join(' ');
-        }
-        // Try to find character by ID in any format
-        for (var i = 0; i < data.characters.length; i++) {
-            if (String(data.characters[i].id) === String(participant.id)) {
-                var c = data.characters[i];
-                return [c.firstName, c.middleName, c.lastName]
-                    .filter(function(n) { return n; })
-                    .join(' ');
-            }
-        }
-        return 'Unknown Character';
-    } else if (participant.type === 'team') {
-        var team = data.teams.find(function(t) { return String(t.id) === String(participant.id); });
-        if (team) return team.name;
-        // Try to find team by ID in any format
-        for (var i = 0; i < data.teams.length; i++) {
-            if (String(data.teams[i].id) === String(participant.id)) {
-                return data.teams[i].name;
-            }
-        }
-        return 'Unknown Team';
-    }
-    
-    return 'Unknown';
-}
-
-/**
- * Get active academic teams for a given week
- * @param {number} week - Week number
- * @param {string} excludeTournamentId - Optional tournament ID to exclude
- * @returns {Array} Array of active academic teams
- */
-function getActiveTeamsForWeek(week, excludeTournamentId) {
-    const weekNum = parseInt(week) || 1;
-    const block = getWeekBlock(weekNum);
-    
-    return data.teams.filter(team => {
-        if (team.status === 'deleted' || team.status === 'inactive') return false;
-        if (team.type !== 'academic') return false;
-        
-        const start = parseInt(team.startPeriod);
-        const end = parseInt(team.endPeriod);
-        if (isNaN(start)) return false;
-        
-        return start <= block.end && (isNaN(end) || end >= block.start);
-    }).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Get all active teams (all types)
- * @param {string} excludeTournamentId - Optional tournament ID to exclude
- * @returns {Array} Array of all active teams
- */
-function getAllActiveTeams(excludeTournamentId) {
-    return data.teams.filter(team => {
-        if (team.status === 'deleted' || team.status === 'inactive') return false;
-        return true;
-    }).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Get teams of a specific type
- * @param {string} type - Team type (academic, professional, temporary)
- * @param {string} status - Status filter (active, inactive, all)
- * @returns {Array} Array of filtered teams
- */
-function getTeamsByType(type, status) {
-    var teams = data.teams.filter(function(t) {
-        if (t.status === 'deleted') return false;
-        if (t.type !== type) return false;
-        return true;
-    });
-    
-    if (status === 'active') {
-        teams = teams.filter(function(t) { return t.status === 'active'; });
-    } else if (status === 'inactive') {
-        teams = teams.filter(function(t) { return t.status === 'inactive' || t.status === 'deprecated'; });
-    }
-    
-    return teams.sort(function(a, b) {
-        return a.name.localeCompare(b.name);
-    });
-}
-
-/**
- * Log an activity entry
- * @param {string} message - Activity message
- * @param {string} type - Activity type (info, warning, etc.)
- */
-function logActivity(message, type = 'info') {
-    if (!data.activities) data.activities = [];
-    data.activities.unshift({
-        id: generateId(),
-        message: message,
-        type: type,
-        timestamp: new Date().toISOString()
-    });
-    
-    if (data.activities.length > 100) {
-        data.activities = data.activities.slice(0, 100);
-    }
-    
-    saveData().catch(err => console.warn('Failed to save activity:', err));
-}
-
-/**
- * Get students (trainees, rookies, juniors from character list)
- * @returns {Array} Array of student characters
- */
-function getStudents() {
-    if (!data.characters) return [];
-    return data.characters.filter(c => {
-        if (c.deceased) return false;
-        const status = getCurrentStatus(c).toLowerCase();
-        return status === 'trainee' || status === 'rookie' || 
-               status === 'junior' || status === 'student';
-    }).sort((a, b) => a.firstName.localeCompare(b.firstName));
-}
-
-/**
- * Get non-civilian characters (trainee, rookie, junior, senior, instructor, support)
- * @returns {Array} Array of non-civilian characters
- */
-function getNonCivilianCharacters() {
-    if (!data.characters) return [];
-    return data.characters.filter(c => {
-        if (c.deceased) return false;
-        const status = getCurrentStatus(c).toLowerCase();
-        return status !== 'civilian' && status !== '';
-    }).sort((a, b) => a.firstName.localeCompare(b.firstName));
-}
-
-/**
- * Get instructors from character list
- * @returns {Array} Array of instructor characters
- */
-function getInstructors() {
-    if (!data.characters) return [];
-    return data.characters.filter(c => {
-        if (c.deceased) return false;
-        const status = getCurrentStatus(c).toLowerCase();
-        return status === 'instructor' || status === 'teacher' || 
-               status === 'professor' || status === 'senior';
-    }).sort((a, b) => a.firstName.localeCompare(b.firstName));
-}
-
-/**
- * Get a discipline by ID
- * @param {string} id - Discipline ID
- * @returns {Object|null} Discipline object or null
- */
-function getDiscipline(id) {
-    if (!data.curriculum || !data.curriculum.disciplines) return null;
-    return data.curriculum.disciplines.find(d => String(d.id) === String(id));
-}
-
-/**
- * Get available disciplines for a week
- * @param {number} week - Week number
- * @returns {Array} Array of available disciplines
- */
-function getAvailableDisciplines(week) {
-    if (!data.curriculum || !data.curriculum.disciplines) return [];
-    const weekNum = parseInt(week) || 1;
-    return data.curriculum.disciplines.filter(d => {
-        const start = parseInt(d.startWeek);
-        const end = parseInt(d.endWeek);
-        return !isNaN(start) && start <= weekNum && (isNaN(end) || end >= weekNum);
-    });
-}
-
-/**
- * Get student schedule for a week
- * @param {string} studentId - Student ID
- * @param {number} week - Week number
- * @returns {Object} Schedule object
- */
-function getStudentSchedule(studentId, week) {
-    if (!data.curriculum) {
-        data.curriculum = { 
-            disciplines: [], 
-            schedules: {}, 
-            restDays: {}, 
-            examDays: {}, 
-            grades: {}, 
-            rankings: {}, 
+function initEmptyData() {
+    data = {
+        characters: [],
+        teams: [],
+        tournaments: [],
+        missions: [],
+        activities: [],
+        currentYear: new Date().getFullYear(),
+        currentWeek: 1,
+        curriculum: {
+            disciplines: [],
+            schedules: {},
+            restDays: {},
+            examDays: {},
+            grades: {},
+            rankings: {},
             currentWeek: 1,
             classInstructors: {},
             classLabels: {},
@@ -342,142 +68,877 @@ function getStudentSchedule(studentId, week) {
             instructorGroups: {},
             disciplineGroups: {},
             autoGroups: {}
+        },
+        social: {
+            relationships: [],
+            relationshipTypes: [
+                { id: 'familiar', label: 'Familiar', color: '#8cbb3a' },
+                { id: 'professional', label: 'Professional', color: '#c9a24b' },
+                { id: 'romantic', label: 'Romantic', color: '#c1453c' },
+                { id: 'friendship', label: 'Friendship', color: '#4a9bc7' },
+                { id: 'mentor', label: 'Mentor/Mentee', color: '#9b59b6' },
+                { id: 'rivalry', label: 'Rivalry', color: '#e67e22' },
+                { id: 'alliance', label: 'Alliance', color: '#27ae60' },
+                { id: 'other', label: 'Other', color: '#7f8c8d' }
+            ],
+            nextId: 1
+        }
+    };
+    console.warn('Using empty data fallback');
+    onDataLoaded();
+}
+
+function onDataLoaded() {
+    if (typeof initImportExport === 'function') {
+        initImportExport();
+    }
+    if (typeof initMissionsSystem === 'function') {
+        initMissionsSystem();
+    }
+    if (typeof initTeamManagerSystem === 'function') {
+        initTeamManagerSystem();
+    }
+    if (typeof initScheduleSystem === 'function') {
+        initScheduleSystem();
+    }
+    if (typeof initStudentScheduleSystem === 'function') {
+        initStudentScheduleSystem();
+    }
+    if (typeof initSocialSystem === 'function') {
+        initSocialSystem();
+    }
+    
+    updateDashboardStats();
+    
+    var yearDisplay = document.getElementById('header-current-year');
+    if (yearDisplay) {
+        yearDisplay.addEventListener('click', function() {
+            showYearModal();
+        });
+    }
+    
+    console.log('App initialized with:', {
+        characters: data.characters ? data.characters.length : 0,
+        teams: data.teams ? data.teams.length : 0,
+        tournaments: data.tournaments ? data.tournaments.length : 0,
+        missions: data.missions ? data.missions.length : 0,
+        social: data.social ? data.social.relationships.length : 0
+    });
+    
+    renderAll();
+}
+
+function updateDashboardStats() {
+    var charCount = document.getElementById('char-count');
+    var teamCount = document.getElementById('team-count');
+    var tournCount = document.getElementById('tournament-count');
+    var studentCount = document.getElementById('student-count');
+    var disciplineCount = document.getElementById('discipline-count');
+    var missionCount = document.getElementById('mission-count');
+    var socialCount = document.getElementById('social-count');
+    var yearDisplay = document.getElementById('header-current-year');
+    
+    if (charCount) charCount.textContent = data.characters ? data.characters.length : 0;
+    if (teamCount) {
+        var activeTeams = data.teams ? data.teams.filter(function(t) { return t.status !== 'deleted'; }).length : 0;
+        teamCount.textContent = activeTeams;
+    }
+    if (tournCount) tournCount.textContent = data.tournaments ? data.tournaments.length : 0;
+    if (studentCount) {
+        var students = typeof getStudents === 'function' ? getStudents() : [];
+        studentCount.textContent = students.length;
+    }
+    if (disciplineCount) {
+        var count = data.curriculum && data.curriculum.disciplines ? data.curriculum.disciplines.length : 0;
+        disciplineCount.textContent = count;
+    }
+    if (missionCount) {
+        missionCount.textContent = data.missions ? data.missions.length : 0;
+    }
+    if (socialCount) {
+        socialCount.textContent = data.social && data.social.relationships ? data.social.relationships.length : 0;
+    }
+    if (yearDisplay) yearDisplay.textContent = data.currentYear || new Date().getFullYear();
+}
+
+function showYearModal() {
+    var currentYear = data.currentYear || new Date().getFullYear();
+    var newYear = prompt('Enter the current year:', currentYear);
+    if (newYear !== null && newYear !== '') {
+        var yearNum = parseInt(newYear);
+        if (!isNaN(yearNum) && yearNum > 0) {
+            data.currentYear = yearNum;
+            if (typeof saveData === 'function') {
+                saveData().then(function() {
+                    if (typeof logActivity === 'function') {
+                        logActivity('Set current year to ' + yearNum);
+                    }
+                    updateDashboardStats();
+                }).catch(function(err) {
+                    console.error('Failed to save year:', err);
+                    alert('Failed to save year. Please try again.');
+                });
+            } else {
+                updateDashboardStats();
+            }
+        } else {
+            alert('Please enter a valid year (positive number).');
+        }
+    }
+}
+
+function renderAll() {
+    var path = window.location.pathname;
+    var page = path.split('/').pop() || 'index.html';
+    
+    console.log('Rendering page:', page);
+    
+    if (!data) {
+        console.warn('Data not initialized yet, waiting...');
+        return;
+    }
+    
+    if (page === 'index.html' || page === '') {
+        updateDashboardStats();
+    } else if (page === 'characters.html') {
+        if (typeof renderCharacters === 'function') {
+            renderCharacters();
+        }
+        if (typeof initCharacterEvents === 'function') {
+            initCharacterEvents();
+        }
+    } else if (page === 'tournaments.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderTournamentsView === 'function') {
+            renderTournamentsView(container);
+        } else {
+            console.error('renderTournamentsView not found');
+        }
+    } else if (page === 'curriculum.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderCurriculumView === 'function') {
+            renderCurriculumView(container);
+        }
+    } else if (page === 'missions.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderMissionsView === 'function') {
+            renderMissionsView(container);
+        }
+    } else if (page === 'team-manager.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderTeamManagerView === 'function') {
+            renderTeamManagerView(container);
+        }
+    } else if (page === 'social.html') {
+        var container = document.getElementById('app-container');
+        if (container && typeof renderSocialView === 'function') {
+            renderSocialView(container);
+        } else {
+            console.error('renderSocialView not found');
+        }
+    }
+}
+
+// ============================================================
+// CHARACTER FUNCTIONS
+// ============================================================
+
+function renderCharacters() {
+    var container = document.getElementById('characters-container');
+    if (!container) return;
+    
+    if (!data || !data.characters) {
+        container.innerHTML = '<p class="empty-state">No characters created yet. Add your first character!</p>';
+        return;
+    }
+    
+    var statusFilter = document.getElementById('char-status-filter')?.value || 'all';
+    var nameFilter = document.getElementById('char-name-filter')?.value?.toLowerCase() || '';
+    
+    if (data.characters.length === 0) {
+        container.innerHTML = '<p class="empty-state">No characters created yet. Add your first character!</p>';
+        return;
+    }
+    
+    var sortedChars = data.characters.slice().sort(function(a, b) {
+        if (a.deceased && !b.deceased) return 1;
+        if (!a.deceased && b.deceased) return -1;
+        return (a.firstName || '').toLowerCase().localeCompare((b.firstName || '').toLowerCase());
+    });
+    
+    var filteredChars = sortedChars.filter(function(char) {
+        if (nameFilter) {
+            var fullName = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
+            if (fullName.indexOf(nameFilter) === -1) return false;
+        }
+        if (statusFilter !== 'all') {
+            if (statusFilter === 'deceased') {
+                if (!char.deceased) return false;
+            } else if (statusFilter === 'eliminated') {
+                var hasElimination = char.eliminations && char.eliminations.length > 0;
+                if (!hasElimination) return false;
+            } else {
+                var status = getCurrentStatus(char).toLowerCase();
+                if (status !== statusFilter) return false;
+            }
+        }
+        return true;
+    });
+    
+    if (filteredChars.length === 0) {
+        container.innerHTML = '<p class="empty-state">No characters match the current filters.</p>';
+        return;
+    }
+    
+    var html = '';
+    filteredChars.forEach(function(char) {
+        var fullName = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
+        var age = calculateAge(char);
+        var ageDisplay = age !== null ? age + ' yrs' : '-';
+        var status = getCurrentStatus(char);
+        var teamCount = getCharacterTeamCount(char.id);
+        var isDead = char.deceased || false;
+        var deadClass = isDead ? ' deceased' : '';
+        var deadBadge = isDead ? ' <span class="deceased-badge">Deceased</span>' : '';
+        
+        var hasTournamentElim = false;
+        var hasStandalone = false;
+        var latestElimWeek = null;
+        var tournamentNames = [];
+        
+        if (char.eliminations && char.eliminations.length > 0) {
+            char.eliminations.forEach(function(elim) {
+                if (elim.standalone) {
+                    hasStandalone = true;
+                } else {
+                    hasTournamentElim = true;
+                    if (elim.tournamentId) {
+                        var tourn = data.tournaments ? data.tournaments.find(function(t) { return String(t.id) === String(elim.tournamentId); }) : null;
+                        if (tourn) {
+                            tournamentNames.push(tourn.name);
+                        }
+                    }
+                }
+                var week = parseInt(elim.week);
+                if (!isNaN(week) && (latestElimWeek === null || week > latestElimWeek)) {
+                    latestElimWeek = week;
+                }
+            });
+        }
+        
+        var elimBadges = '';
+        if (hasStandalone) {
+            elimBadges += ' <span class="eliminated-badge">Standalone Eliminated</span>';
+        }
+        if (hasTournamentElim) {
+            var tournDisplay = tournamentNames.length > 0 ? ' (' + tournamentNames.slice(0, 2).join(', ') + (tournamentNames.length > 2 ? ' +' + (tournamentNames.length - 2) : '') + ')' : '';
+            elimBadges += ' <span class="eliminated-badge">Tournament Eliminated' + tournDisplay + '</span>';
+        }
+        var elimWeekBadge = latestElimWeek !== null ? ' <span class="warning-badge">Wk ' + latestElimWeek + '</span>' : '';
+        
+        html += '<div class="list-item char-item' + deadClass + '" data-id="' + char.id + '">' +
+            '<span><strong>' + fullName + '</strong>' + deadBadge + elimBadges + elimWeekBadge + '</span>' +
+            '<span>' + ageDisplay + '</span>' +
+            '<span>' + status + '</span>' +
+            '<span>' + teamCount + '</span>' +
+            '<span class="actions">' +
+                '<button class="small edit-character" data-id="' + char.id + '">Edit</button>' +
+                '<button class="small danger delete-character" data-id="' + char.id + '">Delete</button>' +
+            '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+    
+    container.querySelectorAll('.edit-character').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showCharacterForm(btn.dataset.id);
+        });
+    });
+    container.querySelectorAll('.delete-character').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            deleteCharacter(btn.dataset.id);
+        });
+    });
+}
+
+function initCharacterEvents() {
+    var addBtn = document.getElementById('add-character-btn');
+    if (addBtn) {
+        var newAddBtn = addBtn.cloneNode(true);
+        addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+        newAddBtn.addEventListener('click', function() { showCharacterForm(); });
+    }
+    
+    var cancelBtn = document.getElementById('cancel-char-btn');
+    if (cancelBtn) {
+        var newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+        newCancelBtn.addEventListener('click', hideCharacterForm);
+    }
+    
+    var form = document.getElementById('char-form');
+    if (form) {
+        var newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+        newForm.addEventListener('submit', saveCharacter);
+    }
+    
+    var addStatusBtn = document.getElementById('add-status-btn');
+    if (addStatusBtn) {
+        var newStatusBtn = addStatusBtn.cloneNode(true);
+        addStatusBtn.parentNode.replaceChild(newStatusBtn, addStatusBtn);
+        newStatusBtn.addEventListener('click', function() {
+            var container = document.getElementById('career-status-container');
+            addCareerStatusEntry(container);
+        });
+    }
+    
+    var addStandaloneElimBtn = document.getElementById('add-standalone-elim-btn');
+    if (addStandaloneElimBtn) {
+        var newElimBtn = addStandaloneElimBtn.cloneNode(true);
+        addStandaloneElimBtn.parentNode.replaceChild(newElimBtn, addStandaloneElimBtn);
+        newElimBtn.addEventListener('click', function() {
+            addStandaloneElimination();
+        });
+    }
+    
+    var deceasedCheck = document.getElementById('char-deceased');
+    if (deceasedCheck) {
+        deceasedCheck.addEventListener('change', function() {
+            var deathFields = document.getElementById('death-fields');
+            if (deathFields) {
+                deathFields.style.display = this.checked ? 'block' : 'none';
+            }
+        });
+    }
+    
+    var statusFilter = document.getElementById('char-status-filter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            renderCharacters();
+        });
+    }
+    
+    var nameFilter = document.getElementById('char-name-filter');
+    if (nameFilter) {
+        nameFilter.addEventListener('input', function() {
+            renderCharacters();
+        });
+    }
+    
+    var clearFilter = document.getElementById('clear-char-filter');
+    if (clearFilter) {
+        clearFilter.addEventListener('click', function() {
+            var statusFilter = document.getElementById('char-status-filter');
+            var nameFilter = document.getElementById('char-name-filter');
+            if (statusFilter) statusFilter.value = 'all';
+            if (nameFilter) nameFilter.value = '';
+            renderCharacters();
+        });
+    }
+}
+
+function showCharacterForm(editId) {
+    var form = document.getElementById('character-form');
+    var title = document.getElementById('form-title');
+    var formElement = document.getElementById('char-form');
+    form.classList.remove('hidden');
+    
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    var deceasedCheck = document.getElementById('char-deceased');
+    var deathFields = document.getElementById('death-fields');
+    if (deceasedCheck) {
+        deceasedCheck.onchange = function() {
+            if (deathFields) {
+                deathFields.style.display = this.checked ? 'block' : 'none';
+            }
         };
     }
-    if (!data.curriculum.schedules) {
-        data.curriculum.schedules = {};
-    }
-    if (!data.curriculum.schedules[studentId]) {
-        data.curriculum.schedules[studentId] = {};
-    }
-    if (!data.curriculum.schedules[studentId][week]) {
-        data.curriculum.schedules[studentId][week] = {};
-    }
-    return data.curriculum.schedules[studentId][week];
-}
-
-/**
- * Get total hours for a student in a week
- * @param {string} studentId - Student ID
- * @param {number} week - Week number
- * @returns {number} Total hours
- */
-function getTotalHours(studentId, week) {
-    const schedule = getStudentSchedule(studentId, week);
-    let total = 0;
-    for (const day in schedule) {
-        for (const hour in schedule[day]) {
-            if (schedule[day][hour]) total++;
-        }
-    }
-    return total;
-}
-
-/**
- * Get hours used per discipline for a student in a week
- * @param {string} studentId - Student ID
- * @param {number} week - Week number
- * @returns {Object} Object mapping discipline IDs to hours used
- */
-function getDisciplineHours(studentId, week) {
-    const schedule = getStudentSchedule(studentId, week);
-    const hours = {};
-    for (const day in schedule) {
-        for (const hour in schedule[day]) {
-            const disciplineId = schedule[day][hour];
-            if (disciplineId) {
-                if (!hours[disciplineId]) hours[disciplineId] = 0;
-                hours[disciplineId]++;
-            }
-        }
-    }
-    return hours;
-}
-
-/**
- * Check if a character is eliminated in a specific week
- * @param {string} charId - Character ID
- * @param {number} week - Week number
- * @returns {boolean} True if eliminated
- */
-function isCharacterEliminated(charId, week) {
-    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
-    if (!char) return false;
-    if (char.deceased) return true;
     
-    if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
-        var weekNum = parseInt(week) || 1;
-        for (var i = 0; i < char.eliminatedWeeks.length; i++) {
-            var elimWeek = parseInt(char.eliminatedWeeks[i]);
-            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
-                return true;
+    if (editId) {
+        title.textContent = 'Edit Character';
+        var char = data.characters.find(function(c) { return String(c.id) === String(editId); });
+        if (char) {
+            document.getElementById('char-firstname').value = char.firstName || '';
+            document.getElementById('char-middlename').value = char.middleName || '';
+            document.getElementById('char-lastname').value = char.lastName || '';
+            document.getElementById('char-birthyear').value = char.birthYear || '';
+            document.getElementById('char-gender').value = char.gender || '';
+            document.getElementById('char-associated-names').value = char.associatedNames || '';
+            document.getElementById('char-eyes').value = char.eyes || '';
+            document.getElementById('char-hair').value = char.hair || '';
+            document.getElementById('char-skin').value = char.skin || '';
+            document.getElementById('char-height').value = char.height || '';
+            document.getElementById('char-build').value = char.build || '';
+            document.getElementById('char-appearance-notes').value = char.appearanceNotes || '';
+            document.getElementById('char-notes').value = char.notes || '';
+            document.getElementById('char-specialty').value = char.specialty || '';
+            document.getElementById('char-deceased').checked = char.deceased || false;
+            document.getElementById('char-death-year').value = char.deathYear || '';
+            document.getElementById('char-death-cause').value = char.deathCause || '';
+            document.getElementById('char-death-age').value = char.deathAge || '';
+            if (deathFields) {
+                deathFields.style.display = char.deceased ? 'block' : 'none';
             }
+            
+            var container = document.getElementById('career-status-container');
+            container.innerHTML = '';
+            if (char.careerStatus && char.careerStatus.length > 0) {
+                char.careerStatus.forEach(function(status) {
+                    addCareerStatusEntry(container, status.status, status.startYear, status.endYear);
+                });
+            } else {
+                addCareerStatusEntry(container);
+            }
+            
+            renderStandaloneEliminations(char);
+            renderTournamentEliminations(char);
+            
+            formElement.dataset.editId = editId;
+            document.getElementById('standalone-char-id').value = editId;
+        }
+    } else {
+        title.textContent = 'Add Character';
+        formElement.reset();
+        delete formElement.dataset.editId;
+        if (deathFields) deathFields.style.display = 'none';
+        
+        var container = document.getElementById('career-status-container');
+        container.innerHTML = '';
+        addCareerStatusEntry(container);
+        
+        document.getElementById('char-specialty').value = '';
+        var specialtyField = document.getElementById('specialty-field');
+        if (specialtyField) specialtyField.style.display = 'none';
+        
+        var standaloneContainer = document.getElementById('standalone-eliminations-container');
+        if (standaloneContainer) standaloneContainer.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No standalone eliminations recorded.</p>';
+        document.getElementById('standalone-char-id').value = '';
+        document.getElementById('standalone-elim-week').value = 1;
+        document.getElementById('standalone-elim-reason').value = '';
+        
+        var tournContainer = document.getElementById('tournament-eliminations-view');
+        if (tournContainer) {
+            tournContainer.innerHTML = '<p class="empty-state" style="padding:6px;font-size:0.75rem;">No tournament eliminations recorded.</p>';
         }
     }
-    return false;
+    setTimeout(function() {
+        var firstName = document.getElementById('char-firstname');
+        if (firstName) firstName.focus();
+    }, 300);
 }
 
-/**
- * Get all characters eliminated in a specific week
- * @param {number} week - Week number
- * @returns {Array} Array of eliminated character IDs
- */
-function getEliminatedCharacters(week) {
-    var weekNum = parseInt(week) || 1;
-    var result = [];
-    data.characters.forEach(function(char) {
-        if (isCharacterEliminated(char.id, weekNum)) {
-            result.push(char.id);
+function renderTournamentEliminations(char) {
+    var container = document.getElementById('tournament-eliminations-view');
+    if (!container) return;
+    
+    var tournElims = [];
+    if (char.eliminations) {
+        tournElims = char.eliminations.filter(function(e) { return !e.standalone; });
+    }
+    
+    if (tournElims.length === 0) {
+        container.innerHTML = '<p class="empty-state" style="padding:6px;font-size:0.75rem;">No tournament eliminations recorded.</p>';
+        return;
+    }
+    
+    var html = '';
+    tournElims.forEach(function(elim) {
+        var tournName = 'Unknown Tournament';
+        if (elim.tournamentId && data.tournaments) {
+            var tourn = data.tournaments.find(function(t) { return String(t.id) === String(elim.tournamentId); });
+            if (tourn) tournName = tourn.name;
+        }
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--info-soft);border-radius:4px;margin-bottom:2px;border-left:3px solid var(--info);">';
+        html += '<span style="font-size:0.75rem;"><strong>' + tournName + '</strong> - Week ' + elim.week + (elim.reason ? ' (' + elim.reason + ')' : '') + '</span>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function renderStandaloneEliminations(char) {
+    var container = document.getElementById('standalone-eliminations-container');
+    if (!container) return;
+    
+    var standaloneElims = [];
+    if (char.eliminations) {
+        standaloneElims = char.eliminations.filter(function(e) { return e.standalone; });
+    }
+    
+    if (standaloneElims.length === 0) {
+        container.innerHTML = '<p class="empty-state" style="padding:8px;font-size:0.8rem;">No standalone eliminations recorded.</p>';
+        return;
+    }
+    
+    var html = '';
+    standaloneElims.forEach(function(elim, index) {
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--warning-soft);border-radius:4px;margin-bottom:2px;border-left:3px solid var(--warning);">';
+        html += '<span style="font-size:0.75rem;">Week ' + elim.week + (elim.reason ? ' - ' + elim.reason : '') + ' <span style="color:var(--warning);font-size:0.6rem;">[Standalone]</span></span>';
+        html += '<button class="remove-standalone-elim small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 4px;" data-index="' + index + '">✕</button>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+    
+    container.querySelectorAll('.remove-standalone-elim').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            removeStandaloneElimination(char.id, parseInt(this.dataset.index));
+        });
+    });
+}
+
+function addStandaloneElimination() {
+    var charId = document.getElementById('standalone-char-id')?.value;
+    if (!charId) {
+        alert('Please select a character first.');
+        return;
+    }
+    
+    var week = parseInt(document.getElementById('standalone-elim-week')?.value) || 1;
+    var reason = document.getElementById('standalone-elim-reason')?.value || 'Dropped out';
+    
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char) {
+        alert('Character not found.');
+        return;
+    }
+    
+    var alreadyEliminated = false;
+    if (char.eliminatedWeeks) {
+        char.eliminatedWeeks.forEach(function(w) {
+            if (parseInt(w) <= week) {
+                alreadyEliminated = true;
+            }
+        });
+    }
+    
+    if (alreadyEliminated) {
+        alert('This character is already eliminated at or before week ' + week + '.');
+        return;
+    }
+    
+    if (!char.eliminations) char.eliminations = [];
+    if (!char.eliminatedWeeks) char.eliminatedWeeks = [];
+    
+    char.eliminations.push({
+        tournamentId: null,
+        week: week,
+        reason: reason,
+        standalone: true
+    });
+    
+    char.eliminatedWeeks.push(week);
+    char.eliminatedWeeks.sort(function(a, b) { return a - b; });
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Eliminated ' + char.firstName + ' (standalone, Week ' + week + '): ' + reason);
+    }
+    
+    if (typeof saveData === 'function') {
+        saveData().then(function() {
+            renderCharacters();
+            var form = document.getElementById('character-form');
+            if (form && !form.classList.contains('hidden')) {
+                showCharacterForm(charId);
+            }
+            alert('Character eliminated successfully!');
+        }).catch(function(err) {
+            console.error('Failed to save:', err);
+            alert('Failed to save elimination.');
+        });
+    } else {
+        renderCharacters();
+        alert('Character eliminated successfully! (Data not saved to IndexedDB)');
+    }
+}
+
+function removeStandaloneElimination(charId, index) {
+    if (!confirm('Remove this standalone elimination?')) return;
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (!char || !char.eliminations) return;
+    
+    var elim = char.eliminations[index];
+    if (!elim || !elim.standalone) return;
+    
+    if (char.eliminatedWeeks) {
+        var weekIdx = char.eliminatedWeeks.indexOf(parseInt(elim.week));
+        if (weekIdx !== -1) {
+            char.eliminatedWeeks.splice(weekIdx, 1);
+        }
+    }
+    
+    char.eliminations.splice(index, 1);
+    
+    if (typeof saveData === 'function') {
+        saveData().then(function() {
+            renderCharacters();
+            showCharacterForm(charId);
+            alert('Standalone elimination removed.');
+        }).catch(function(err) {
+            console.error('Failed to save:', err);
+            alert('Failed to remove elimination.');
+        });
+    } else {
+        renderCharacters();
+        showCharacterForm(charId);
+        alert('Standalone elimination removed.');
+    }
+}
+
+function hideCharacterForm() {
+    document.getElementById('character-form').classList.add('hidden');
+    var list = document.getElementById('character-list');
+    if (list) {
+        list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function addCareerStatusEntry(container, status, startYear, endYear) {
+    var entry = document.createElement('div');
+    entry.className = 'career-status-entry';
+    entry.innerHTML = `
+        <select class="career-status-select">
+            <option value="">Select status...</option>
+            <option value="civilian" ${status === 'civilian' ? 'selected' : ''}>Civilian</option>
+            <option value="trainee" ${status === 'trainee' ? 'selected' : ''}>Trainee</option>
+            <option value="rookie" ${status === 'rookie' ? 'selected' : ''}>Rookie</option>
+            <option value="junior" ${status === 'junior' ? 'selected' : ''}>Junior</option>
+            <option value="senior" ${status === 'senior' ? 'selected' : ''}>Senior</option>
+            <option value="instructor" ${status === 'instructor' ? 'selected' : ''}>Instructor</option>
+            <option value="support" ${status === 'support' ? 'selected' : ''}>Support</option>
+        </select>
+        <input type="number" class="career-start-year" placeholder="Start Year" value="${startYear || ''}">
+        <input type="number" class="career-end-year" placeholder="End Year (or leave blank)" value="${endYear || ''}">
+        <button type="button" class="small danger remove-status">✕</button>
+    `;
+    container.appendChild(entry);
+    var select = entry.querySelector('.career-status-select');
+    var specialtyField = document.getElementById('specialty-field');
+    select.onchange = function() {
+        if (specialtyField) {
+            specialtyField.style.display = (this.value === 'instructor' || this.value === 'support') ? 'block' : 'none';
+        }
+    };
+    entry.querySelector('.remove-status').onclick = function() {
+        if (container.children.length > 1) {
+            entry.remove();
+        } else {
+            alert('You need at least one status entry.');
+        }
+    };
+}
+
+function saveCharacter(e) {
+    e.preventDefault();
+    var form = e.target;
+    var editId = form.dataset.editId;
+    var isDeceased = document.getElementById('char-deceased').checked;
+    var deathYear = document.getElementById('char-death-year').value.trim();
+    var deathCause = document.getElementById('char-death-cause').value.trim();
+    var deathAge = document.getElementById('char-death-age').value.trim();
+    
+    var careerStatus = [];
+    document.querySelectorAll('.career-status-entry').forEach(function(entry) {
+        var select = entry.querySelector('.career-status-select');
+        var startInput = entry.querySelector('.career-start-year');
+        var endInput = entry.querySelector('.career-end-year');
+        if (select && select.value) {
+            careerStatus.push({
+                status: select.value,
+                startYear: startInput ? startInput.value || '' : '',
+                endYear: endInput ? endInput.value || '' : ''
+            });
         }
     });
-    return result;
+    
+    var charData = {
+        firstName: document.getElementById('char-firstname').value.trim(),
+        middleName: document.getElementById('char-middlename').value.trim(),
+        lastName: document.getElementById('char-lastname').value.trim(),
+        birthYear: document.getElementById('char-birthyear').value || '',
+        gender: document.getElementById('char-gender').value.trim(),
+        associatedNames: document.getElementById('char-associated-names').value.trim(),
+        eyes: document.getElementById('char-eyes').value.trim(),
+        hair: document.getElementById('char-hair').value.trim(),
+        skin: document.getElementById('char-skin').value.trim(),
+        height: document.getElementById('char-height').value.trim(),
+        build: document.getElementById('char-build').value.trim(),
+        appearanceNotes: document.getElementById('char-appearance-notes').value.trim(),
+        notes: document.getElementById('char-notes').value.trim(),
+        deceased: isDeceased,
+        deathYear: deathYear,
+        deathCause: deathCause,
+        deathAge: deathAge,
+        careerStatus: careerStatus,
+        specialty: document.getElementById('char-specialty').value.trim()
+    };
+    
+    if (editId) {
+        var existing = data.characters.find(function(c) { return String(c.id) === String(editId); });
+        if (existing && existing.eliminations) {
+            charData.eliminations = existing.eliminations.slice();
+        }
+    }
+    
+    if (!charData.firstName) {
+        alert('First name is required.');
+        return;
+    }
+    
+    if (isDeceased && !deathYear && !deathAge) {
+        alert('Please enter either Death Year or Death Age for deceased characters.');
+        return;
+    }
+    
+    if (editId) {
+        var index = data.characters.findIndex(function(c) { return String(c.id) === String(editId); });
+        if (index !== -1) {
+            var existing = data.characters[index];
+            if (!charData.eliminations) {
+                charData.eliminations = existing.eliminations || [];
+            }
+            charData.id = existing.id;
+            charData.createdAt = existing.createdAt;
+            data.characters[index] = Object.assign({}, existing, charData);
+            if (typeof logActivity === 'function') {
+                logActivity('Updated character: ' + charData.firstName);
+            }
+        }
+    } else {
+        var newChar = {
+            id: generateId('char'),
+            firstName: charData.firstName,
+            middleName: charData.middleName,
+            lastName: charData.lastName,
+            birthYear: charData.birthYear,
+            gender: charData.gender,
+            associatedNames: charData.associatedNames,
+            eyes: charData.eyes,
+            hair: charData.hair,
+            skin: charData.skin,
+            height: charData.height,
+            build: charData.build,
+            appearanceNotes: charData.appearanceNotes,
+            notes: charData.notes,
+            deceased: charData.deceased,
+            deathYear: charData.deathYear,
+            deathCause: charData.deathCause,
+            deathAge: charData.deathAge,
+            careerStatus: charData.careerStatus,
+            specialty: charData.specialty,
+            eliminations: [],
+            eliminatedWeeks: [],
+            createdAt: new Date().toISOString()
+        };
+        data.characters.push(newChar);
+        if (typeof logActivity === 'function') {
+            logActivity('Added character: ' + charData.firstName);
+        }
+    }
+    
+    if (typeof saveData === 'function') {
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+    }
+    renderCharacters();
+    updateDashboardStats();
+    hideCharacterForm();
 }
 
-/**
- * Get team member count (active members only)
- * @param {Object} team - Team object
- * @param {number} week - Week to check
- * @returns {number} Number of active members
- */
-function getActiveTeamMemberCount(team, week) {
-    if (!team || !team.members) return 0;
-    var weekNum = parseInt(week) || 1;
+function deleteCharacter(id) {
+    if (!confirm('Delete this character permanently?')) return;
+    var char = data.characters.find(function(c) { return String(c.id) === String(id); });
+    if (!char) return;
+    
+    data.teams.forEach(function(team) {
+        if (team.members) {
+            team.members = team.members.filter(function(m) { return String(m.characterId) !== String(id); });
+        }
+    });
+    
+    data.characters = data.characters.filter(function(c) { return String(c.id) !== String(id); });
+    if (typeof logActivity === 'function') {
+        logActivity('Deleted character: ' + char.firstName);
+    }
+    if (typeof saveData === 'function') {
+        saveData().catch(function(err) { console.error('Failed to save:', err); });
+    }
+    renderCharacters();
+    updateDashboardStats();
+}
+
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+
+function generateId(prefix) {
+    return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function calculateAge(char) {
+    if (!char || !char.birthYear) return null;
+    var birthYear = parseInt(char.birthYear);
+    if (isNaN(birthYear)) return null;
+    
+    if (char.deceased) {
+        if (char.deathAge) return parseInt(char.deathAge);
+        if (char.deathYear) {
+            var deathYear = parseInt(char.deathYear);
+            if (!isNaN(deathYear)) return deathYear - birthYear;
+        }
+        return null;
+    }
+    
+    var currentYear = data.currentYear || new Date().getFullYear();
+    return currentYear - birthYear;
+}
+
+function getCharacterAge(char) {
+    var age = calculateAge(char);
+    return age !== null ? age + ' yrs' : '-';
+}
+
+function getCurrentStatus(char) {
+    if (!char || !char.careerStatus || char.careerStatus.length === 0) {
+        return 'Civilian';
+    }
+    
+    var currentYear = data.currentYear || new Date().getFullYear();
+    var currentStatus = 'Civilian';
+    
+    char.careerStatus.forEach(function(status) {
+        var start = parseInt(status.startYear);
+        var end = status.endYear ? parseInt(status.endYear) : null;
+        
+        if (!isNaN(start) && start <= currentYear && (end === null || currentYear <= end)) {
+            currentStatus = status.status.charAt(0).toUpperCase() + status.status.slice(1);
+        }
+    });
+    
+    return currentStatus;
+}
+
+function getCharacterTeamCount(charId) {
     var count = 0;
-    team.members.forEach(function(member) {
-        var join = parseInt(member.joinPeriod);
-        var leave = parseInt(member.leavePeriod);
-        if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+    data.teams.forEach(function(team) {
+        if (team.members && team.members.some(function(m) { return String(m.characterId) === String(charId); })) {
             count++;
         }
     });
-    return count;
+    return count > 0 ? count : '-';
 }
 
-/**
- * Get active members of a team
- * @param {Object} team - Team object
- * @param {number} week - Week to check
- * @returns {Array} Array of active members
- */
-function getActiveTeamMembers(team, week) {
-    if (!team || !team.members) return [];
-    var weekNum = parseInt(week) || 1;
-    var result = [];
-    team.members.forEach(function(member) {
-        var join = parseInt(member.joinPeriod);
-        var leave = parseInt(member.leavePeriod);
-        if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
-            result.push(member);
-        }
-    });
-    return result;
+function getStudents() {
+    if (!data.characters) return [];
+    return data.characters.filter(function(c) {
+        if (c.deceased) return false;
+        var status = getCurrentStatus(c).toLowerCase();
+        return status === 'trainee' || status === 'rookie' || 
+               status === 'junior' || status === 'student';
+    }).sort(function(a, b) { return a.firstName.localeCompare(b.firstName); });
 }
 
-/**
- * Get character name by ID
- * @param {string} charId - Character ID
- * @returns {string} Character name or 'Unknown'
- */
 function getCharacterNameById(charId) {
     if (!charId) return 'Unknown';
     var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
@@ -487,145 +948,67 @@ function getCharacterNameById(charId) {
     return 'Unknown';
 }
 
-/**
- * Get character by ID
- * @param {string} charId - Character ID
- * @returns {Object|null} Character object or null
- */
 function getCharacterById(charId) {
     if (!charId) return null;
     return data.characters.find(function(c) { return String(c.id) === String(charId); });
 }
 
-/**
- * Get character's current team(s) during a specific week
- * @param {string} charId - Character ID
- * @param {number} week - Week number
- * @returns {Array} Array of team names the character is in
- */
-function getCharacterCurrentTeams(charId, week) {
-    var weekNum = parseInt(week) || 1;
-    var teams = [];
-    data.teams.forEach(function(team) {
-        if (team.status === 'deleted') return;
-        if (team.members) {
-            team.members.forEach(function(member) {
-                if (String(member.characterId) === String(charId)) {
-                    var join = parseInt(member.joinPeriod);
-                    var leave = parseInt(member.leavePeriod);
-                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
-                        teams.push(team.name);
-                    }
-                }
-            });
-        }
-    });
-    return teams;
+function logActivity(message) {
+    console.log('[Activity]', message);
 }
 
-/**
- * Format date for display
- * @param {string} dateString - ISO date string
- * @returns {string} Formatted date
- */
-function formatDate(dateString) {
-    if (!dateString) return 'N/A';
-    var date = new Date(dateString);
-    return date.toLocaleDateString();
-}
-
-/**
- * Truncate a string to a certain length
- * @param {string} str - String to truncate
- * @param {number} length - Maximum length
- * @returns {string} Truncated string
- */
-function truncateString(str, length) {
-    if (!str) return '';
-    if (str.length <= length) return str;
-    return str.substring(0, length) + '...';
-}
-
-/**
- * Debounce a function
- * @param {Function} func - Function to debounce
- * @param {number} wait - Milliseconds to wait
- * @returns {Function} Debounced function
- */
-function debounce(func, wait) {
-    let timeout;
-    return function() {
-        const context = this;
-        const args = arguments;
-        clearTimeout(timeout);
-        timeout = setTimeout(function() {
-            func.apply(context, args);
-        }, wait);
+function getWeekBlock(weekNum) {
+    var num = parseInt(weekNum) || 1;
+    var start = Math.floor((num - 1) / 2) * 2 + 1;
+    return {
+        start: start,
+        end: start + 1,
+        label: start + '-' + (start + 1)
     };
 }
 
-// Make utils available globally
-window.utils = {
-    generateId,
-    getWeekBlock,
-    getRankingBlock,
-    calculateAge,
-    getCharacterAge,
-    getCurrentStatus,
-    getCharacterTeamCount,
-    getParticipantName,
-    getActiveTeamsForWeek,
-    getAllActiveTeams,
-    getTeamsByType,
-    logActivity,
-    getStudents,
-    getNonCivilianCharacters,
-    getInstructors,
-    getDiscipline,
-    getAvailableDisciplines,
-    getStudentSchedule,
-    getTotalHours,
-    getDisciplineHours,
-    isCharacterEliminated,
-    getEliminatedCharacters,
-    getActiveTeamMemberCount,
-    getActiveTeamMembers,
-    getCharacterNameById,
-    getCharacterById,
-    getCharacterCurrentTeams,
-    formatDate,
-    truncateString,
-    debounce
-};
+// ============================================================
+// EXPOSE FUNCTIONS GLOBALLY
+// ============================================================
 
-// Also expose individual functions globally for convenience
+window.renderAll = renderAll;
+window.updateDashboardStats = updateDashboardStats;
+window.showYearModal = showYearModal;
+window.renderCharacters = renderCharacters;
+window.initCharacterEvents = initCharacterEvents;
+window.showCharacterForm = showCharacterForm;
+window.hideCharacterForm = hideCharacterForm;
+window.addCareerStatusEntry = addCareerStatusEntry;
+window.saveCharacter = saveCharacter;
+window.deleteCharacter = deleteCharacter;
+window.addStandaloneElimination = addStandaloneElimination;
+window.renderStandaloneEliminations = renderStandaloneEliminations;
+window.renderTournamentEliminations = renderTournamentEliminations;
+window.removeStandaloneElimination = removeStandaloneElimination;
+window.getStudents = getStudents;
+window.getCurrentStatus = getCurrentStatus;
+window.getCharacterAge = getCharacterAge;
+window.calculateAge = calculateAge;
+window.getCharacterTeamCount = getCharacterTeamCount;
 window.generateId = generateId;
 window.getWeekBlock = getWeekBlock;
-window.getRankingBlock = getRankingBlock;
-window.calculateAge = calculateAge;
-window.getCharacterAge = getCharacterAge;
-window.getCurrentStatus = getCurrentStatus;
-window.getCharacterTeamCount = getCharacterTeamCount;
-window.getParticipantName = getParticipantName;
-window.getActiveTeamsForWeek = getActiveTeamsForWeek;
-window.getAllActiveTeams = getAllActiveTeams;
-window.getTeamsByType = getTeamsByType;
 window.logActivity = logActivity;
-window.getStudents = getStudents;
-window.getNonCivilianCharacters = getNonCivilianCharacters;
-window.getInstructors = getInstructors;
-window.getDiscipline = getDiscipline;
-window.getAvailableDisciplines = getAvailableDisciplines;
-window.getStudentSchedule = getStudentSchedule;
-window.getTotalHours = getTotalHours;
-window.getDisciplineHours = getDisciplineHours;
-window.isCharacterEliminated = isCharacterEliminated;
-window.getEliminatedCharacters = getEliminatedCharacters;
-window.getActiveTeamMemberCount = getActiveTeamMemberCount;
-window.getActiveTeamMembers = getActiveTeamMembers;
 window.getCharacterNameById = getCharacterNameById;
 window.getCharacterById = getCharacterById;
-window.getCharacterCurrentTeams = getCharacterCurrentTeams;
-window.formatDate = formatDate;
-window.truncateString = truncateString;
-window.debounce = debounce;
+
+// ============================================================
+// INITIALIZE
+// ============================================================
+
+document.addEventListener('DOMContentLoaded', initApp);
+
+window.addEventListener('load', function() {
+    var path = window.location.pathname;
+    var page = path.split('/').pop() || 'index.html';
+    
+    if (page !== 'index.html' && page !== '') {
+        setTimeout(function() {
+            renderAll();
+        }, 300);
+    }
+});
