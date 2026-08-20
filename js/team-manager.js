@@ -1,14 +1,34 @@
 /**
  * team-manager.js - Team Manager
  * Divided into four tabs: Academic, Professional, Temporary, Civilian
- * Each tab shows only the appropriate team type with relevant filters
- * Shows current members and full history (all members ever part of the team)
+ * Each tab has its own independent filter state
+ * 
+ * Academic - Filtered by week, remembers week on page refresh/tab switch
+ * Professional - Filtered by year, inactive teams at bottom greyed out
+ * Temporary - Filtered by year, no inactive status (all are one-time)
+ * Civilian - No filter, always shows all
  */
 
 var teamManagerState = {
     currentTab: 'academic',
-    currentFilter: 'active', // active, inactive, all
-    filterWeek: 1,
+    // Independent filter states per tab
+    filters: {
+        academic: {
+            filterWeek: 1,
+            filterStatus: 'active'
+        },
+        professional: {
+            filterYear: '',
+            filterStatus: 'active'
+        },
+        temporary: {
+            filterYear: '',
+            filterStatus: 'active'
+        },
+        civilian: {
+            filterStatus: 'active'
+        }
+    },
     expandedTeamId: null,
     currentTeamId: null
 };
@@ -42,9 +62,9 @@ function initTeamManagerSystem() {
 }
 
 /**
- * Get teams filtered by type and status
+ * Get teams filtered by type and status with tab-specific filters
  */
-function getFilteredTeams(type, filter) {
+function getFilteredTeams(type, filter, tabFilter) {
     initTeamManagerSystem();
     var teams = data.teams.filter(function(t) { return t.status !== 'deleted'; });
     
@@ -59,16 +79,10 @@ function getFilteredTeams(type, filter) {
         teams = teams.filter(function(t) { return t.type === 'civilian'; });
     }
     
-    // Filter by status
-    if (filter === 'active') {
-        teams = teams.filter(function(t) { return t.status === 'active'; });
-    } else if (filter === 'inactive') {
-        teams = teams.filter(function(t) { return t.status === 'deprecated' || t.status === 'inactive'; });
-    }
-    
-    // For academic teams, filter by week
+    // Apply tab-specific filters
     if (type === 'academic') {
-        var weekNum = teamManagerState.filterWeek || 1;
+        // Academic: Filter by week
+        var weekNum = tabFilter?.filterWeek || teamManagerState.filters.academic.filterWeek || 1;
         var block = getWeekBlock(weekNum);
         teams = teams.filter(function(team) {
             var start = parseInt(team.startPeriod);
@@ -76,9 +90,56 @@ function getFilteredTeams(type, filter) {
             if (isNaN(start)) return true;
             return start <= block.end && (isNaN(end) || end >= block.start);
         });
+        // Also filter by status if needed
+        if (filter === 'active') {
+            teams = teams.filter(function(t) { return t.status === 'active'; });
+        } else if (filter === 'inactive') {
+            teams = teams.filter(function(t) { return t.status === 'deprecated' || t.status === 'inactive'; });
+        }
+    } else if (type === 'professional') {
+        // Professional: Filter by year (startPeriod >= filterYear)
+        var year = tabFilter?.filterYear || '';
+        if (year) {
+            var yearNum = parseInt(year);
+            if (!isNaN(yearNum)) {
+                teams = teams.filter(function(team) {
+                    var start = parseInt(team.startPeriod);
+                    return !isNaN(start) && start >= yearNum;
+                });
+            }
+        }
+        // Filter by status - inactive teams go to bottom
+        if (filter === 'active') {
+            teams = teams.filter(function(t) { return t.status === 'active'; });
+        } else if (filter === 'inactive') {
+            teams = teams.filter(function(t) { return t.status === 'deprecated' || t.status === 'inactive'; });
+        }
+    } else if (type === 'temporary') {
+        // Temporary: Filter by year (startPeriod >= filterYear)
+        var year = tabFilter?.filterYear || '';
+        if (year) {
+            var yearNum = parseInt(year);
+            if (!isNaN(yearNum)) {
+                teams = teams.filter(function(team) {
+                    var start = parseInt(team.startPeriod);
+                    return !isNaN(start) && start >= yearNum;
+                });
+            }
+        }
+        // No inactive filter - all temporary teams are shown
+    } else if (type === 'civilian') {
+        // Civilian: No filters, show all
+        // Just ensure we show all civilian teams
     }
     
+    // Sort teams: active first, then inactive/deprecated
     teams.sort(function(a, b) {
+        // For professional, put inactive at bottom
+        if (type === 'professional') {
+            var aActive = a.status === 'active' ? 0 : 1;
+            var bActive = b.status === 'active' ? 0 : 1;
+            if (aActive !== bActive) return aActive - bActive;
+        }
         return a.name.localeCompare(b.name);
     });
     
@@ -132,8 +193,15 @@ function getTeamPeriodDisplay(team) {
             return 'From ' + team.startPeriod;
         }
         return '-';
+    } else if (team.type === 'temporary') {
+        if (team.startPeriod && team.endPeriod) {
+            return team.startPeriod + ' - ' + team.endPeriod;
+        } else if (team.startPeriod) {
+            return 'From ' + team.startPeriod;
+        }
+        return '-';
     } else {
-        // Temporary or Civilian
+        // Civilian
         if (team.startPeriod && team.endPeriod) {
             return team.startPeriod + ' - ' + team.endPeriod;
         } else if (team.startPeriod) {
@@ -227,64 +295,40 @@ function getMemberStatusInfo(status) {
 }
 
 /**
- * Check if a character is currently active in ANY team during the given week
- * Returns the team name if found, or null if not in any team
+ * Get character's current career status for a specific year/week
  */
-function getCharacterCurrentTeam(charId, week, excludeTeamId) {
-    var weekNum = parseInt(week) || 1;
-    var excludeId = excludeTeamId ? String(excludeTeamId) : null;
-    
-    for (var i = 0; i < data.teams.length; i++) {
-        var team = data.teams[i];
-        if (team.status === 'deleted' || team.status === 'inactive') continue;
-        if (excludeId && String(team.id) === excludeId) continue;
-        
-        if (team.members) {
-            for (var j = 0; j < team.members.length; j++) {
-                var member = team.members[j];
-                if (String(member.characterId) === String(charId)) {
-                    var join = parseInt(member.joinPeriod);
-                    var leave = parseInt(member.leavePeriod);
-                    // Check if the character is active in this team during the week
-                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
-                        return team.name;
-                    }
-                }
-            }
-        }
+function getCharacterStatusAtYear(char, year) {
+    if (!char || !char.careerStatus || char.careerStatus.length === 0) {
+        return 'civilian';
     }
-    return null;
+    
+    var yearNum = parseInt(year) || 1;
+    var currentStatus = 'civilian';
+    
+    char.careerStatus.forEach(function(status) {
+        var start = parseInt(status.startYear);
+        var end = status.endYear ? parseInt(status.endYear) : null;
+        
+        if (!isNaN(start) && start <= yearNum && (end === null || yearNum <= end)) {
+            currentStatus = status.status;
+        }
+    });
+    
+    return currentStatus;
 }
 
 /**
- * Check if a character is a former member of ANY team (left before the given week)
+ * Check if a character's academic period is complete
  */
-function getCharacterFormerTeam(charId, week) {
+function isAcademicPeriodComplete(char, week) {
+    if (!char) return true;
     var weekNum = parseInt(week) || 1;
-    
-    for (var i = 0; i < data.teams.length; i++) {
-        var team = data.teams[i];
-        if (team.status === 'deleted') continue;
-        
-        if (team.members) {
-            for (var j = 0; j < team.members.length; j++) {
-                var member = team.members[j];
-                if (String(member.characterId) === String(charId)) {
-                    var join = parseInt(member.joinPeriod);
-                    var leave = parseInt(member.leavePeriod);
-                    // Check if the character left this team before the given week
-                    if (!isNaN(join) && join <= weekNum && !isNaN(leave) && leave < weekNum) {
-                        return team.name;
-                    }
-                }
-            }
-        }
-    }
-    return null;
+    var status = getCharacterStatusAtYear(char, weekNum);
+    return status !== 'trainee';
 }
 
 /**
- * Get character availability status for a specific time
+ * Get character availability for a specific time
  */
 function getCharacterAvailability(charId, week, teamId) {
     var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
@@ -322,10 +366,39 @@ function getCharacterAvailability(charId, week, teamId) {
         }
     }
     
-    // Check if already in any team during this week (excluding current team)
-    var currentTeam = getCharacterCurrentTeam(charId, weekNum, teamId);
-    if (currentTeam) {
-        return { available: false, reason: 'Currently in team: ' + currentTeam };
+    // Check if already in another team (academic teams only count if still a trainee)
+    var targetTeam = data.teams.find(function(t) { return String(t.id) === String(teamId); });
+    var targetTeamType = targetTeam ? targetTeam.type : null;
+    
+    for (var i = 0; i < data.teams.length; i++) {
+        var team = data.teams[i];
+        if (team.status === 'deleted' || team.status === 'inactive') continue;
+        if (String(team.id) === String(teamId)) continue;
+        
+        // If target is professional/temporary/civilian, ignore academic teams if not a trainee
+        if (targetTeamType === 'professional' || targetTeamType === 'temporary' || targetTeamType === 'civilian') {
+            if (team.type === 'academic') {
+                if (isAcademicPeriodComplete(char, weekNum)) {
+                    continue;
+                }
+            }
+        }
+        
+        if (team.members) {
+            for (var j = 0; j < team.members.length; j++) {
+                var member = team.members[j];
+                if (String(member.characterId) === String(charId)) {
+                    var join = parseInt(member.joinPeriod);
+                    var leave = parseInt(member.leavePeriod);
+                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+                        var typeLabel = team.type === 'academic' ? 'Academic' : 
+                                       team.type === 'professional' ? 'Professional' : 
+                                       team.type === 'temporary' ? 'Temporary' : 'Civilian';
+                        return { available: false, reason: 'Currently in ' + typeLabel + ' team: ' + team.name };
+                    }
+                }
+            }
+        }
     }
     
     return { available: true, reason: 'Available' };
@@ -392,12 +465,12 @@ function renderTeamManagerView(container) {
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label id="team-start-label">Start Week</label>
-                                <input type="text" id="team-start" placeholder="Week (e.g., 1)">
+                                <label id="team-start-label">Start Period</label>
+                                <input type="text" id="team-start" placeholder="Week or Year">
                             </div>
                             <div class="form-group">
-                                <label id="team-end-label">End Week (optional)</label>
-                                <input type="text" id="team-end" placeholder="Week (e.g., 52)">
+                                <label id="team-end-label">End Period (optional)</label>
+                                <input type="text" id="team-end" placeholder="Week or Year">
                             </div>
                             <div class="form-group">
                                 <label>Current Ranking</label>
@@ -540,7 +613,6 @@ function populateMissionSelector() {
     
     var missions = data.missions || [];
     select.innerHTML = '<option value="">None</option>';
-    // Show active missions first, then completed
     var sortedMissions = missions.slice().sort(function(a, b) {
         if (a.status === 'active' && b.status !== 'active') return -1;
         if (a.status !== 'active' && b.status === 'active') return 1;
@@ -566,23 +638,24 @@ function getCharactersForTeamType(teamType) {
     chars.forEach(function(c) {
         var status = getCurrentStatus(c).toLowerCase();
         
-        // Never show civilians unless team type is civilian
-        if (status === 'civilian' && teamType !== 'civilian') return;
-        
         if (teamType === 'academic') {
-            // Academic: only show trainees
-            if (status === 'trainee') {
+            if (status === 'trainee' || status.startsWith('trainee')) {
                 result.push(c);
             }
         } else if (teamType === 'civilian') {
-            // Civilian: only show civilians
             if (status === 'civilian') {
                 result.push(c);
             }
         } else {
-            // Professional or Temporary: show trainees, rookies, juniors, seniors, instructors
             var allowedStatuses = ['trainee', 'rookie', 'junior', 'senior', 'instructor', 'support'];
-            if (allowedStatuses.indexOf(status) !== -1) {
+            var isAllowed = false;
+            for (var i = 0; i < allowedStatuses.length; i++) {
+                if (status === allowedStatuses[i] || status.startsWith(allowedStatuses[i])) {
+                    isAllowed = true;
+                    break;
+                }
+            }
+            if (isAllowed) {
                 result.push(c);
             }
         }
@@ -598,29 +671,54 @@ function renderTeamTab(tab) {
     var container = document.getElementById(tab + '-content');
     if (!container) return;
     
-    var filter = teamManagerState.currentFilter || 'active';
-    var teams = getFilteredTeams(tab, filter);
+    var filter = teamManagerState.filters[tab]?.filterStatus || 'active';
+    var tabFilter = teamManagerState.filters[tab] || {};
+    
+    var teams = getFilteredTeams(tab, filter, tabFilter);
     
     // Build filter controls based on tab type
     var filterHtml = '';
     if (tab === 'academic') {
+        var weekValue = tabFilter.filterWeek || 1;
         filterHtml = `
             <div class="filter-section">
                 <label for="team-filter-week">Week:</label>
-                <input type="number" id="team-filter-week" value="${teamManagerState.filterWeek || 1}" min="1" max="52" style="width:80px;">
+                <input type="number" id="team-filter-week" value="${weekValue}" min="1" max="52" style="width:80px;">
                 <button id="apply-filter-btn" class="small primary">Apply</button>
                 <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active during this 2-week block</span>
+                <label style="margin-left:12px;display:flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--text-dim);cursor:pointer;">
+                    <input type="checkbox" id="academic-show-inactive" ${filter === 'inactive' ? 'checked' : ''} style="width:auto;accent-color:var(--accent);cursor:pointer;"> Show Inactive
+                </label>
             </div>
         `;
-    } else {
+    } else if (tab === 'professional') {
+        var yearValue = tabFilter.filterYear || '';
         filterHtml = `
             <div class="filter-section">
-                <label for="team-status-filter">Status:</label>
-                <select id="team-status-filter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:0.75rem;width:auto;">
-                    <option value="active" ${filter === 'active' ? 'selected' : ''}>Active</option>
-                    <option value="inactive" ${filter === 'inactive' ? 'selected' : ''}>Inactive</option>
-                    <option value="all" ${filter === 'all' ? 'selected' : ''}>All</option>
-                </select>
+                <label for="team-filter-year">Year:</label>
+                <input type="number" id="team-filter-year" value="${yearValue}" min="1900" max="2100" style="width:80px;" placeholder="All">
+                <button id="apply-filter-btn" class="small primary">Apply</button>
+                <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active from this year onward</span>
+                <label style="margin-left:12px;display:flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--text-dim);cursor:pointer;">
+                    <input type="checkbox" id="professional-show-inactive" ${filter === 'inactive' ? 'checked' : ''} style="width:auto;accent-color:var(--accent);cursor:pointer;"> Show Inactive
+                </label>
+            </div>
+        `;
+    } else if (tab === 'temporary') {
+        var yearValue = tabFilter.filterYear || '';
+        filterHtml = `
+            <div class="filter-section">
+                <label for="team-filter-year">Year:</label>
+                <input type="number" id="team-filter-year" value="${yearValue}" min="1900" max="2100" style="width:80px;" placeholder="All">
+                <button id="apply-filter-btn" class="small primary">Apply</button>
+                <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Shows teams active from this year onward</span>
+                <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">Temporary teams are always shown (no inactive filter)</span>
+            </div>
+        `;
+    } else if (tab === 'civilian') {
+        filterHtml = `
+            <div class="filter-section">
+                <span style="font-size:0.75rem;color:var(--text-dim);">All civilian teams shown (no filters)</span>
             </div>
         `;
     }
@@ -658,19 +756,28 @@ function renderTeamList(teams, tab) {
             'temporary': 'temporary teams',
             'civilian': 'civilian teams'
         };
-        return '<p class="empty-state">No ' + (labels[tab] || 'teams') + ' found. Create your first team!</p>';
+        return '<p class="empty-state">No ' + (labels[tab] || 'teams') + ' found.</p>';
     }
     
     var html = '';
-    var filterWeek = teamManagerState.filterWeek || 1;
+    var filterWeek = teamManagerState.filters.academic?.filterWeek || 1;
     
     teams.forEach(function(team) {
         var periodDisplay = getTeamPeriodDisplay(team);
         var memberCount = getActiveMemberCount(team);
         var isExpanded = teamManagerState.expandedTeamId === team.id;
         
+        var isInactive = team.status === 'deprecated' || team.status === 'inactive';
         var statusLabel = team.status === 'active' ? 'Active' : (team.status === 'deprecated' ? 'Deprecated' : 'Inactive');
         var statusColor = team.status === 'active' ? 'var(--accent)' : 'var(--text-dim)';
+        
+        // For professional, grey out inactive teams
+        var inactiveClass = '';
+        var inactiveStyle = '';
+        if (tab === 'professional' && isInactive) {
+            inactiveClass = ' inactive-team';
+            inactiveStyle = 'opacity:0.5;background:var(--panel-alt);';
+        }
         
         var rankDisplay = team.currentRank || '-';
         var missionDisplay = '';
@@ -681,8 +788,13 @@ function renderTeamList(teams, tab) {
             }
         }
         
-        html += '<div class="list-item team-item" data-id="' + team.id + '" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;">';
-        html += '<span><strong>' + team.name + '</strong>' + missionDisplay + '</span>';
+        var typeLabel = team.type === 'academic' ? '📚 Academic' : 
+                        team.type === 'professional' ? '💼 Professional' : 
+                        team.type === 'temporary' ? '📋 Temporary' : '👤 Civilian';
+        
+        html += '<div class="list-item team-item' + inactiveClass + '" data-id="' + team.id + '" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;' + inactiveStyle + '">';
+        html += '<span><strong>' + team.name + '</strong> <span style="font-size:0.6rem;color:var(--text-dim);">' + typeLabel + '</span>' + missionDisplay + 
+            (isInactive ? ' <span style="color:var(--text-dim);font-size:0.6rem;">(Inactive)</span>' : '') + '</span>';
         html += '<span style="font-size:0.75rem;">' + periodDisplay + '</span>';
         html += '<span style="font-size:0.75rem;">' + rankDisplay + '</span>';
         html += '<span style="font-size:0.75rem;">' + memberCount + '</span>';
@@ -697,7 +809,6 @@ function renderTeamList(teams, tab) {
         
         if (isExpanded) {
             html += '<div class="team-members-expanded" data-team-id="' + team.id + '">';
-            // Show current active members
             var activeMembers = getActiveMembers(team, filterWeek);
             if (activeMembers.length > 0) {
                 html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:4px;">Current Active Members:</div>';
@@ -708,6 +819,7 @@ function renderTeamList(teams, tab) {
                     var deadMarker = char && char.deceased ? ' Deceased' : '';
                     var status = getMemberStatusAtWeek(member, filterWeek);
                     var statusInfo = getMemberStatusInfo(status);
+                    
                     html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;">' +
                         '<span>' + name + deadMarker + ' <span class="role">(' + (member.role || 'Member') + ')</span></span>' +
                         '<span style="color:var(--text-dim);font-size:0.75rem;">Age: ' + age + ' | Joined: ' + (member.joinPeriod || '?') + (member.leavePeriod ? ' → ' + member.leavePeriod : '') + ' | <span style="color:' + statusInfo.color + ';">' + statusInfo.label + '</span></span>' +
@@ -727,44 +839,48 @@ function renderTeamList(teams, tab) {
  * Attach filter events for a tab
  */
 function attachFilterEvents(tab) {
-    var filterWeek = document.getElementById('team-filter-week');
-    if (filterWeek) {
-        filterWeek.addEventListener('change', function() {
-            var val = parseInt(this.value);
-            if (!isNaN(val) && val > 0 && val <= 52) {
-                teamManagerState.filterWeek = val;
-                renderTeamTab(tab);
-            }
-        });
-        filterWeek.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                var val = parseInt(this.value);
-                if (!isNaN(val) && val > 0 && val <= 52) {
-                    teamManagerState.filterWeek = val;
+    var container = document.getElementById('teams-container-' + tab);
+    if (!container) return;
+    
+    var applyBtn = document.getElementById('apply-filter-btn');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function() {
+            if (tab === 'academic') {
+                var week = parseInt(document.getElementById('team-filter-week').value);
+                if (!isNaN(week) && week > 0 && week <= 52) {
+                    teamManagerState.filters.academic.filterWeek = week;
                     renderTeamTab(tab);
+                } else {
+                    alert('Please enter a valid week (1-52).');
+                }
+            } else if (tab === 'professional' || tab === 'temporary') {
+                var year = document.getElementById('team-filter-year').value;
+                if (year === '' || !isNaN(parseInt(year))) {
+                    teamManagerState.filters[tab].filterYear = year;
+                    renderTeamTab(tab);
+                } else {
+                    alert('Please enter a valid year.');
                 }
             }
         });
     }
     
-    var statusFilter = document.getElementById('team-status-filter');
-    if (statusFilter) {
-        statusFilter.addEventListener('change', function() {
-            teamManagerState.currentFilter = this.value;
-            renderTeamTab(tab);
+    // Enter key support for inputs
+    var input = document.getElementById('team-filter-week') || document.getElementById('team-filter-year');
+    if (input) {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                applyBtn.click();
+            }
         });
     }
     
-    var applyBtn = document.getElementById('apply-filter-btn');
-    if (applyBtn) {
-        applyBtn.addEventListener('click', function() {
-            var week = parseInt(document.getElementById('team-filter-week').value);
-            if (!isNaN(week) && week > 0 && week <= 52) {
-                teamManagerState.filterWeek = week;
-                renderTeamTab(tab);
-            } else {
-                alert('Please enter a valid week (1-52).');
-            }
+    // Show inactive checkbox
+    var inactiveCheck = document.getElementById(tab + '-show-inactive');
+    if (inactiveCheck) {
+        inactiveCheck.addEventListener('change', function() {
+            teamManagerState.filters[tab].filterStatus = this.checked ? 'inactive' : 'active';
+            renderTeamTab(tab);
         });
     }
 }
@@ -776,7 +892,6 @@ function attachTeamActionEvents(tab) {
     var container = document.getElementById('teams-container-' + tab);
     if (!container) return;
     
-    // Toggle members
     container.querySelectorAll('.toggle-members').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -790,7 +905,6 @@ function attachTeamActionEvents(tab) {
         });
     });
     
-    // Manage members
     container.querySelectorAll('.manage-members').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -798,7 +912,6 @@ function attachTeamActionEvents(tab) {
         });
     });
     
-    // Manage rankings
     container.querySelectorAll('.manage-rankings').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -806,7 +919,6 @@ function attachTeamActionEvents(tab) {
         });
     });
     
-    // Edit team
     container.querySelectorAll('.edit-team').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -814,7 +926,6 @@ function attachTeamActionEvents(tab) {
         });
     });
     
-    // Delete team
     container.querySelectorAll('.delete-team').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1047,7 +1158,7 @@ function getStatusPriority(status) {
 }
 
 /**
- * Open member management modal - shows full member history with character status
+ * Open member management modal
  */
 function openMemberModal(teamId, tab) {
     var modal = document.getElementById('member-modal');
@@ -1061,13 +1172,11 @@ function openMemberModal(teamId, tab) {
     var select = document.getElementById('member-character');
     select.innerHTML = '<option value="">Select character...</option>';
     
-    var currentWeek = teamManagerState.filterWeek || 1;
+    var currentWeek = teamManagerState.filters.academic?.filterWeek || 1;
     var teamType = team.type || 'academic';
     
-    // Get characters based on team type
     var eligibleChars = getCharactersForTeamType(teamType);
     
-    // Get members already in this team
     var currentMemberIds = [];
     var formerMemberIds = [];
     if (team.members) {
@@ -1081,7 +1190,6 @@ function openMemberModal(teamId, tab) {
         });
     }
     
-    // Build character lists with availability info
     var inTeamChars = [];
     var inOtherTeamChars = [];
     var formerChars = [];
@@ -1094,19 +1202,16 @@ function openMemberModal(teamId, tab) {
         var charStatus = getCurrentStatus(char).toLowerCase();
         var isDeceased = char.deceased || false;
         
-        // Check if already in this team
         var inTeam = currentMemberIds.indexOf(charId) !== -1;
         var isFormer = formerMemberIds.indexOf(charId) !== -1;
         
         if (inTeam) {
-            // Already in team - show at top with "Already in team" label
             var status = getMemberStatusAtWeek({ characterId: charId, joinPeriod: '', leavePeriod: '' }, currentWeek);
             var statusInfo = getMemberStatusInfo(status);
             inTeamChars.push({ char: char, status: 'in_team', label: '✓ Already in team', statusInfo: statusInfo });
             return;
         }
         
-        // Check if deceased
         if (isDeceased) {
             if (char.deathYear) {
                 var deathYear = parseInt(char.deathYear);
@@ -1130,7 +1235,6 @@ function openMemberModal(teamId, tab) {
             return;
         }
         
-        // Check if eliminated
         var isEliminated = false;
         if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
             for (var i = 0; i < char.eliminatedWeeks.length; i++) {
@@ -1147,32 +1251,26 @@ function openMemberModal(teamId, tab) {
             return;
         }
         
-        // Check if former member of this team
         if (isFormer) {
             formerChars.push({ char: char, status: 'former', label: '↩ Former Member' });
             return;
         }
         
-        // Check if in another team currently
         var availability = getCharacterAvailability(charId, currentWeek, teamId);
         if (!availability.available) {
-            // In another team currently
             inOtherTeamChars.push({ char: char, status: 'in_other_team', label: '⊘ ' + availability.reason });
             return;
         }
         
-        // Available
         availableChars.push({ char: char, status: 'available', label: '' });
     });
     
-    // Sort functions
     function sortByName(a, b) {
         var nameA = [a.char.firstName, a.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         var nameB = [b.char.firstName, b.char.lastName].filter(function(n) { return n; }).join(' ').toLowerCase();
         return nameA.localeCompare(nameB);
     }
     
-    // Sort each group
     inTeamChars.sort(sortByName);
     availableChars.sort(sortByName);
     inOtherTeamChars.sort(sortByName);
@@ -1180,7 +1278,6 @@ function openMemberModal(teamId, tab) {
     eliminatedChars.sort(sortByName);
     deceasedChars.sort(sortByName);
     
-    // Build the dropdown with groups
     var groupOrder = [
         { items: inTeamChars, label: '— Already in Team —' },
         { items: availableChars, label: '— Available —' },
@@ -1248,7 +1345,7 @@ function openMemberModal(teamId, tab) {
 }
 
 /**
- * Render members in the member modal - shows full history with status
+ * Render members in the member modal
  */
 function renderMembers(team) {
     var container = document.getElementById('members-list');
@@ -1258,10 +1355,9 @@ function renderMembers(team) {
     }
     
     var periodLabel = team.type === 'academic' ? 'Wk' : 'Period';
-    var currentWeek = teamManagerState.filterWeek || 1;
+    var currentWeek = teamManagerState.filters.academic?.filterWeek || 1;
     var html = '';
     
-    // Separate current/active members from former
     var activeMembers = [];
     var formerMembers = [];
     
@@ -1274,14 +1370,12 @@ function renderMembers(team) {
         }
     });
     
-    // Sort active members by join period
     activeMembers.sort(function(a, b) {
         var aJoin = parseInt(a.member.joinPeriod) || 0;
         var bJoin = parseInt(b.member.joinPeriod) || 0;
         return aJoin - bJoin;
     });
     
-    // Sort former members by status priority then name
     formerMembers.sort(function(a, b) {
         var aPriority = getStatusPriority(a.status);
         var bPriority = getStatusPriority(b.status);
@@ -1343,7 +1437,6 @@ function renderMembers(team) {
     });
     container.innerHTML = html;
     
-    // Re-attach event listeners
     container.querySelectorAll('.edit-member').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1380,14 +1473,12 @@ function addMember() {
     var team = data.teams.find(function(t) { return String(t.id) === String(teamId); });
     if (!team) return;
     
-    // Check if already in team
     if (team.members && team.members.some(function(m) { return String(m.characterId) === String(charId); })) {
         alert('This character is already in the team.');
         return;
     }
     
-    // Check availability
-    var currentWeek = teamManagerState.filterWeek || 1;
+    var currentWeek = teamManagerState.filters.academic?.filterWeek || 1;
     var availability = getCharacterAvailability(charId, currentWeek, teamId);
     if (!availability.available) {
         if (!confirm('This character is currently not available: ' + availability.reason + '\n\nAdd them anyway?')) {
@@ -1676,19 +1767,17 @@ function closeRankingModal() {
  * Initialize team manager events
  */
 function initTeamManagerEvents() {
-    // Tab switching
+    // Tab switching - preserves filter state per tab
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var tab = this.dataset.tab;
             teamManagerState.currentTab = tab;
             
-            // Update tab buttons
             document.querySelectorAll('.tab-btn').forEach(function(b) {
                 b.classList.remove('active');
             });
             this.classList.add('active');
             
-            // Update panels
             document.querySelectorAll('.tab-panel').forEach(function(p) {
                 p.style.display = 'none';
                 p.classList.remove('active');
@@ -1811,8 +1900,8 @@ window.getTeamPeriodDisplay = getTeamPeriodDisplay;
 window.getMemberStatusAtWeek = getMemberStatusAtWeek;
 window.getMemberStatusInfo = getMemberStatusInfo;
 window.getCharacterAvailability = getCharacterAvailability;
-window.getCharacterCurrentTeam = getCharacterCurrentTeam;
-window.getCharacterFormerTeam = getCharacterFormerTeam;
+window.getCharacterStatusAtYear = getCharacterStatusAtYear;
+window.isAcademicPeriodComplete = isAcademicPeriodComplete;
 window.showTeamForm = showTeamForm;
 window.saveTeam = saveTeam;
 window.deleteTeam = deleteTeam;
