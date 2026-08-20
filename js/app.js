@@ -234,7 +234,21 @@ function renderAll() {
         if (container && typeof renderSocialView === 'function') {
             renderSocialView(container);
         } else {
-            console.error('renderSocialView not found');
+            console.error('renderSocialView not found - checking if social.js loaded');
+            // Try to load from social/ folder
+            var script = document.createElement('script');
+            script.src = 'social/social.js';
+            script.onload = function() {
+                if (typeof renderSocialView === 'function') {
+                    renderSocialView(container);
+                } else {
+                    container.innerHTML = '<p class="empty-state">Social module loaded but renderSocialView not found.</p>';
+                }
+            };
+            script.onerror = function() {
+                container.innerHTML = '<p class="empty-state">Failed to load social/social.js. Please check the file path.</p>';
+            };
+            document.head.appendChild(script);
         }
     }
 }
@@ -607,7 +621,7 @@ function renderStandaloneEliminations(char) {
     standaloneElims.forEach(function(elim, index) {
         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--warning-soft);border-radius:4px;margin-bottom:2px;border-left:3px solid var(--warning);">';
         html += '<span style="font-size:0.75rem;">Week ' + elim.week + (elim.reason ? ' - ' + elim.reason : '') + ' <span style="color:var(--warning);font-size:0.6rem;">[Standalone]</span></span>';
-        html += '<button class="remove-standalone-elim small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 4px;" data-index="' + index + '">✕</button>';
+        html += '<button class="remove-standalone-elim small" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.6rem;padding:0 4px;" data-index="' + index + '">\u2715</button>';
         html += '</div>';
     });
     container.innerHTML = html;
@@ -747,7 +761,7 @@ function addCareerStatusEntry(container, status, startYear, endYear) {
         </select>
         <input type="number" class="career-start-year" placeholder="Start Year" value="${startYear || ''}">
         <input type="number" class="career-end-year" placeholder="End Year (or leave blank)" value="${endYear || ''}">
-        <button type="button" class="small danger remove-status">✕</button>
+        <button type="button" class="small danger remove-status">\u2715</button>
     `;
     container.appendChild(entry);
     var select = entry.querySelector('.career-status-select');
@@ -938,8 +952,6 @@ function getCharacterAge(char) {
 /**
  * Get current career status for a character
  * Returns the most recent status based on the career status history
- * @param {Object} char - Character object
- * @returns {string} Current status name
  */
 function getCurrentStatus(char) {
     if (!char || !char.careerStatus || char.careerStatus.length === 0) {
