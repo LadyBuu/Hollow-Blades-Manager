@@ -156,15 +156,26 @@ function getTeamName(teamId) {
 }
 
 /**
- * Get active members for a team in a week
+ * Get active members for a team in a period (week for academic, year for others)
  */
-function getActiveMembers(team, week) {
+function getActiveMembers(team, period) {
     if (!team.members) return [];
-    var weekNum = parseInt(week) || 1;
+    var periodNum = parseInt(period) || 1;
+    
     return team.members.filter(function(m) {
         var join = parseInt(m.joinPeriod);
         var leave = parseInt(m.leavePeriod);
-        return !isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum);
+        
+        // For academic teams, period is a week
+        if (team.type === 'academic') {
+            return !isNaN(join) && join <= periodNum && (isNaN(leave) || leave >= periodNum);
+        } else {
+            // For professional/temporary/civilian teams, period is a year
+            // If no join period, treat as always active
+            if (isNaN(join)) return true;
+            // Active if join <= current year and (no leave or leave >= current year)
+            return join <= periodNum && (isNaN(leave) || leave >= periodNum);
+        }
     });
 }
 
@@ -173,6 +184,19 @@ function getActiveMembers(team, week) {
  */
 function getActiveMemberCount(team) {
     if (!team.members) return 0;
+    // For professional/temporary/civilian, just count all members with no leave period
+    // or where leave period hasn't passed
+    if (team.type !== 'academic') {
+        var currentYear = data.currentYear || new Date().getFullYear();
+        var count = 0;
+        team.members.forEach(function(m) {
+            var leave = parseInt(m.leavePeriod);
+            if (isNaN(leave) || leave >= currentYear) {
+                count++;
+            }
+        });
+        return count;
+    }
     return team.members.length;
 }
 
@@ -221,10 +245,10 @@ function getMissionTitle(missionId) {
 }
 
 /**
- * Get member status for a specific week
+ * Get member status for a specific period (week for academic, year for others)
  */
-function getMemberStatusAtWeek(member, week) {
-    var weekNum = parseInt(week) || 1;
+function getMemberStatusAtPeriod(member, period, teamType) {
+    var periodNum = parseInt(period) || 1;
     var join = parseInt(member.joinPeriod);
     var leave = parseInt(member.leavePeriod);
     
@@ -235,7 +259,7 @@ function getMemberStatusAtWeek(member, week) {
     if (char && char.deceased) {
         if (char.deathYear) {
             var deathYear = parseInt(char.deathYear);
-            if (!isNaN(deathYear) && deathYear <= weekNum) {
+            if (!isNaN(deathYear) && deathYear <= periodNum) {
                 return 'deceased';
             }
         }
@@ -243,7 +267,7 @@ function getMemberStatusAtWeek(member, week) {
             var birthYear = parseInt(char.birthYear);
             if (!isNaN(birthYear)) {
                 var deathYear = birthYear + parseInt(char.deathAge);
-                if (deathYear <= weekNum) {
+                if (deathYear <= periodNum) {
                     return 'deceased';
                 }
             }
@@ -255,28 +279,44 @@ function getMemberStatusAtWeek(member, week) {
     if (char && char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
         for (var i = 0; i < char.eliminatedWeeks.length; i++) {
             var elimWeek = parseInt(char.eliminatedWeeks[i]);
-            if (!isNaN(elimWeek) && elimWeek <= weekNum) {
+            if (!isNaN(elimWeek) && elimWeek <= periodNum) {
                 return 'eliminated';
             }
         }
     }
     
-    // Check if left the team
-    if (!isNaN(leave) && leave < weekNum) {
-        return 'left';
-    }
-    
-    // Check if not joined yet
-    if (!isNaN(join) && join > weekNum) {
-        return 'future';
-    }
-    
-    // Check if currently active
-    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
-        return 'active';
+    // For academic teams, use week-based logic
+    if (teamType === 'academic') {
+        if (!isNaN(leave) && leave < periodNum) {
+            return 'left';
+        }
+        if (!isNaN(join) && join > periodNum) {
+            return 'future';
+        }
+        if (!isNaN(join) && join <= periodNum && (isNaN(leave) || leave >= periodNum)) {
+            return 'active';
+        }
+    } else {
+        // For professional/temporary/civilian, use year-based logic
+        if (!isNaN(leave) && leave < periodNum) {
+            return 'left';
+        }
+        if (!isNaN(join) && join > periodNum) {
+            return 'future';
+        }
+        if (isNaN(join) || (join <= periodNum && (isNaN(leave) || leave >= periodNum))) {
+            return 'active';
+        }
     }
     
     return 'unknown';
+}
+
+/**
+ * Get member status for a specific week (academic)
+ */
+function getMemberStatusAtWeek(member, week) {
+    return getMemberStatusAtPeriod(member, week, 'academic');
 }
 
 /**
@@ -497,7 +537,7 @@ function renderTeamManagerView(container) {
                                         <input type="text" class="name-history-name" placeholder="Team Name">
                                         <input type="text" class="name-history-start" placeholder="Start">
                                         <input type="text" class="name-history-end" placeholder="End">
-                                        <button type="button" class="small danger remove-name">✕</button>
+                                        <button type="button" class="small danger remove-name">\u2715</button>
                                     </div>
                                 </div>
                                 <button type="button" id="add-name-history-btn" class="small" style="margin-top:8px;">+ Add Name Period</button>
@@ -760,11 +800,25 @@ function renderTeamList(teams, tab) {
     }
     
     var html = '';
-    var filterWeek = teamManagerState.filters.academic?.filterWeek || 1;
+    // For academic, use filterWeek; for others, use current year
+    var filterPeriod = tab === 'academic' ? (teamManagerState.filters.academic?.filterWeek || 1) : (data.currentYear || new Date().getFullYear());
     
     teams.forEach(function(team) {
         var periodDisplay = getTeamPeriodDisplay(team);
-        var memberCount = getActiveMemberCount(team);
+        
+        // Count active members based on team type
+        var memberCount = 0;
+        if (team.type === 'academic') {
+            memberCount = getActiveMembers(team, filterPeriod).length;
+        } else {
+            // For professional/temporary/civilian, count members with no leave or leave >= current year
+            var currentYear = data.currentYear || new Date().getFullYear();
+            memberCount = team.members ? team.members.filter(function(m) {
+                var leave = parseInt(m.leavePeriod);
+                return isNaN(leave) || leave >= currentYear;
+            }).length : 0;
+        }
+        
         var isExpanded = teamManagerState.expandedTeamId === team.id;
         
         var isInactive = team.status === 'deprecated' || team.status === 'inactive';
@@ -788,9 +842,9 @@ function renderTeamList(teams, tab) {
             }
         }
         
-        var typeLabel = team.type === 'academic' ? '📚 Academic' : 
-                        team.type === 'professional' ? '💼 Professional' : 
-                        team.type === 'temporary' ? '📋 Temporary' : '👤 Civilian';
+        var typeLabel = team.type === 'academic' ? '\uD83D\uDCDA Academic' : 
+                        team.type === 'professional' ? '\uD83D\uDCBC Professional' : 
+                        team.type === 'temporary' ? '\uD83D\uDCCB Temporary' : '\uD83D\uDC64 Civilian';
         
         html += '<div class="list-item team-item' + inactiveClass + '" data-id="' + team.id + '" style="grid-template-columns:1.2fr 0.8fr 0.6fr 0.6fr 1fr;' + inactiveStyle + '">';
         html += '<span><strong>' + team.name + '</strong> <span style="font-size:0.6rem;color:var(--text-dim);">' + typeLabel + '</span>' + missionDisplay + 
@@ -799,7 +853,7 @@ function renderTeamList(teams, tab) {
         html += '<span style="font-size:0.75rem;">' + rankDisplay + '</span>';
         html += '<span style="font-size:0.75rem;">' + memberCount + '</span>';
         html += '<span class="actions">' +
-            '<button class="small toggle-members" data-id="' + team.id + '">' + (isExpanded ? '▼' : '▶') + '</button>' +
+            '<button class="small toggle-members" data-id="' + team.id + '">' + (isExpanded ? '\u25BC' : '\u25B6') + '</button>' +
             '<button class="small manage-members" data-id="' + team.id + '">Members</button>' +
             '<button class="small manage-rankings" data-id="' + team.id + '">Rankings</button>' +
             '<button class="small edit-team" data-id="' + team.id + '">Edit</button>' +
@@ -809,7 +863,7 @@ function renderTeamList(teams, tab) {
         
         if (isExpanded) {
             html += '<div class="team-members-expanded" data-team-id="' + team.id + '">';
-            var activeMembers = getActiveMembers(team, filterWeek);
+            var activeMembers = getActiveMembers(team, filterPeriod);
             if (activeMembers.length > 0) {
                 html += '<div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:4px;">Current Active Members:</div>';
                 activeMembers.forEach(function(member) {
@@ -817,16 +871,16 @@ function renderTeamList(teams, tab) {
                     var name = char ? [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ') : 'Unknown';
                     var age = char ? getCharacterAge(char) : '-';
                     var deadMarker = char && char.deceased ? ' Deceased' : '';
-                    var status = getMemberStatusAtWeek(member, filterWeek);
+                    var status = team.type === 'academic' ? getMemberStatusAtWeek(member, filterPeriod) : getMemberStatusAtPeriod(member, filterPeriod, team.type);
                     var statusInfo = getMemberStatusInfo(status);
                     
                     html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;">' +
                         '<span>' + name + deadMarker + ' <span class="role">(' + (member.role || 'Member') + ')</span></span>' +
-                        '<span style="color:var(--text-dim);font-size:0.75rem;">Age: ' + age + ' | Joined: ' + (member.joinPeriod || '?') + (member.leavePeriod ? ' → ' + member.leavePeriod : '') + ' | <span style="color:' + statusInfo.color + ';">' + statusInfo.label + '</span></span>' +
+                        '<span style="color:var(--text-dim);font-size:0.75rem;">Age: ' + age + ' | Joined: ' + (member.joinPeriod || '?') + (member.leavePeriod ? ' \u2192 ' + member.leavePeriod : '') + ' | <span style="color:' + statusInfo.color + ';">' + statusInfo.label + '</span></span>' +
                     '</div>';
                 });
             } else {
-                html += '<div class="member-entry empty" style="color:var(--text-dim);font-size:0.8rem;">No active members this week</div>';
+                html += '<div class="member-entry empty" style="color:var(--text-dim);font-size:0.8rem;">No active members this period</div>';
             }
             html += '</div>';
         }
@@ -1034,7 +1088,7 @@ function addNameHistoryEntry(container, name, start, end) {
         <input type="text" class="name-history-name" placeholder="Team Name" value="${name || ''}">
         <input type="text" class="name-history-start" placeholder="Start" value="${start || ''}">
         <input type="text" class="name-history-end" placeholder="End" value="${end || ''}">
-        <button type="button" class="small danger remove-name">✕</button>
+        <button type="button" class="small danger remove-name">\u2715</button>
     `;
     container.appendChild(entry);
     entry.querySelector('.remove-name').onclick = function() {
@@ -1172,7 +1226,7 @@ function openMemberModal(teamId, tab) {
     var select = document.getElementById('member-character');
     select.innerHTML = '<option value="">Select character...</option>';
     
-    var currentWeek = teamManagerState.filters.academic?.filterWeek || 1;
+    var currentPeriod = team.type === 'academic' ? (teamManagerState.filters.academic?.filterWeek || 1) : (data.currentYear || new Date().getFullYear());
     var teamType = team.type || 'academic';
     
     var eligibleChars = getCharactersForTeamType(teamType);
@@ -1181,7 +1235,7 @@ function openMemberModal(teamId, tab) {
     var formerMemberIds = [];
     if (team.members) {
         team.members.forEach(function(m) {
-            var status = getMemberStatusAtWeek(m, currentWeek);
+            var status = team.type === 'academic' ? getMemberStatusAtWeek(m, currentPeriod) : getMemberStatusAtPeriod(m, currentPeriod, team.type);
             if (status === 'active' || status === 'future') {
                 currentMemberIds.push(m.characterId);
             } else {
@@ -1206,16 +1260,16 @@ function openMemberModal(teamId, tab) {
         var isFormer = formerMemberIds.indexOf(charId) !== -1;
         
         if (inTeam) {
-            var status = getMemberStatusAtWeek({ characterId: charId, joinPeriod: '', leavePeriod: '' }, currentWeek);
+            var status = team.type === 'academic' ? getMemberStatusAtWeek({ characterId: charId, joinPeriod: '', leavePeriod: '' }, currentPeriod) : getMemberStatusAtPeriod({ characterId: charId, joinPeriod: '', leavePeriod: '' }, currentPeriod, team.type);
             var statusInfo = getMemberStatusInfo(status);
-            inTeamChars.push({ char: char, status: 'in_team', label: '✓ Already in team', statusInfo: statusInfo });
+            inTeamChars.push({ char: char, status: 'in_team', label: '\u2713 Already in team', statusInfo: statusInfo });
             return;
         }
         
         if (isDeceased) {
             if (char.deathYear) {
                 var deathYear = parseInt(char.deathYear);
-                if (!isNaN(deathYear) && deathYear <= currentWeek) {
+                if (!isNaN(deathYear) && deathYear <= currentPeriod) {
                     isDeceased = true;
                 }
             }
@@ -1223,7 +1277,7 @@ function openMemberModal(teamId, tab) {
                 var birthYear = parseInt(char.birthYear);
                 if (!isNaN(birthYear)) {
                     var deathYear = birthYear + parseInt(char.deathAge);
-                    if (deathYear <= currentWeek) {
+                    if (deathYear <= currentPeriod) {
                         isDeceased = true;
                     }
                 }
@@ -1231,7 +1285,7 @@ function openMemberModal(teamId, tab) {
         }
         
         if (isDeceased) {
-            deceasedChars.push({ char: char, status: 'deceased', label: '✝ Deceased' });
+            deceasedChars.push({ char: char, status: 'deceased', label: '\u271D Deceased' });
             return;
         }
         
@@ -1239,7 +1293,7 @@ function openMemberModal(teamId, tab) {
         if (char.eliminatedWeeks && char.eliminatedWeeks.length > 0) {
             for (var i = 0; i < char.eliminatedWeeks.length; i++) {
                 var elimWeek = parseInt(char.eliminatedWeeks[i]);
-                if (!isNaN(elimWeek) && elimWeek <= currentWeek) {
+                if (!isNaN(elimWeek) && elimWeek <= currentPeriod) {
                     isEliminated = true;
                     break;
                 }
@@ -1247,18 +1301,18 @@ function openMemberModal(teamId, tab) {
         }
         
         if (isEliminated) {
-            eliminatedChars.push({ char: char, status: 'eliminated', label: '⚠ Eliminated' });
+            eliminatedChars.push({ char: char, status: 'eliminated', label: '\u26A0 Eliminated' });
             return;
         }
         
         if (isFormer) {
-            formerChars.push({ char: char, status: 'former', label: '↩ Former Member' });
+            formerChars.push({ char: char, status: 'former', label: '\u21A9 Former Member' });
             return;
         }
         
-        var availability = getCharacterAvailability(charId, currentWeek, teamId);
+        var availability = getCharacterAvailability(charId, currentPeriod, teamId);
         if (!availability.available) {
-            inOtherTeamChars.push({ char: char, status: 'in_other_team', label: '⊘ ' + availability.reason });
+            inOtherTeamChars.push({ char: char, status: 'in_other_team', label: '\u2298 ' + availability.reason });
             return;
         }
         
@@ -1279,12 +1333,12 @@ function openMemberModal(teamId, tab) {
     deceasedChars.sort(sortByName);
     
     var groupOrder = [
-        { items: inTeamChars, label: '— Already in Team —' },
-        { items: availableChars, label: '— Available —' },
-        { items: inOtherTeamChars, label: '— In Other Teams —' },
-        { items: formerChars, label: '— Former Members —' },
-        { items: eliminatedChars, label: '— Eliminated —' },
-        { items: deceasedChars, label: '— Deceased —' }
+        { items: inTeamChars, label: '\u2014 Already in Team \u2014' },
+        { items: availableChars, label: '\u2014 Available \u2014' },
+        { items: inOtherTeamChars, label: '\u2014 In Other Teams \u2014' },
+        { items: formerChars, label: '\u2014 Former Members \u2014' },
+        { items: eliminatedChars, label: '\u2014 Eliminated \u2014' },
+        { items: deceasedChars, label: '\u2014 Deceased \u2014' }
     ];
     
     var hasItems = false;
@@ -1355,14 +1409,15 @@ function renderMembers(team) {
     }
     
     var periodLabel = team.type === 'academic' ? 'Wk' : 'Period';
-    var currentWeek = teamManagerState.filters.academic?.filterWeek || 1;
+    var currentPeriod = team.type === 'academic' ? (teamManagerState.filters.academic?.filterWeek || 1) : (data.currentYear || new Date().getFullYear());
     var html = '';
     
+    // Separate current/active members from former
     var activeMembers = [];
     var formerMembers = [];
     
     team.members.forEach(function(member, index) {
-        var status = getMemberStatusAtWeek(member, currentWeek);
+        var status = team.type === 'academic' ? getMemberStatusAtWeek(member, currentPeriod) : getMemberStatusAtPeriod(member, currentPeriod, team.type);
         if (status === 'active' || status === 'future') {
             activeMembers.push({ member: member, index: index, status: status });
         } else {
@@ -1398,25 +1453,25 @@ function renderMembers(team) {
         var statusInfo = getMemberStatusInfo(status);
         var periodDisplay = periodLabel + (member.joinPeriod || '?');
         if (member.leavePeriod) {
-            periodDisplay += ' → ' + periodLabel + member.leavePeriod;
+            periodDisplay += ' \u2192 ' + periodLabel + member.leavePeriod;
         }
         
         var statusIcon = '';
         var statusSuffix = '';
         if (status === 'deceased') {
-            statusIcon = '✝ ';
+            statusIcon = '\u271D ';
             statusSuffix = ' (Deceased)';
         } else if (status === 'eliminated') {
-            statusIcon = '⚠ ';
+            statusIcon = '\u26A0 ';
             statusSuffix = ' (Eliminated)';
         } else if (status === 'left') {
-            statusIcon = '↩ ';
+            statusIcon = '\u21A9 ';
             statusSuffix = ' (Former)';
         } else if (status === 'future') {
-            statusIcon = '⏳ ';
+            statusIcon = '\u23F3 ';
             statusSuffix = ' (Future)';
         } else if (status === 'active') {
-            statusIcon = '✓ ';
+            statusIcon = '\u2713 ';
         }
         
         html += '<div class="member-entry" style="border-left:3px solid ' + statusInfo.color + ';padding-left:8px;' + 
@@ -1478,8 +1533,8 @@ function addMember() {
         return;
     }
     
-    var currentWeek = teamManagerState.filters.academic?.filterWeek || 1;
-    var availability = getCharacterAvailability(charId, currentWeek, teamId);
+    var currentPeriod = team.type === 'academic' ? (teamManagerState.filters.academic?.filterWeek || 1) : (data.currentYear || new Date().getFullYear());
+    var availability = getCharacterAvailability(charId, currentPeriod, teamId);
     if (!availability.available) {
         if (!confirm('This character is currently not available: ' + availability.reason + '\n\nAdd them anyway?')) {
             return;
@@ -1898,6 +1953,7 @@ window.getActiveMembers = getActiveMembers;
 window.getActiveMemberCount = getActiveMemberCount;
 window.getTeamPeriodDisplay = getTeamPeriodDisplay;
 window.getMemberStatusAtWeek = getMemberStatusAtWeek;
+window.getMemberStatusAtPeriod = getMemberStatusAtPeriod;
 window.getMemberStatusInfo = getMemberStatusInfo;
 window.getCharacterAvailability = getCharacterAvailability;
 window.getCharacterStatusAtYear = getCharacterStatusAtYear;
