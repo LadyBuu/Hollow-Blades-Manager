@@ -235,6 +235,7 @@ function getTeamsByType(type, status) {
  * @param {string} type - Activity type (info, warning, etc.)
  */
 function logActivity(message, type = 'info') {
+    if (!data.activities) data.activities = [];
     data.activities.unshift({
         id: generateId(),
         message: message,
@@ -473,6 +474,56 @@ function getActiveTeamMembers(team, week) {
 }
 
 /**
+ * Get character name by ID
+ * @param {string} charId - Character ID
+ * @returns {string} Character name or 'Unknown'
+ */
+function getCharacterNameById(charId) {
+    if (!charId) return 'Unknown';
+    var char = data.characters.find(function(c) { return String(c.id) === String(charId); });
+    if (char) {
+        return [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
+    }
+    return 'Unknown';
+}
+
+/**
+ * Get character by ID
+ * @param {string} charId - Character ID
+ * @returns {Object|null} Character object or null
+ */
+function getCharacterById(charId) {
+    if (!charId) return null;
+    return data.characters.find(function(c) { return String(c.id) === String(charId); });
+}
+
+/**
+ * Get character's current team(s) during a specific week
+ * @param {string} charId - Character ID
+ * @param {number} week - Week number
+ * @returns {Array} Array of team names the character is in
+ */
+function getCharacterCurrentTeams(charId, week) {
+    var weekNum = parseInt(week) || 1;
+    var teams = [];
+    data.teams.forEach(function(team) {
+        if (team.status === 'deleted') return;
+        if (team.members) {
+            team.members.forEach(function(member) {
+                if (String(member.characterId) === String(charId)) {
+                    var join = parseInt(member.joinPeriod);
+                    var leave = parseInt(member.leavePeriod);
+                    if (!isNaN(join) && join <= weekNum && (isNaN(leave) || leave >= weekNum)) {
+                        teams.push(team.name);
+                    }
+                }
+            });
+        }
+    });
+    return teams;
+}
+
+/**
  * Format date for display
  * @param {string} dateString - ISO date string
  * @returns {string} Formatted date
@@ -539,6 +590,9 @@ window.utils = {
     getEliminatedCharacters,
     getActiveTeamMemberCount,
     getActiveTeamMembers,
+    getCharacterNameById,
+    getCharacterById,
+    getCharacterCurrentTeams,
     formatDate,
     truncateString,
     debounce
@@ -569,6 +623,9 @@ window.isCharacterEliminated = isCharacterEliminated;
 window.getEliminatedCharacters = getEliminatedCharacters;
 window.getActiveTeamMemberCount = getActiveTeamMemberCount;
 window.getActiveTeamMembers = getActiveTeamMembers;
+window.getCharacterNameById = getCharacterNameById;
+window.getCharacterById = getCharacterById;
+window.getCharacterCurrentTeams = getCharacterCurrentTeams;
 window.formatDate = formatDate;
 window.truncateString = truncateString;
 window.debounce = debounce;
