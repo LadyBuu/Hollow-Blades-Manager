@@ -82,6 +82,31 @@ function initEmptyData() {
                 { id: 'other', label: 'Other', color: '#7f8c8d' }
             ],
             nextId: 1
+        },
+        statsConfig: {
+            classes: [
+                { id: 'barbarian', label: 'Barbarian', icon: '\uD83D\uDE08', primaryStats: ['str', 'con'], secondaryStats: ['dex'], statWeights: { str: 0.4, con: 0.3, dex: 0.2, wis: 0.1 }, minStats: { str: 13, con: 12 } },
+                { id: 'bard', label: 'Bard', icon: '\uD83C\uDFB8', primaryStats: ['cha', 'dex'], secondaryStats: ['int', 'wis'], statWeights: { cha: 0.35, dex: 0.25, int: 0.2, wis: 0.15, con: 0.05 }, minStats: { cha: 13, dex: 12 } },
+                { id: 'cleric', label: 'Cleric', icon: '\u2728', primaryStats: ['wis', 'con'], secondaryStats: ['str', 'cha'], statWeights: { wis: 0.35, con: 0.25, str: 0.2, cha: 0.15, dex: 0.05 }, minStats: { wis: 13, con: 12 } },
+                { id: 'druid', label: 'Druid', icon: '\uD83C\uDF31', primaryStats: ['wis', 'con'], secondaryStats: ['int', 'dex'], statWeights: { wis: 0.35, con: 0.25, int: 0.2, dex: 0.15, str: 0.05 }, minStats: { wis: 13, con: 12 } },
+                { id: 'fighter', label: 'Fighter', icon: '\uD83D\uDDE1\uFE0F', primaryStats: ['str', 'con'], secondaryStats: ['dex'], statWeights: { str: 0.35, con: 0.3, dex: 0.25, wis: 0.1 }, minStats: { str: 13, con: 12 } },
+                { id: 'monk', label: 'Monk', icon: '\uD83E\uDDD8', primaryStats: ['dex', 'wis'], secondaryStats: ['con', 'str'], statWeights: { dex: 0.35, wis: 0.3, con: 0.2, str: 0.15 }, minStats: { dex: 13, wis: 13 } },
+                { id: 'paladin', label: 'Paladin', icon: '\uD83D\uDEE1\uFE0F', primaryStats: ['str', 'cha'], secondaryStats: ['con', 'wis'], statWeights: { str: 0.3, cha: 0.3, con: 0.2, wis: 0.15, dex: 0.05 }, minStats: { str: 13, cha: 13 } },
+                { id: 'ranger', label: 'Ranger', icon: '\uD83C\uDFF7\uFE0F', primaryStats: ['dex', 'wis'], secondaryStats: ['con', 'str'], statWeights: { dex: 0.35, wis: 0.25, con: 0.2, str: 0.15, int: 0.05 }, minStats: { dex: 13, wis: 12 } },
+                { id: 'rogue', label: 'Rogue', icon: '\uD83D\uDD77\uFE0F', primaryStats: ['dex', 'int'], secondaryStats: ['cha', 'wis'], statWeights: { dex: 0.35, int: 0.25, cha: 0.2, wis: 0.15, str: 0.05 }, minStats: { dex: 13, int: 12 } },
+                { id: 'sorcerer', label: 'Sorcerer', icon: '\uD83D\uDD25', primaryStats: ['cha', 'con'], secondaryStats: ['dex', 'int'], statWeights: { cha: 0.4, con: 0.2, dex: 0.2, int: 0.15, wis: 0.05 }, minStats: { cha: 13, con: 12 } },
+                { id: 'warlock', label: 'Warlock', icon: '\uD83D\uDD6F\uFE0F', primaryStats: ['cha', 'con'], secondaryStats: ['dex', 'int'], statWeights: { cha: 0.35, con: 0.25, dex: 0.2, int: 0.15, wis: 0.05 }, minStats: { cha: 13, con: 12 } },
+                { id: 'wizard', label: 'Wizard', icon: '\uD83E\uDDE0', primaryStats: ['int', 'con'], secondaryStats: ['dex', 'wis'], statWeights: { int: 0.4, con: 0.2, dex: 0.2, wis: 0.15, cha: 0.05 }, minStats: { int: 13, con: 12 } },
+                { id: 'artificer', label: 'Artificer', icon: '\uD83D\uDD27', primaryStats: ['int', 'con'], secondaryStats: ['dex', 'wis'], statWeights: { int: 0.35, con: 0.25, dex: 0.2, wis: 0.15, cha: 0.05 }, minStats: { int: 13, con: 12 } },
+                { id: 'blood_hunter', label: 'Blood Hunter', icon: '\uD83D\uDD2A', primaryStats: ['dex', 'wis'], secondaryStats: ['con', 'str'], statWeights: { dex: 0.3, wis: 0.3, con: 0.2, str: 0.15, int: 0.05 }, minStats: { dex: 13, wis: 13 } },
+                { id: 'gunslinger', label: 'Gunslinger', icon: '\uD83D\uDD2B', primaryStats: ['dex', 'wis'], secondaryStats: ['con', 'int'], statWeights: { dex: 0.35, wis: 0.25, con: 0.2, int: 0.15, str: 0.05 }, minStats: { dex: 13, wis: 12 } },
+                { id: 'inquisitive', label: 'Inquisitive', icon: '\uD83D\uDD0D', primaryStats: ['int', 'wis'], secondaryStats: ['dex', 'cha'], statWeights: { int: 0.3, wis: 0.3, dex: 0.2, cha: 0.15, con: 0.05 }, minStats: { int: 13, wis: 13 } },
+                { id: 'mystic', label: 'Mystic', icon: '\uD83E\uDDF8', primaryStats: ['int', 'wis'], secondaryStats: ['con', 'cha'], statWeights: { int: 0.3, wis: 0.3, con: 0.2, cha: 0.15, dex: 0.05 }, minStats: { int: 13, wis: 13 } },
+                { id: 'samurai', label: 'Samurai', icon: '\uD83D\uDDE1\uFE0F', primaryStats: ['str', 'wis'], secondaryStats: ['dex', 'con'], statWeights: { str: 0.3, wis: 0.25, dex: 0.2, con: 0.2, cha: 0.05 }, minStats: { str: 13, wis: 12 } },
+                { id: 'shadow_weaver', label: 'Shadow Weaver', icon: '\uD83C\uDF03', primaryStats: ['int', 'dex'], secondaryStats: ['cha', 'con'], statWeights: { int: 0.3, dex: 0.25, cha: 0.2, con: 0.15, wis: 0.1 }, minStats: { int: 13, dex: 13 } },
+                { id: 'warden', label: 'Warden', icon: '\uD83C\uDF33', primaryStats: ['str', 'wis'], secondaryStats: ['con', 'dex'], statWeights: { str: 0.3, wis: 0.25, con: 0.2, dex: 0.2, cha: 0.05 }, minStats: { str: 13, wis: 12 } },
+                { id: 'witch_hunter', label: 'Witch Hunter', icon: '\uD83D\uDD6F\uFE0F', primaryStats: ['dex', 'wis'], secondaryStats: ['con', 'int'], statWeights: { dex: 0.3, wis: 0.25, con: 0.2, int: 0.15, str: 0.1 }, minStats: { dex: 13, wis: 12 } }
+            ]
         }
     };
     console.warn('Using empty data fallback');
@@ -207,6 +232,9 @@ function renderAll() {
         if (typeof initCharacterEvents === 'function') {
             initCharacterEvents();
         }
+        if (typeof initStatsEvents === 'function') {
+            initStatsEvents();
+        }
     } else if (page === 'tournaments.html') {
         var container = document.getElementById('app-container');
         if (container && typeof renderTournamentsView === 'function') {
@@ -235,7 +263,6 @@ function renderAll() {
             renderSocialView(container);
         } else {
             console.error('renderSocialView not found - checking if social.js loaded');
-            // Try to load from social/ folder
             var script = document.createElement('script');
             script.src = 'social/social.js';
             script.onload = function() {
@@ -282,7 +309,6 @@ function renderCharacters() {
     });
     
     var filteredChars = sortedChars.filter(function(char) {
-        // Hide eliminated/deceased if checkbox is checked
         if (hideEliminatedDeceased) {
             if (char.deceased) return false;
             if (char.eliminations && char.eliminations.length > 0) return false;
@@ -300,7 +326,6 @@ function renderCharacters() {
                 if (!hasElimination) return false;
             } else {
                 var status = getCurrentStatus(char).toLowerCase();
-                // Check if the status matches or starts with the filter (for "Former" statuses)
                 if (status !== statusFilter && !status.startsWith(statusFilter + ' ')) {
                     return false;
                 }
@@ -314,7 +339,16 @@ function renderCharacters() {
         return;
     }
     
-    var html = '';
+    var html = '<div class="list-header char-header">' +
+        '<span>Name</span>' +
+        '<span>Age</span>' +
+        '<span>Status</span>' +
+        '<span>Class</span>' +
+        '<span>Power</span>' +
+        '<span>Teams</span>' +
+        '<span>Actions</span>' +
+    '</div>';
+    
     filteredChars.forEach(function(char) {
         var fullName = [char.firstName, char.middleName, char.lastName].filter(function(n) { return n; }).join(' ');
         var age = calculateAge(char);
@@ -324,6 +358,14 @@ function renderCharacters() {
         var isDead = char.deceased || false;
         var deadClass = isDead ? ' deceased' : '';
         var deadBadge = isDead ? ' <span class="deceased-badge">Deceased</span>' : '';
+        
+        // Stats and class
+        var stats = getCharacterStats(char);
+        var suggestedClass = suggestClassFromStats(stats);
+        var classDisplay = suggestedClass ? suggestedClass.icon + ' ' + suggestedClass.label : '\u2014';
+        var powerDisplay = getPowerLevelDisplay(char);
+        var powerLevel = getPowerLevelFromDisplay(powerDisplay);
+        var powerColor = getPowerLevelColor(powerLevel);
         
         var hasTournamentElim = false;
         var hasStandalone = false;
@@ -364,6 +406,8 @@ function renderCharacters() {
             '<span><strong>' + fullName + '</strong>' + deadBadge + elimBadges + elimWeekBadge + '</span>' +
             '<span>' + ageDisplay + '</span>' +
             '<span>' + status + '</span>' +
+            '<span style="font-size:0.75rem;color:var(--accent);">' + classDisplay + '</span>' +
+            '<span style="font-size:0.85rem;color:' + powerColor + ';letter-spacing:1px;">' + powerDisplay + '</span>' +
             '<span>' + teamCount + '</span>' +
             '<span class="actions">' +
                 '<button class="small edit-character" data-id="' + char.id + '">Edit</button>' +
@@ -479,17 +523,13 @@ function showCharacterForm(editId) {
     var formElement = document.getElementById('char-form');
     form.classList.remove('hidden');
     
-    // Find the character list item and scroll to it, not the top
     var targetElement = form;
     if (editId) {
-        // Try to find the list item for this character
         var listItem = document.querySelector('.char-item[data-id="' + editId + '"]');
         if (listItem) {
             targetElement = listItem;
         }
     }
-    
-    // Scroll to the target element with smooth behavior
     targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
     
     var deceasedCheck = document.getElementById('char-deceased');
@@ -528,6 +568,18 @@ function showCharacterForm(editId) {
                 deathFields.style.display = char.deceased ? 'block' : 'none';
             }
             
+            // Load stats
+            var stats = getCharacterStats(char);
+            document.getElementById('char-str').value = stats.str || 10;
+            document.getElementById('char-dex').value = stats.dex || 10;
+            document.getElementById('char-con').value = stats.con || 10;
+            document.getElementById('char-int').value = stats.int || 10;
+            document.getElementById('char-wis').value = stats.wis || 10;
+            document.getElementById('char-cha').value = stats.cha || 10;
+            if (typeof updateClassSuggestion === 'function') {
+                updateClassSuggestion();
+            }
+            
             var container = document.getElementById('career-status-container');
             container.innerHTML = '';
             if (char.careerStatus && char.careerStatus.length > 0) {
@@ -549,6 +601,17 @@ function showCharacterForm(editId) {
         formElement.reset();
         delete formElement.dataset.editId;
         if (deathFields) deathFields.style.display = 'none';
+        
+        // Set default stats
+        document.getElementById('char-str').value = 10;
+        document.getElementById('char-dex').value = 10;
+        document.getElementById('char-con').value = 10;
+        document.getElementById('char-int').value = 10;
+        document.getElementById('char-wis').value = 10;
+        document.getElementById('char-cha').value = 10;
+        if (typeof updateClassSuggestion === 'function') {
+            updateClassSuggestion();
+        }
         
         var container = document.getElementById('career-status-container');
         container.innerHTML = '';
@@ -735,7 +798,6 @@ function hideCharacterForm() {
     document.getElementById('character-form').classList.add('hidden');
     var list = document.getElementById('character-list');
     if (list) {
-        // Scroll to the character list header instead of the top
         var header = list.querySelector('.list-header');
         if (header) {
             header.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -822,7 +884,15 @@ function saveCharacter(e) {
         deathCause: deathCause,
         deathAge: deathAge,
         careerStatus: careerStatus,
-        specialty: document.getElementById('char-specialty').value.trim()
+        specialty: document.getElementById('char-specialty').value.trim(),
+        stats: {
+            str: parseInt(document.getElementById('char-str').value) || 10,
+            dex: parseInt(document.getElementById('char-dex').value) || 10,
+            con: parseInt(document.getElementById('char-con').value) || 10,
+            int: parseInt(document.getElementById('char-int').value) || 10,
+            wis: parseInt(document.getElementById('char-wis').value) || 10,
+            cha: parseInt(document.getElementById('char-cha').value) || 10
+        }
     };
     
     if (editId) {
@@ -878,6 +948,7 @@ function saveCharacter(e) {
             deathAge: charData.deathAge,
             careerStatus: charData.careerStatus,
             specialty: charData.specialty,
+            stats: charData.stats,
             eliminations: [],
             eliminatedWeeks: [],
             createdAt: new Date().toISOString()
@@ -919,6 +990,137 @@ function deleteCharacter(id) {
 }
 
 // ============================================================
+// STATS FUNCTIONS
+// ============================================================
+
+/**
+ * Get character stats, with defaults if not set
+ */
+function getCharacterStats(char) {
+    if (!char) return { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+    if (!char.stats) {
+        char.stats = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+    }
+    var statKeys = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+    var defaultStats = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+    for (var i = 0; i < statKeys.length; i++) {
+        var key = statKeys[i];
+        if (char.stats[key] === undefined || char.stats[key] === null) {
+            char.stats[key] = defaultStats[key];
+        }
+    }
+    return char.stats;
+}
+
+/**
+ * Calculate power level for a character
+ */
+function calculatePowerLevel(char) {
+    if (!char) return 0;
+    var stats = getCharacterStats(char);
+    var total = 0;
+    for (var key in stats) {
+        total += parseInt(stats[key]) || 10;
+    }
+    return total;
+}
+
+/**
+ * Get power level display (5 circles)
+ */
+function getPowerLevelDisplay(char) {
+    var power = calculatePowerLevel(char);
+    var maxPower = 180;
+    var percentage = Math.min(100, Math.round((power / maxPower) * 100));
+    var level = Math.floor(percentage / 20);
+    if (level > 4) level = 4;
+    if (level < 0) level = 0;
+    var filled = '\u25CF';
+    var empty = '\u25CB';
+    var display = '';
+    for (var i = 0; i < 5; i++) {
+        display += (i <= level) ? filled : empty;
+    }
+    return display;
+}
+
+/**
+ * Get power level from display string
+ */
+function getPowerLevelFromDisplay(display) {
+    var count = 0;
+    for (var i = 0; i < display.length; i++) {
+        if (display[i] === '\u25CF') count++;
+    }
+    return count || 1;
+}
+
+/**
+ * Get power level color
+ */
+function getPowerLevelColor(level) {
+    var colors = [
+        'var(--text-dim)',
+        'var(--warning)',
+        'var(--accent)',
+        'var(--info)',
+        'var(--danger)'
+    ];
+    return colors[Math.min(level - 1, 4)] || 'var(--text-dim)';
+}
+
+/**
+ * Suggest a class based on character stats
+ */
+function suggestClassFromStats(stats) {
+    if (!stats) return null;
+    
+    var scores = {
+        str: parseInt(stats.str) || 10,
+        dex: parseInt(stats.dex) || 10,
+        con: parseInt(stats.con) || 10,
+        int: parseInt(stats.int) || 10,
+        wis: parseInt(stats.wis) || 10,
+        cha: parseInt(stats.cha) || 10
+    };
+    
+    var classList = data.statsConfig?.classes || [];
+    var bestClass = null;
+    var bestScore = -Infinity;
+    
+    classList.forEach(function(cls) {
+        var meetsMin = true;
+        if (cls.minStats) {
+            for (var stat in cls.minStats) {
+                if ((scores[stat] || 0) < cls.minStats[stat]) {
+                    meetsMin = false;
+                    break;
+                }
+            }
+        }
+        if (!meetsMin) return;
+        
+        var total = 0;
+        var totalWeight = 0;
+        if (cls.statWeights) {
+            for (var stat in cls.statWeights) {
+                var weight = cls.statWeights[stat] || 0;
+                var score = scores[stat] || 10;
+                total += (score - 10) * weight;
+                totalWeight += weight;
+            }
+        }
+        var normalized = totalWeight > 0 ? total / totalWeight : 0;
+        if (normalized > bestScore) {
+            bestScore = normalized;
+            bestClass = cls;
+        }
+    });
+    
+    return bestClass;
+}
+
+// ============================================================
 // UTILITY FUNCTIONS
 // ============================================================
 
@@ -951,7 +1153,6 @@ function getCharacterAge(char) {
 
 /**
  * Get current career status for a character
- * Returns the most recent status based on the career status history
  */
 function getCurrentStatus(char) {
     if (!char || !char.careerStatus || char.careerStatus.length === 0) {
@@ -963,7 +1164,6 @@ function getCurrentStatus(char) {
     var mostRecentStart = -Infinity;
     var hasExactMatch = false;
     
-    // First, check if any status exactly matches the current year
     char.careerStatus.forEach(function(status) {
         var start = parseInt(status.startYear);
         var end = status.endYear ? parseInt(status.endYear) : null;
@@ -980,7 +1180,6 @@ function getCurrentStatus(char) {
         return mostRecentStatus;
     }
     
-    // Otherwise, find the most recent status by start year
     char.careerStatus.forEach(function(status) {
         var start = parseInt(status.startYear);
         var end = status.endYear ? parseInt(status.endYear) : null;
@@ -993,7 +1192,6 @@ function getCurrentStatus(char) {
         }
     });
     
-    // Check if all roles have ended
     var allEnded = true;
     char.careerStatus.forEach(function(status) {
         var start = parseInt(status.startYear);
@@ -1088,6 +1286,12 @@ window.getWeekBlock = getWeekBlock;
 window.logActivity = logActivity;
 window.getCharacterNameById = getCharacterNameById;
 window.getCharacterById = getCharacterById;
+window.getCharacterStats = getCharacterStats;
+window.calculatePowerLevel = calculatePowerLevel;
+window.getPowerLevelDisplay = getPowerLevelDisplay;
+window.getPowerLevelFromDisplay = getPowerLevelFromDisplay;
+window.getPowerLevelColor = getPowerLevelColor;
+window.suggestClassFromStats = suggestClassFromStats;
 
 // ============================================================
 // INITIALIZE
