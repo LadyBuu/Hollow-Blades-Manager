@@ -263,8 +263,9 @@ function renderAll() {
             renderSocialView(container);
         } else {
             console.error('renderSocialView not found - checking if social.js loaded');
+            // Try to load from js/ folder
             var script = document.createElement('script');
-            script.src = 'social/social.js';
+            script.src = 'js/social.js';
             script.onload = function() {
                 if (typeof renderSocialView === 'function') {
                     renderSocialView(container);
@@ -273,7 +274,7 @@ function renderAll() {
                 }
             };
             script.onerror = function() {
-                container.innerHTML = '<p class="empty-state">Failed to load social/social.js. Please check the file path.</p>';
+                container.innerHTML = '<p class="empty-state">Failed to load js/social.js. Please check the file path.</p>';
             };
             document.head.appendChild(script);
         }
