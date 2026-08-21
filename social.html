@@ -49,7 +49,7 @@
     <script src="js/utils.js"></script>
     <script src="js/export.js"></script>
     <script src="js/app.js"></script>
-    <script src="social/social.js"></script>
+    <script src="js/social.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var checkData = setInterval(function() {
@@ -60,15 +60,6 @@
                         renderSocialView(container);
                     } else {
                         console.error('renderSocialView not found after data loaded');
-                        // Try loading from social/ folder
-                        var script = document.createElement('script');
-                        script.src = 'social/social.js';
-                        script.onload = function() {
-                            if (typeof renderSocialView === 'function') {
-                                renderSocialView(container);
-                            }
-                        };
-                        document.head.appendChild(script);
                     }
                 }
             }, 200);
