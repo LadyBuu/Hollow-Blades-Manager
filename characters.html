@@ -55,7 +55,10 @@
             <label for="char-name-filter" style="margin-left:8px;">Name:</label>
             <input type="text" id="char-name-filter" placeholder="Search..." style="width:150px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:0.75rem;">
             <label style="margin-left:8px;display:flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--text-dim);cursor:pointer;">
-                <input type="checkbox" id="hide-eliminated-deceased" style="width:auto;accent-color:var(--accent);cursor:pointer;"> Hide Eliminated/Deceased
+                <input type="checkbox" id="hide-deceased" style="width:auto;accent-color:var(--danger);cursor:pointer;"> Hide Deceased
+            </label>
+            <label style="margin-left:4px;display:flex;align-items:center;gap:4px;font-size:0.75rem;color:var(--text-dim);cursor:pointer;">
+                <input type="checkbox" id="hide-eliminated" style="width:auto;accent-color:var(--warning);cursor:pointer;"> Hide Eliminated
             </label>
             <button id="clear-char-filter" class="small secondary">Clear</button>
         </div>
@@ -106,6 +109,10 @@
                         <input type="text" id="char-height" placeholder="e.g., 5'10\", 178cm" />
                     </div>
                     <div class="form-group">
+                        <label>Weight</label>
+                        <input type="text" id="char-weight" placeholder="e.g., 75kg, 165lbs" />
+                    </div>
+                    <div class="form-group">
                         <label>Build</label>
                         <input type="text" id="char-build" placeholder="Slim, Athletic, Stocky..." />
                     </div>
@@ -130,7 +137,7 @@
                                 </select>
                                 <input type="number" class="career-start-year" placeholder="Start Year" />
                                 <input type="number" class="career-end-year" placeholder="End Year (or leave blank)" />
-                                <button type="button" class="small danger remove-status">\u2715</button>
+                                <button type="button" class="small danger remove-status">✕</button>
                             </div>
                         </div>
                         <button type="button" id="add-status-btn" class="small" style="margin-top:8px;">+ Add Status</button>
@@ -143,7 +150,7 @@
 
                     <!-- STATS SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
-                        <label style="font-size:0.85rem;color:var(--accent);font-weight:600;">\u2726 Character Stats</label>
+                        <label style="font-size:0.85rem;color:var(--accent);font-weight:600;">✦ Character Stats</label>
                         <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Assign D&D-style stats (3-18 range recommended). Class will be auto-suggested based on stat distribution.</p>
                         
                         <div class="stat-input-group">
@@ -175,8 +182,106 @@
                         
                         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                             <label style="font-size:0.75rem;color:var(--text-dim);">Suggested Class:</label>
-                            <span id="suggested-class" class="suggested-class empty">\u2014</span>
-                            <button type="button" id="recalculate-class-btn" class="small secondary">\u21BB Recalculate</button>
+                            <span id="suggested-class" class="suggested-class empty">—</span>
+                            <button type="button" id="recalculate-class-btn" class="small secondary">⟳ Recalculate</button>
+                        </div>
+                    </div>
+
+                    <!-- MAGIC SECTION -->
+                    <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
+                        <label style="font-size:0.85rem;color:var(--info);font-weight:600;">✦ Magical Abilities</label>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Proficiency level for each magic type (0-10). A magical class will be auto-suggested based on your highest proficiencies.</p>
+                        
+                        <div class="magic-grid">
+                            <!-- Elemental Magic -->
+                            <div class="magic-category-label elemental">⚡ Elemental Magic</div>
+                            <div class="form-group magic-item">
+                                <label>⛰ Earth</label>
+                                <input type="number" id="magic-earth" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>💧 Water</label>
+                                <input type="number" id="magic-water" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🔥 Fire</label>
+                                <input type="number" id="magic-fire" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🌀 Air</label>
+                                <input type="number" id="magic-air" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>⚒ Metal</label>
+                                <input type="number" id="magic-metal" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🌳 Wood</label>
+                                <input type="number" id="magic-wood" min="0" max="10" value="0" />
+                            </div>
+                            
+                            <!-- Body Magic -->
+                            <div class="magic-category-label body">💪 Body Magic</div>
+                            <div class="form-group magic-item">
+                                <label>🩸 Blood</label>
+                                <input type="number" id="magic-blood" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🦴 Bone</label>
+                                <input type="number" id="magic-bone" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🧠 Mind</label>
+                                <input type="number" id="magic-mind" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🧬 Morphic</label>
+                                <input type="number" id="magic-morphic" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>✨ Life</label>
+                                <input type="number" id="magic-life" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>☠ Death</label>
+                                <input type="number" id="magic-death" min="0" max="10" value="0" />
+                            </div>
+                            
+                            <!-- Aether Magic -->
+                            <div class="magic-category-label aether">✦ Aether Magic</div>
+                            <div class="form-group magic-item">
+                                <label>🌌 Space</label>
+                                <input type="number" id="magic-space" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>⏳ Time</label>
+                                <input type="number" id="magic-time" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🌐 Dimension</label>
+                                <input type="number" id="magic-dimension" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>● Void</label>
+                                <input type="number" id="magic-void" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🌍 Reality</label>
+                                <input type="number" id="magic-reality" min="0" max="10" value="0" />
+                            </div>
+                            <div class="form-group magic-item">
+                                <label>🕯 Transference</label>
+                                <input type="number" id="magic-transference" min="0" max="10" value="0" />
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            <label style="font-size:0.75rem;color:var(--text-dim);">Suggested Magical Class:</label>
+                            <span id="suggested-magic-class" class="suggested-class empty">—</span>
+                            <button type="button" id="recalculate-magic-class-btn" class="small secondary">⟳ Recalculate</button>
+                        </div>
+                        <div style="margin-top:4px;font-size:0.65rem;color:var(--text-dim);">
+                            Magic Power: <span id="magic-power-display" style="font-weight:600;color:var(--info);">◯◯◯◯◯</span>
                         </div>
                     </div>
 
@@ -255,6 +360,7 @@
                 <span>Age</span>
                 <span>Status</span>
                 <span>Class</span>
+                <span>Magic</span>
                 <span>Power</span>
                 <span>Teams</span>
                 <span>Actions</span>
@@ -280,6 +386,7 @@
     <script src="js/export.js"></script>
     <script src="js/app.js"></script>
     <script src="js/stats.js"></script>
+    <script src="js/magic.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var checkData = setInterval(function() {
@@ -293,6 +400,9 @@
                     }
                     if (typeof initStatsEvents === 'function') {
                         initStatsEvents();
+                    }
+                    if (typeof initMagicEvents === 'function') {
+                        initMagicEvents();
                     }
                 }
             }, 200);
