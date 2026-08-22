@@ -2,6 +2,7 @@
  * missions.js - Mission Manager
  * Handles mission creation, assignment, tracking, and completion
  * Professional and Temporary teams can be assigned to missions
+ * Includes CSV import/export for bulk mission management
  */
 
 // Mission state
@@ -373,6 +374,314 @@ function populateTeamSelectors() {
 }
 
 /**
+ * Export missions to CSV
+ */
+function exportMissionsCSV() {
+    var missions = getMissions('all');
+    if (missions.length === 0) {
+        alert('No missions to export.');
+        return;
+    }
+    
+    var lines = [];
+    
+    // Header
+    lines.push('Title,Status,Priority,Difficulty,Team,TeamType,Location,Duration,Pay,Progress,Objectives,Notes,Tags,Created At,Completed At');
+    
+    missions.forEach(function(m) {
+        var teamName = getTeamName(m.assignedTeamId);
+        var teamType = getTeamTypeLabel(m.assignedTeamId);
+        var objectivesStr = '';
+        if (m.objectives) {
+            objectivesStr = m.objectives.map(function(o) {
+                return o.text + (o.done ? ' ✓' : '');
+            }).join('; ');
+        }
+        var tagsStr = (m.tags || []).join('; ');
+        var createdAt = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '';
+        var completedAt = m.completedAt ? new Date(m.completedAt).toLocaleDateString() : '';
+        
+        var row = [
+            csvField(m.title || ''),
+            m.status || 'active',
+            m.priority || 'medium',
+            m.difficulty || 'medium',
+            csvField(teamName),
+            csvField(teamType),
+            csvField(m.location || ''),
+            csvField(m.duration || ''),
+            csvField(m.pay || ''),
+            m.progress || '0',
+            csvField(objectivesStr),
+            csvField(m.notes || ''),
+            csvField(tagsStr),
+            createdAt,
+            completedAt
+        ];
+        lines.push(row.join(','));
+    });
+    
+    var csvContent = lines.join('\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'missions-export-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Exported ' + missions.length + ' missions to CSV');
+    }
+}
+
+/**
+ * Export mission template CSV
+ */
+function exportMissionTemplateCSV() {
+    var lines = [
+        'Title,Status,Priority,Difficulty,Team,TeamType,Location,Duration,Pay,Progress,Objectives,Notes,Tags,Created At,Completed At',
+        'Operation Nightfall,active,high,hard,Shadow Squad,Professional,Berlin,2 weeks,5000 credits,50,Infiltrate base;Retrieve documents ✓;Extract intel,Use stealth approach,covert;rescue,2024-01-15,',
+        'Rescue Mission,active,medium,medium,Team Alpha,Academic,London,3 days,2000 credits,0,Find hostages;Extract safely,Proceed with caution,rescue;hostage,2024-01-20,',
+        'Supply Run,completed,low,easy,Logistics Team,Temporary,Outpost 7,1 day,500 credits,100,Deliver supplies ✓;Check inventory ✓,All delivered,logistics;supply,2024-01-10,2024-01-11'
+    ];
+    
+    var csvContent = lines.join('\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'mission-template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    if (typeof logActivity === 'function') {
+        logActivity('Exported mission template CSV');
+    }
+}
+
+/**
+ * Import missions from CSV
+ */
+function importMissionsCSV(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            if (!confirm('This will add missions from the CSV file. Existing missions will be preserved. Continue?')) return;
+            
+            var lines = e.target.result.split('\n');
+            var headers = [];
+            var importedCount = 0;
+            var errorCount = 0;
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                
+                var values = parseCSVLine(line);
+                
+                if (i === 0) {
+                    // Check if this is a header row
+                    var possibleHeaders = ['Title', 'Status', 'Priority', 'Difficulty', 'Team', 'TeamType', 'Location', 'Duration', 'Pay', 'Progress', 'Objectives', 'Notes', 'Tags', 'Created At', 'Completed At'];
+                    var headerMatch = 0;
+                    values.forEach(function(v) {
+                        if (possibleHeaders.indexOf(v.trim()) !== -1) headerMatch++;
+                    });
+                    if (headerMatch >= 3) {
+                        headers = values.map(function(h) { return h.trim(); });
+                        continue;
+                    }
+                }
+                
+                // Parse as data row
+                var missionData = {
+                    title: '',
+                    status: 'active',
+                    priority: 'medium',
+                    difficulty: 'medium',
+                    assignedTeamId: null,
+                    location: '',
+                    duration: '',
+                    pay: '',
+                    progress: 0,
+                    objectives: [],
+                    notes: '',
+                    tags: []
+                };
+                
+                var headerMap = {
+                    'Title': 'title',
+                    'Status': 'status',
+                    'Priority': 'priority',
+                    'Difficulty': 'difficulty',
+                    'Team': 'teamName',
+                    'Location': 'location',
+                    'Duration': 'duration',
+                    'Pay': 'pay',
+                    'Progress': 'progress',
+                    'Objectives': 'objectives',
+                    'Notes': 'notes',
+                    'Tags': 'tags'
+                };
+                
+                // If no headers detected, use position-based mapping
+                if (headers.length === 0) {
+                    headers = ['Title', 'Status', 'Priority', 'Difficulty', 'Team', 'TeamType', 'Location', 'Duration', 'Pay', 'Progress', 'Objectives', 'Notes', 'Tags', 'Created At', 'Completed At'];
+                }
+                
+                headers.forEach(function(header, index) {
+                    var value = values[index] ? values[index].trim() : '';
+                    var mapped = headerMap[header];
+                    
+                    if (!mapped) return;
+                    
+                    if (mapped === 'title') {
+                        missionData.title = value;
+                    } else if (mapped === 'status') {
+                        if (['active', 'completed', 'cancelled'].indexOf(value) !== -1) {
+                            missionData.status = value;
+                        }
+                    } else if (mapped === 'priority') {
+                        if (['low', 'medium', 'high', 'critical'].indexOf(value) !== -1) {
+                            missionData.priority = value;
+                        }
+                    } else if (mapped === 'difficulty') {
+                        if (['easy', 'medium', 'hard', 'expert'].indexOf(value) !== -1) {
+                            missionData.difficulty = value;
+                        }
+                    } else if (mapped === 'teamName') {
+                        // Find team by name
+                        if (value) {
+                            var team = data.teams.find(function(t) { 
+                                return t.name.toLowerCase() === value.toLowerCase() && t.status !== 'deleted';
+                            });
+                            if (team) {
+                                missionData.assignedTeamId = team.id;
+                            }
+                        }
+                    } else if (mapped === 'location') {
+                        missionData.location = value;
+                    } else if (mapped === 'duration') {
+                        missionData.duration = value;
+                    } else if (mapped === 'pay') {
+                        missionData.pay = value;
+                    } else if (mapped === 'progress') {
+                        var prog = parseInt(value);
+                        if (!isNaN(prog)) missionData.progress = prog;
+                    } else if (mapped === 'objectives') {
+                        if (value) {
+                            var objParts = value.split(';');
+                            objParts.forEach(function(part) {
+                                part = part.trim();
+                                if (part) {
+                                    var done = part.endsWith('✓');
+                                    var text = part.replace('✓', '').trim();
+                                    if (text) {
+                                        missionData.objectives.push({ text: text, done: done });
+                                    }
+                                }
+                            });
+                        }
+                    } else if (mapped === 'notes') {
+                        missionData.notes = value;
+                    } else if (mapped === 'tags') {
+                        if (value) {
+                            missionData.tags = value.split(';').map(function(t) { return t.trim(); }).filter(function(t) { return t; });
+                        }
+                    }
+                });
+                
+                if (!missionData.title) {
+                    errorCount++;
+                    continue;
+                }
+                
+                // Create the mission
+                var newMission = createMission(missionData);
+                if (newMission) {
+                    importedCount++;
+                    if (missionData.status === 'completed') {
+                        newMission.status = 'completed';
+                        newMission.completedAt = new Date().toISOString();
+                    }
+                    if (missionData.progress > 0) {
+                        newMission.progress = missionData.progress;
+                    }
+                    // Add log entry
+                    addMissionLog(newMission.id, 'Imported from CSV');
+                }
+            }
+            
+            saveData().then(function() {
+                renderMissions();
+                alert('CSV import completed!\n\n' +
+                    'Successfully imported: ' + importedCount + ' missions\n' +
+                    'Errors: ' + errorCount);
+            }).catch(function(err) {
+                alert('Failed to save missions: ' + err.message);
+            });
+            
+        } catch (err) {
+            alert('Failed to import CSV: ' + err.message);
+            console.error(err);
+        }
+    };
+    reader.readAsText(file);
+}
+
+/**
+ * CSV field helper
+ */
+function csvField(value) {
+    if (value === null || value === undefined) return '';
+    var str = String(value);
+    if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+        return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+}
+
+/**
+ * Parse CSV line
+ */
+function parseCSVLine(line) {
+    var values = [];
+    var current = '';
+    var inQuotes = false;
+    
+    for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (inQuotes) {
+            if (ch === '"' && line[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else if (ch === '"') {
+                inQuotes = false;
+            } else {
+                current += ch;
+            }
+        } else {
+            if (ch === '"') {
+                inQuotes = true;
+            } else if (ch === ',') {
+                values.push(current.trim());
+                current = '';
+            } else if (ch === '\n' || ch === '\r') {
+                // Skip line breaks
+            } else {
+                current += ch;
+            }
+        }
+    }
+    values.push(current.trim());
+    return values;
+}
+
+/**
  * Render the missions view
  */
 function renderMissionsView(container) {
@@ -381,7 +690,13 @@ function renderMissionsView(container) {
     container.innerHTML = `
         <div class="page-header">
             <h2>Mission Manager</h2>
-            <button id="add-mission-btn" class="primary">+ New Mission</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="add-mission-btn" class="primary">+ New Mission</button>
+                <button id="export-missions-csv-btn" class="small">\uD83D\uDCC4 Export CSV</button>
+                <button id="import-missions-csv-btn" class="small">\uD83D\uDCCD Import CSV</button>
+                <button id="template-missions-csv-btn" class="small secondary">Template CSV</button>
+                <input type="file" id="missions-csv-file-input" accept=".csv" style="display:none" />
+            </div>
         </div>
 
         <div class="filter-section">
@@ -815,6 +1130,35 @@ function initMissionEvents() {
         addBtn.addEventListener('click', function() { showMissionForm(); });
     }
     
+    // Export CSV
+    var exportBtn = document.getElementById('export-missions-csv-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportMissionsCSV);
+    }
+    
+    // Import CSV
+    var importBtn = document.getElementById('import-missions-csv-btn');
+    if (importBtn) {
+        importBtn.addEventListener('click', function() {
+            document.getElementById('missions-csv-file-input').click();
+        });
+    }
+    var fileInput = document.getElementById('missions-csv-file-input');
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                importMissionsCSV(this.files[0]);
+                this.value = '';
+            }
+        });
+    }
+    
+    // Template CSV
+    var templateBtn = document.getElementById('template-missions-csv-btn');
+    if (templateBtn) {
+        templateBtn.addEventListener('click', exportMissionTemplateCSV);
+    }
+    
     // Form close buttons
     var closeFormBtn = document.getElementById('close-mission-form');
     if (closeFormBtn) {
@@ -930,3 +1274,8 @@ window.getStatusInfo = getStatusInfo;
 window.getDifficultyLabel = getDifficultyLabel;
 window.populateTeamSelectors = populateTeamSelectors;
 window.addObjectiveToList = addObjectiveToList;
+window.exportMissionsCSV = exportMissionsCSV;
+window.exportMissionTemplateCSV = exportMissionTemplateCSV;
+window.importMissionsCSV = importMissionsCSV;
+window.csvField = csvField;
+window.parseCSVLine = parseCSVLine;
