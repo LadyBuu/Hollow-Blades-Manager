@@ -68,6 +68,10 @@
             <h3 id="form-title">Add Character</h3>
             <form id="char-form">
                 <div class="form-grid">
+                    <!-- NAME SECTION -->
+                    <div class="form-group full-width" style="border-bottom:1px solid var(--border-soft);padding-bottom:12px;margin-bottom:8px;">
+                        <label style="font-size:0.85rem;color:var(--accent);font-weight:600;">Name</label>
+                    </div>
                     <div class="form-group">
                         <label>First Name *</label>
                         <input type="text" id="char-firstname" required />
@@ -77,9 +81,32 @@
                         <input type="text" id="char-middlename" />
                     </div>
                     <div class="form-group">
-                        <label>Last Name</label>
-                        <input type="text" id="char-lastname" />
+                        <label>Last Name *</label>
+                        <input type="text" id="char-lastname" required />
                     </div>
+                    <div class="form-group">
+                        <label>Nickname (e.g., Ben)</label>
+                        <input type="text" id="char-nickname" placeholder="e.g., Ben" />
+                    </div>
+                    <div class="form-group">
+                        <label>Alias (e.g., The Shadow)</label>
+                        <input type="text" id="char-alias" placeholder="e.g., The Shadow" />
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Previous Names (comma separated)</label>
+                        <input type="text" id="char-previous-names" placeholder="e.g., John Smith, Jonathan Doe" />
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Display Name Format</label>
+                        <select id="char-name-format" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;">
+                            <option value="firstlast">First + Last (e.g., Benjamin Parker)</option>
+                            <option value="lastfirst">Last, First (e.g., Parker, Benjamin)</option>
+                            <option value="nicklast">Nickname + Last (e.g., Ben Parker)</option>
+                            <option value="firstnick">First + Nickname (e.g., Benjamin "Ben")</option>
+                            <option value="alias">Alias (e.g., The Shadow)</option>
+                        </select>
+                    </div>
+                    
                     <div class="form-group">
                         <label>Year of Birth</label>
                         <input type="number" id="char-birthyear" />
@@ -87,10 +114,6 @@
                     <div class="form-group">
                         <label>Gender</label>
                         <input type="text" id="char-gender" placeholder="Male/Female/Other" />
-                    </div>
-                    <div class="form-group">
-                        <label>Associated Names</label>
-                        <input type="text" id="char-associated-names" placeholder="e.g., The Shadow, Nightwalker" />
                     </div>
                     <div class="form-group">
                         <label>Eye Color</label>
@@ -151,7 +174,7 @@
                     <!-- STATS SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
                         <label style="font-size:0.85rem;color:var(--accent);font-weight:600;">✦ Character Stats</label>
-                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Assign D&D-style stats (3-18 range recommended). Class will be auto-suggested based on stat distribution.</p>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Assign D&D-style stats (3-18 range recommended). Physical class will be auto-suggested.</p>
                         
                         <div class="stat-input-group">
                             <div class="form-group">
@@ -181,104 +204,103 @@
                         </div>
                         
                         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                            <label style="font-size:0.75rem;color:var(--text-dim);">Suggested Class:</label>
+                            <label style="font-size:0.75rem;color:var(--text-dim);">Physical Class:</label>
                             <span id="suggested-class" class="suggested-class empty">—</span>
-                            <button type="button" id="recalculate-class-btn" class="small secondary">⟳ Recalculate</button>
+                            <button type="button" id="random-stats-btn" class="small secondary">🎲 Random</button>
+                            <button type="button" id="recalculate-class-btn" class="small secondary">⟳ Recalc</button>
                         </div>
                     </div>
 
                     <!-- MAGIC SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
                         <label style="font-size:0.85rem;color:var(--info);font-weight:600;">✦ Magical Abilities</label>
-                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Proficiency level for each magic type (0-10). A magical class will be auto-suggested based on your highest proficiencies.</p>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Proficiency level for each magic type (0-10). Magical class will be auto-suggested.</p>
                         
                         <div class="magic-grid">
-                            <!-- Elemental Magic -->
-                            <div class="magic-category-label elemental">⚡ Elemental Magic</div>
+                            <div class="magic-category-label elemental">⚡ Elemental</div>
                             <div class="form-group magic-item">
-                                <label>⛰ Earth</label>
+                                <label>Earth</label>
                                 <input type="number" id="magic-earth" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>💧 Water</label>
+                                <label>Water</label>
                                 <input type="number" id="magic-water" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🔥 Fire</label>
+                                <label>Fire</label>
                                 <input type="number" id="magic-fire" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🌀 Air</label>
+                                <label>Air</label>
                                 <input type="number" id="magic-air" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>⚒ Metal</label>
+                                <label>Metal</label>
                                 <input type="number" id="magic-metal" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🌳 Wood</label>
+                                <label>Wood</label>
                                 <input type="number" id="magic-wood" min="0" max="10" value="0" />
                             </div>
                             
-                            <!-- Body Magic -->
-                            <div class="magic-category-label body">💪 Body Magic</div>
+                            <div class="magic-category-label body">💪 Body</div>
                             <div class="form-group magic-item">
-                                <label>🩸 Blood</label>
+                                <label>Blood</label>
                                 <input type="number" id="magic-blood" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🦴 Bone</label>
+                                <label>Bone</label>
                                 <input type="number" id="magic-bone" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🧠 Mind</label>
+                                <label>Mind</label>
                                 <input type="number" id="magic-mind" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🧬 Morphic</label>
+                                <label>Morphic</label>
                                 <input type="number" id="magic-morphic" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>✨ Life</label>
+                                <label>Life</label>
                                 <input type="number" id="magic-life" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>☠ Death</label>
+                                <label>Death</label>
                                 <input type="number" id="magic-death" min="0" max="10" value="0" />
                             </div>
                             
-                            <!-- Aether Magic -->
-                            <div class="magic-category-label aether">✦ Aether Magic</div>
+                            <div class="magic-category-label aether">✦ Aether</div>
                             <div class="form-group magic-item">
-                                <label>🌌 Space</label>
+                                <label>Space</label>
                                 <input type="number" id="magic-space" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>⏳ Time</label>
+                                <label>Time</label>
                                 <input type="number" id="magic-time" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🌐 Dimension</label>
+                                <label>Dimension</label>
                                 <input type="number" id="magic-dimension" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>● Void</label>
+                                <label>Void</label>
                                 <input type="number" id="magic-void" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🌍 Reality</label>
+                                <label>Reality</label>
                                 <input type="number" id="magic-reality" min="0" max="10" value="0" />
                             </div>
                             <div class="form-group magic-item">
-                                <label>🕯 Transference</label>
+                                <label>Transference</label>
                                 <input type="number" id="magic-transference" min="0" max="10" value="0" />
                             </div>
                         </div>
                         
                         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                            <label style="font-size:0.75rem;color:var(--text-dim);">Suggested Magical Class:</label>
+                            <label style="font-size:0.75rem;color:var(--text-dim);">Magical Class:</label>
                             <span id="suggested-magic-class" class="suggested-class empty">—</span>
-                            <button type="button" id="recalculate-magic-class-btn" class="small secondary">⟳ Recalculate</button>
+                            <button type="button" id="random-magic-btn" class="small secondary">🎲 Random</button>
+                            <button type="button" id="recalculate-magic-class-btn" class="small secondary">⟳ Recalc</button>
                         </div>
                         <div style="margin-top:4px;font-size:0.65rem;color:var(--text-dim);">
                             Magic Power: <span id="magic-power-display" style="font-weight:600;color:var(--info);">◯◯◯◯◯</span>
@@ -309,10 +331,10 @@
                         </div>
                     </div>
 
-                    <!-- STANDALONE ELIMINATION SECTION ONLY -->
+                    <!-- STANDALONE ELIMINATION SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;border-left:3px solid var(--warning);">
-                        <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">Standalone Elimination (Dropout / Injury / etc.)</label>
-                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Eliminate a character directly without tournament association. This will mark them as eliminated from the specified week onward.</p>
+                        <label style="font-size:0.85rem;color:var(--warning);font-weight:600;">Standalone Elimination</label>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Eliminate a character directly without tournament association.</p>
                         
                         <input type="hidden" id="standalone-char-id" />
                         
@@ -320,14 +342,14 @@
                             <label style="font-size:0.7rem;color:var(--text-dim);">Week:</label>
                             <input type="number" id="standalone-elim-week" min="1" max="52" value="1" style="width:70px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;" />
                             <label style="font-size:0.7rem;color:var(--text-dim);">Reason:</label>
-                            <input type="text" id="standalone-elim-reason" placeholder="e.g., Dropped out, Injured, Left" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;" />
-                            <button type="button" id="add-standalone-elim-btn" class="small warning-btn">+ Apply Standalone Elimination</button>
+                            <input type="text" id="standalone-elim-reason" placeholder="e.g., Dropped out" style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 8px;" />
+                            <button type="button" id="add-standalone-elim-btn" class="small warning-btn">+ Apply</button>
                         </div>
                         
                         <div style="margin-top:10px;">
                             <label style="font-size:0.75rem;color:var(--text-dim);">Existing Standalone Eliminations:</label>
                             <div id="standalone-eliminations-container" style="margin-top:4px;">
-                                <p class="empty-state" style="padding:6px;font-size:0.75rem;">No standalone eliminations recorded.</p>
+                                <p class="empty-state" style="padding:6px;font-size:0.75rem;">None recorded.</p>
                             </div>
                         </div>
                     </div>
@@ -335,9 +357,9 @@
                     <!-- TOURNAMENT ELIMINATIONS - VIEW ONLY -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;border-left:3px solid var(--info);">
                         <label style="font-size:0.85rem;color:var(--info);font-weight:600;">Tournament Eliminations (View Only)</label>
-                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">These eliminations are managed from the Tournaments page.</p>
+                        <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Managed from the Tournaments page.</p>
                         <div id="tournament-eliminations-view" style="margin-top:4px;">
-                            <p class="empty-state" style="padding:6px;font-size:0.75rem;">No tournament eliminations recorded.</p>
+                            <p class="empty-state" style="padding:6px;font-size:0.75rem;">None recorded.</p>
                         </div>
                     </div>
                     
@@ -362,7 +384,6 @@
                 <span>Class</span>
                 <span>Magic</span>
                 <span>Power</span>
-                <span>Teams</span>
                 <span>Actions</span>
             </div>
             <div id="characters-container">
