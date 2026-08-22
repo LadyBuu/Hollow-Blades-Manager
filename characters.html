@@ -143,40 +143,40 @@
 
                     <!-- STATS SECTION -->
                     <div class="form-group full-width" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px;">
-                        <label style="font-size:0.85rem;color:var(--accent);font-weight:600;">✦ Character Stats</label>
+                        <label style="font-size:0.85rem;color:var(--accent);font-weight:600;">\u2726 Character Stats</label>
                         <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:8px;">Assign D&D-style stats (3-18 range recommended). Class will be auto-suggested based on stat distribution.</p>
                         
-                        <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;">
+                        <div class="stat-input-group">
                             <div class="form-group">
                                 <label>Strength (STR)</label>
-                                <input type="number" id="char-str" min="1" max="30" value="10" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                                <input type="number" id="char-str" min="1" max="30" value="10" />
                             </div>
                             <div class="form-group">
                                 <label>Dexterity (DEX)</label>
-                                <input type="number" id="char-dex" min="1" max="30" value="10" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                                <input type="number" id="char-dex" min="1" max="30" value="10" />
                             </div>
                             <div class="form-group">
                                 <label>Constitution (CON)</label>
-                                <input type="number" id="char-con" min="1" max="30" value="10" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                                <input type="number" id="char-con" min="1" max="30" value="10" />
                             </div>
                             <div class="form-group">
                                 <label>Intelligence (INT)</label>
-                                <input type="number" id="char-int" min="1" max="30" value="10" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                                <input type="number" id="char-int" min="1" max="30" value="10" />
                             </div>
                             <div class="form-group">
                                 <label>Wisdom (WIS)</label>
-                                <input type="number" id="char-wis" min="1" max="30" value="10" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                                <input type="number" id="char-wis" min="1" max="30" value="10" />
                             </div>
                             <div class="form-group">
                                 <label>Charisma (CHA)</label>
-                                <input type="number" id="char-cha" min="1" max="30" value="10" style="width:100%;padding:6px;background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;" />
+                                <input type="number" id="char-cha" min="1" max="30" value="10" />
                             </div>
                         </div>
                         
                         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
                             <label style="font-size:0.75rem;color:var(--text-dim);">Suggested Class:</label>
-                            <span id="suggested-class" style="font-weight:600;color:var(--accent);padding:2px 12px;background:var(--accent-soft);border-radius:12px;border:1px solid var(--accent);">—</span>
-                            <button type="button" id="recalculate-class-btn" class="small secondary">⟳ Recalculate</button>
+                            <span id="suggested-class" class="suggested-class empty">\u2014</span>
+                            <button type="button" id="recalculate-class-btn" class="small secondary">\u21BB Recalculate</button>
                         </div>
                     </div>
 
