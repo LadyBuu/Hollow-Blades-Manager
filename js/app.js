@@ -235,6 +235,9 @@ function renderAll() {
         if (typeof initStatsEvents === 'function') {
             initStatsEvents();
         }
+        if (typeof initMagicEvents === 'function') {
+            initMagicEvents();
+        }
     } else if (page === 'tournaments.html') {
         var container = document.getElementById('app-container');
         if (container && typeof renderTournamentsView === 'function') {
@@ -263,9 +266,8 @@ function renderAll() {
             renderSocialView(container);
         } else {
             console.error('renderSocialView not found - checking if social.js loaded');
-            // Try to load from js/social/ folder
             var script = document.createElement('script');
-            script.src = 'js/social/social.js';
+            script.src = 'js/social.js';
             script.onload = function() {
                 if (typeof renderSocialView === 'function') {
                     renderSocialView(container);
@@ -274,7 +276,7 @@ function renderAll() {
                 }
             };
             script.onerror = function() {
-                container.innerHTML = '<p class="empty-state">Failed to load js/social/social.js. Please check the file path.</p>';
+                container.innerHTML = '<p class="empty-state">Failed to load js/social.js. Please check the file path.</p>';
             };
             document.head.appendChild(script);
         }
@@ -303,9 +305,17 @@ function renderCharacters() {
         return;
     }
     
+    // Sort: deceased at bottom, eliminated next, then active by name
     var sortedChars = data.characters.slice().sort(function(a, b) {
-        if (a.deceased && !b.deceased) return 1;
-        if (!a.deceased && b.deceased) return -1;
+        var aDeceased = a.deceased || false;
+        var bDeceased = b.deceased || false;
+        var aEliminated = (a.eliminations && a.eliminations.length > 0) || false;
+        var bEliminated = (b.eliminations && b.eliminations.length > 0) || false;
+        
+        if (aDeceased && !bDeceased) return 1;
+        if (!aDeceased && bDeceased) return -1;
+        if (aEliminated && !bEliminated) return 1;
+        if (!aEliminated && bEliminated) return -1;
         return (a.firstName || '').toLowerCase().localeCompare((b.firstName || '').toLowerCase());
     });
     
@@ -345,6 +355,7 @@ function renderCharacters() {
         '<span>Age</span>' +
         '<span>Status</span>' +
         '<span>Class</span>' +
+        '<span>Magic</span>' +
         '<span>Power</span>' +
         '<span>Teams</span>' +
         '<span>Actions</span>' +
@@ -367,6 +378,13 @@ function renderCharacters() {
         var powerDisplay = getPowerLevelDisplay(char);
         var powerLevel = getPowerLevelFromDisplay(powerDisplay);
         var powerColor = getPowerLevelColor(powerLevel);
+        
+        // Magic info
+        var magicClass = suggestMagicClass(char);
+        var magicClassDisplay = magicClass ? magicClass.name : '\u2014';
+        var magicPowerDisplay = getMagicPowerDisplay(char);
+        var magicPowerLevel = getPowerLevelFromDisplay(magicPowerDisplay);
+        var magicPowerColor = getPowerLevelColor(magicPowerLevel);
         
         var hasTournamentElim = false;
         var hasStandalone = false;
@@ -408,6 +426,7 @@ function renderCharacters() {
             '<span>' + ageDisplay + '</span>' +
             '<span>' + status + '</span>' +
             '<span style="font-size:0.75rem;color:var(--accent);">' + classDisplay + '</span>' +
+            '<span style="font-size:0.75rem;color:var(--info);">' + magicClassDisplay + '</span>' +
             '<span style="font-size:0.85rem;color:' + powerColor + ';letter-spacing:1px;">' + powerDisplay + '</span>' +
             '<span>' + teamCount + '</span>' +
             '<span class="actions">' +
@@ -557,6 +576,7 @@ function showCharacterForm(editId) {
             document.getElementById('char-hair').value = char.hair || '';
             document.getElementById('char-skin').value = char.skin || '';
             document.getElementById('char-height').value = char.height || '';
+            document.getElementById('char-weight').value = char.weight || '';
             document.getElementById('char-build').value = char.build || '';
             document.getElementById('char-appearance-notes').value = char.appearanceNotes || '';
             document.getElementById('char-notes').value = char.notes || '';
@@ -579,6 +599,21 @@ function showCharacterForm(editId) {
             document.getElementById('char-cha').value = stats.cha || 10;
             if (typeof updateClassSuggestion === 'function') {
                 updateClassSuggestion();
+            }
+            
+            // Load magic
+            var magic = getCharacterMagic(char);
+            for (var key in magic) {
+                var input = document.getElementById('magic-' + key);
+                if (input) {
+                    input.value = magic[key] || 0;
+                }
+            }
+            if (typeof updateMagicClassSuggestion === 'function') {
+                updateMagicClassSuggestion();
+            }
+            if (typeof updateMagicPowerDisplay === 'function') {
+                updateMagicPowerDisplay();
             }
             
             var container = document.getElementById('career-status-container');
@@ -612,6 +647,21 @@ function showCharacterForm(editId) {
         document.getElementById('char-cha').value = 10;
         if (typeof updateClassSuggestion === 'function') {
             updateClassSuggestion();
+        }
+        
+        // Set default magic
+        var defaultMagic = getDefaultMagicProficiencies();
+        for (var key in defaultMagic) {
+            var input = document.getElementById('magic-' + key);
+            if (input) {
+                input.value = 0;
+            }
+        }
+        if (typeof updateMagicClassSuggestion === 'function') {
+            updateMagicClassSuggestion();
+        }
+        if (typeof updateMagicPowerDisplay === 'function') {
+            updateMagicPowerDisplay();
         }
         
         var container = document.getElementById('career-status-container');
@@ -866,6 +916,15 @@ function saveCharacter(e) {
         }
     });
     
+    // Collect magic proficiencies
+    var magic = {};
+    for (var key in MAGIC_TYPES) {
+        var input = document.getElementById('magic-' + key);
+        if (input) {
+            magic[key] = parseInt(input.value) || 0;
+        }
+    }
+    
     var charData = {
         firstName: document.getElementById('char-firstname').value.trim(),
         middleName: document.getElementById('char-middlename').value.trim(),
@@ -877,6 +936,7 @@ function saveCharacter(e) {
         hair: document.getElementById('char-hair').value.trim(),
         skin: document.getElementById('char-skin').value.trim(),
         height: document.getElementById('char-height').value.trim(),
+        weight: document.getElementById('char-weight').value.trim(),
         build: document.getElementById('char-build').value.trim(),
         appearanceNotes: document.getElementById('char-appearance-notes').value.trim(),
         notes: document.getElementById('char-notes').value.trim(),
@@ -893,7 +953,8 @@ function saveCharacter(e) {
             int: parseInt(document.getElementById('char-int').value) || 10,
             wis: parseInt(document.getElementById('char-wis').value) || 10,
             cha: parseInt(document.getElementById('char-cha').value) || 10
-        }
+        },
+        magic: magic
     };
     
     if (editId) {
@@ -940,6 +1001,7 @@ function saveCharacter(e) {
             hair: charData.hair,
             skin: charData.skin,
             height: charData.height,
+            weight: charData.weight,
             build: charData.build,
             appearanceNotes: charData.appearanceNotes,
             notes: charData.notes,
@@ -950,6 +1012,7 @@ function saveCharacter(e) {
             careerStatus: charData.careerStatus,
             specialty: charData.specialty,
             stats: charData.stats,
+            magic: charData.magic,
             eliminations: [],
             eliminatedWeeks: [],
             createdAt: new Date().toISOString()
@@ -1119,6 +1182,186 @@ function suggestClassFromStats(stats) {
     });
     
     return bestClass;
+}
+
+// ============================================================
+// MAGIC FUNCTIONS
+// ============================================================
+
+/**
+ * Get default magic proficiencies
+ */
+function getDefaultMagicProficiencies() {
+    var proficiencies = {};
+    var magicTypes = {
+        earth: 0, water: 0, fire: 0, air: 0, metal: 0, wood: 0,
+        blood: 0, bone: 0, mind: 0, morphic: 0, life: 0, death: 0,
+        space: 0, time: 0, dimension: 0, void: 0, reality: 0, transference: 0
+    };
+    for (var key in magicTypes) {
+        proficiencies[key] = 0;
+    }
+    return proficiencies;
+}
+
+/**
+ * Get character magic proficiencies, with defaults if not set
+ */
+function getCharacterMagic(char) {
+    if (!char) return getDefaultMagicProficiencies();
+    if (!char.magic) {
+        char.magic = getDefaultMagicProficiencies();
+    }
+    var hasAll = true;
+    var magicTypes = {
+        earth: 0, water: 0, fire: 0, air: 0, metal: 0, wood: 0,
+        blood: 0, bone: 0, mind: 0, morphic: 0, life: 0, death: 0,
+        space: 0, time: 0, dimension: 0, void: 0, reality: 0, transference: 0
+    };
+    for (var key in magicTypes) {
+        if (char.magic[key] === undefined || char.magic[key] === null) {
+            hasAll = false;
+            break;
+        }
+    }
+    if (!hasAll) {
+        var defaultMagic = getDefaultMagicProficiencies();
+        for (var key in defaultMagic) {
+            if (char.magic[key] === undefined || char.magic[key] === null) {
+                char.magic[key] = defaultMagic[key];
+            }
+        }
+    }
+    return char.magic;
+}
+
+/**
+ * Calculate total magical power
+ */
+function calculateMagicPower(char) {
+    var magic = getCharacterMagic(char);
+    var total = 0;
+    for (var key in magic) {
+        total += parseInt(magic[key]) || 0;
+    }
+    return total;
+}
+
+/**
+ * Get magic power level display
+ */
+function getMagicPowerDisplay(char) {
+    var power = calculateMagicPower(char);
+    var maxPower = 180; // 18 types * 10 max
+    var percentage = Math.min(100, Math.round((power / maxPower) * 100));
+    var level = Math.floor(percentage / 20);
+    if (level > 4) level = 4;
+    if (level < 0) level = 0;
+    var filled = '\u25CF';
+    var empty = '\u25CB';
+    var display = '';
+    for (var i = 0; i < 5; i++) {
+        display += (i <= level) ? filled : empty;
+    }
+    return display;
+}
+
+/**
+ * Suggest a magical class based on proficiencies
+ */
+function suggestMagicClass(char) {
+    var magic = getCharacterMagic(char);
+    if (!magic) return null;
+    
+    var scores = {};
+    for (var key in magic) {
+        scores[key] = parseInt(magic[key]) || 0;
+    }
+    
+    // Category averages
+    var categoryScores = { elemental: 0, body: 0, aether: 0 };
+    var categoryCounts = { elemental: 0, body: 0, aether: 0 };
+    
+    var magicTypes = {
+        earth: 'elemental', water: 'elemental', fire: 'elemental', air: 'elemental', metal: 'elemental', wood: 'elemental',
+        blood: 'body', bone: 'body', mind: 'body', morphic: 'body', life: 'body', death: 'body',
+        space: 'aether', time: 'aether', dimension: 'aether', void: 'aether', reality: 'aether', transference: 'aether'
+    };
+    
+    for (var key in scores) {
+        var category = magicTypes[key];
+        if (categoryScores[category] !== undefined) {
+            categoryScores[category] += scores[key];
+            categoryCounts[category]++;
+        }
+    }
+    
+    var highestCategory = 'elemental';
+    var highestAvg = 0;
+    for (var cat in categoryScores) {
+        if (categoryCounts[cat] > 0) {
+            var avg = categoryScores[cat] / categoryCounts[cat];
+            if (avg > highestAvg) {
+                highestAvg = avg;
+                highestCategory = cat;
+            }
+        }
+    }
+    
+    // Find highest specific type
+    var highestType = null;
+    var highestScore = 0;
+    for (var key in scores) {
+        if (scores[key] > highestScore) {
+            highestScore = scores[key];
+            highestType = key;
+        }
+    }
+    
+    var classMap = {
+        elemental: {
+            earth: 'Geomancer',
+            water: 'Hydromancer',
+            fire: 'Pyromancer',
+            air: 'Aeromancer',
+            metal: 'Ferromancer',
+            wood: 'Dendromancer'
+        },
+        body: {
+            blood: 'Hemomancer',
+            bone: 'Osteomancer',
+            mind: 'Psychomancer',
+            morphic: 'Morphomancer',
+            life: 'Vitalmancer',
+            death: 'Necromancer'
+        },
+        aether: {
+            space: 'Spatiomancer',
+            time: 'Chronomancer',
+            dimension: 'Dimensionist',
+            void: 'Voidmancer',
+            reality: 'Reality Weaver',
+            transference: 'Transference Mage'
+        }
+    };
+    
+    var className = 'Adept Mage';
+    if (highestType && classMap[highestCategory] && classMap[highestCategory][highestType]) {
+        className = classMap[highestCategory][highestType];
+    } else if (highestCategory === 'elemental') {
+        className = 'Elementalist';
+    } else if (highestCategory === 'body') {
+        className = 'Body Mage';
+    } else if (highestCategory === 'aether') {
+        className = 'Aether Mage';
+    }
+    
+    return {
+        name: className,
+        category: highestCategory,
+        primaryType: highestType,
+        score: highestScore
+    };
 }
 
 // ============================================================
@@ -1293,6 +1536,11 @@ window.getPowerLevelDisplay = getPowerLevelDisplay;
 window.getPowerLevelFromDisplay = getPowerLevelFromDisplay;
 window.getPowerLevelColor = getPowerLevelColor;
 window.suggestClassFromStats = suggestClassFromStats;
+window.getDefaultMagicProficiencies = getDefaultMagicProficiencies;
+window.getCharacterMagic = getCharacterMagic;
+window.calculateMagicPower = calculateMagicPower;
+window.getMagicPowerDisplay = getMagicPowerDisplay;
+window.suggestMagicClass = suggestMagicClass;
 
 // ============================================================
 // INITIALIZE
